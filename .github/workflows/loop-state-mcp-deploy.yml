@@ -1,0 +1,71 @@
+name: loop-state-mcp Deploy
+
+# A dispatch is still a deploy: an owner step, never run by an agent. It redeploys this target at the head of `deploy`.
+# Only a push to `deploy` (or a dispatch, which needs write access) starts it: the job runs on the
+# owner's host, and this repository is public, so no pull request may start a workflow that
+# holds a self-hosted job (argus#1207, scripts/public-safe.test.ts). The pull request dry run is
+# deploy-dry-run.yml, on a hosted runner.
+
+on:
+  push:
+    branches: [deploy]
+    paths:
+      - "apps/loop-state-mcp/**"
+      - ".github/workflows/loop-state-mcp-deploy.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: loop-state-mcp-deploy
+  cancel-in-progress: false
+jobs:
+  deploy:
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/deploy'
+    runs-on: [self-hosted, homelab, deploy]
+    timeout-minutes: 90
+    steps:
+      - name: Make host tools and user systemd available
+        run: |
+          {
+            echo "$HOME/.local/share/fnm/aliases/default/bin"
+            echo "$HOME/.local/share/pnpm"
+            echo "$HOME/.local/bin"
+          } >> "$GITHUB_PATH"
+          echo "XDG_RUNTIME_DIR=/run/user/$(id -u)" >> "$GITHUB_ENV"
+          echo "JOB_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
+
+      # The unit runs from the deploy copy (WorkingDirectory=%h/repos/argus/apps/loop-state-mcp), so that
+      # is what gets built, not the job's own checkout: building the checkout restarted the unit
+      # onto the old dist/ (argus#1051). A newer promotion may have landed since this run
+      # started; the copy then takes the newer `deploy`, which deploy.sh's guard requires anyway.
+      - name: Move the deploy copy to deploy
+        run: |
+          cd "$HOME/repos/argus"
+          git fetch --quiet origin deploy
+          git switch --detach origin/deploy
+          echo "deploy copy at $(git rev-parse HEAD); this run was started by ${GITHUB_SHA}"
+
+      - name: Deploy
+        run: |
+          cd "$HOME/repos/argus"
+          bash apps/loop-state-mcp/deploy.sh
+
+      # The effect, not deploy.sh's word for it: it only notes a unit that is not installed,
+      # so require the unit to have been restarted after this job began and the deploy copy
+      # to hold a build.
+      - name: Read the restart back
+        run: |
+          healthy=false
+          for _ in $(seq 1 60); do
+            if curl -fsS "http://127.0.0.1:3791/healthz" > /dev/null 2>&1; then healthy=true; break; fi
+            sleep 1
+          done
+          "$healthy" || { echo "::error::loop-state-mcp does not answer /healthz after the restart"; exit 1; }
+          systemctl --user show loop-state-mcp.service -p ActiveState,SubState,MainPID,ActiveEnterTimestamp
+          started="$(date -d "$(systemctl --user show loop-state-mcp.service -p ActiveEnterTimestamp --value)" +%s)"
+          if (( started < JOB_STARTED_AT )); then
+            echo "::error::loop-state-mcp.service was started before this job began: it was not restarted"
+            exit 1
+          fi
+          test -f "$HOME/repos/argus/apps/loop-state-mcp/dist/index.js"
+          echo "loop-state-mcp restarted at $(git -C "$HOME/repos/argus" rev-parse --short HEAD)"

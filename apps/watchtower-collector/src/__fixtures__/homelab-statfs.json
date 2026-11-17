@@ -1,0 +1,4 @@
+{
+  "/": { "bsize": 4096, "blocks": 25656558, "bfree": 5745819, "bavail": 4431003 },
+  "/mnt/backups": { "bsize": 4096, "blocks": 180340222, "bfree": 23074818, "bavail": 13895682 }
+}

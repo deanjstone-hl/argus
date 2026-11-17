@@ -1,0 +1,35 @@
+name: t3-peer-mcp Deploy
+
+# A dispatch is still a deploy: an owner step, never run by an agent. It redeploys this target at the head of `deploy`.
+# Only a push to `deploy` (or a dispatch, which needs write access) starts it: the job runs on the
+# owner's host, and this repository is public, so no pull request may start a workflow that
+# holds a self-hosted job (argus#1207, scripts/public-safe.test.ts). The pull request dry run is
+# deploy-dry-run.yml, on a hosted runner.
+
+on:
+  push:
+    branches: [deploy]
+    paths:
+      - "apps/t3-peer-mcp/**"
+      - ".github/workflows/t3-peer-mcp-deploy.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: t3-peer-mcp-deploy
+  cancel-in-progress: false
+jobs:
+  deploy:
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/deploy'
+    runs-on: [self-hosted, homelab, deploy]
+    steps:
+      - uses: actions/checkout@v7
+      - name: Make host tools available
+        run: |
+          {
+            echo "$HOME/.local/share/fnm/aliases/default/bin"
+            echo "$HOME/.local/share/pnpm"
+            echo "$HOME/.local/bin"
+          } >> "$GITHUB_PATH"
+      - name: Deploy homelab installation
+        run: bash apps/t3-peer-mcp/deploy.sh

@@ -1,0 +1,28 @@
+{
+  "name": "@argus/watchtower-collector",
+  "version": "1.1.1",
+  "private": true,
+  "description": "Watchtower collector — polls infra and usage sources and records service checks",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "measure:memory": "node --expose-gc --import tsx scripts/measure-memory.ts"
+  },
+  "dependencies": {
+    "@argus/watchtower-contract": "workspace:*",
+    "ccusage": "20.0.17"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "typescript": "~5.8.3",
+    "vitest": "^4.1.10"
+  }
+}

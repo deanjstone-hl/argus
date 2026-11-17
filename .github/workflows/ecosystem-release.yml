@@ -1,0 +1,78 @@
+name: Ecosystem Release
+
+# Publishes ecosystem/manifest.json as the `ecosystem.json` asset of the release tagged
+# `ecosystem`, which the ops hub fetches for myargus.cc's System Map
+# (deanjstone/myargus#310). The tag is fixed: the hub looks the asset up by it.
+#
+# It runs on the owner's promotion, a push to `deploy`, not on a merge to `main`
+# (argus#1168, rule argus-config#1167): a release asset is shared state the hub reads
+# within the hour, so it changes only after the Approve. It deploys nothing else; the hub
+# picks the asset up on its next hourly sync. The path filter reads the range a promotion
+# brings, so a promotion that does not touch the manifest publishes nothing.
+#
+# A dispatch is an owner step, run on `deploy` to replay a promotion that published nothing:
+# gh workflow run ecosystem-release.yml -R deanjstone/argus --ref deploy
+on:
+  push:
+    branches: [deploy]
+    paths:
+      - "ecosystem/manifest.json"
+      - ".github/workflows/ecosystem-release.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ecosystem-release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Validate & Publish Manifest
+    # A dispatch from main (or any other ref) would publish an unpromoted manifest.
+    if: github.ref == 'refs/heads/deploy'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      # setup-node before pnpm, as in the deploy workflows.
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        with:
+          run_install: false
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate the manifest
+        run: node scripts/ecosystem/validate.ts
+
+      - name: Publish the manifest
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if ! gh release view ecosystem >/dev/null 2>&1; then
+            gh release create ecosystem --target "$GITHUB_SHA" \
+              --title "Ecosystem manifest" \
+              --notes "The System Map's manifest, fetched by the ops hub. Replaced on every change to ecosystem/manifest.json; see ecosystem/README.md." \
+              --latest=false
+          fi
+          # `file#text` only sets the asset's label; its name is the file's name, so stage a copy.
+          staged="$RUNNER_TEMP/ecosystem-asset"
+          rm -rf "$staged" && mkdir -p "$staged"
+          cp ecosystem/manifest.json "$staged/ecosystem.json"
+          gh release upload ecosystem "$staged/ecosystem.json" --clobber
+          # The first publish (#927) left the asset named manifest.json.
+          names=$(gh release view ecosystem --json assets --jq '.assets[].name')
+          if grep -qx manifest.json <<< "$names"; then
+            gh release delete-asset ecosystem manifest.json --yes
+          fi

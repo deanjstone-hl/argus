@@ -1,0 +1,242 @@
+name: Release
+
+# argus#1066 (argus-config#1048, #1167): a version is cut when the owner promotes, one per
+# push to `deploy`, never by a merge to `main`. A promotion made only of chore/docs/ci
+# commits releases nothing: semantic-release finds no releasable commit and exits 0.
+#
+# Three jobs, one workflow (argus#1168, rule argus-config#1167). `gate` asks first whether
+# the promotion carries anything semantic-release would publish (scripts/ci/release-needed.sh:
+# a feat, fix, perf, revert or breaking change since the last root tag). When nothing is
+# releasable, no test runs and no version is cut. Otherwise it reuses main's green run of the
+# whole gate on that SHA (scripts/ci/release-proof.sh) and fails on a red main run. `test`
+# runs the full gate itself (scripts/ci.sh: typecheck, lint, build and unit tests for the
+# root workspace and every nested package) only when main has no full run of the SHA
+# (argus#1120). `release` needs both, so a red test means no version. There is no
+# workflow_run trigger: on workflow_run GITHUB_REF is the default branch, so semantic-release
+# would see `main` and silently dry-run (design-system#190).
+#
+# No job reads github.event.commits to decide whether to run. A push event lists 20
+# commits at most and a promotion can ship more, so a filter could skip a promotion that
+# holds a feat. The gate and semantic-release read the real history between the last tag and
+# HEAD.
+#
+# semantic-release only analyses, tags and publishes GitHub Releases (every
+# .releaserc.json). It commits nothing back: `deploy` is fast-forwarded from `main`, so a
+# commit made here would fork the branches. The changelog is the GitHub Release notes.
+#
+# The workflow sits beside the deploy workflows, not in them, so a failed deploy does not
+# hide a release and a failed release does not undo a deploy. A tag made with GITHUB_TOKEN
+# starts no other workflow.
+#
+# A dispatch is an owner step: it cuts a real version, so an agent never runs one.
+
+on:
+  push:
+    branches: [deploy]
+  # Manual retry: a release whose run failed is not retried by the next promotion, which
+  # only tags what is new since the last tag. Dispatch it on deploy instead.
+  workflow_dispatch:
+
+# One Release at a time, queued rather than cancelled (#556). Each run releases the tip of
+# deploy, so when GitHub drops an older pending run in favour of a newer one nothing is
+# lost: the newer run sees every commit the older one would have.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    name: Test before release (main CI on this SHA)
+    # A manual dispatch from main (or any other ref) would test and tag unpromoted code.
+    if: github.ref == 'refs/heads/deploy'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      release: ${{ steps.anything.outputs.release }}
+      reuse: ${{ steps.proof.outputs.reuse }}
+    steps:
+      # The promoted SHA (github.sha), which is what the proof vouches for. Full history:
+      # the next step reads every commit since the last root tag.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      # argus#1168: nothing releasable means no test and no version. Reads git, never the
+      # push event, which lists 20 commits at most.
+      - name: Anything to release?
+        id: anything
+        run: bash scripts/ci/release-needed.sh
+
+      # argus#1120: the promoted SHA is already on main. Reuse main's result when a push run
+      # of CI on it ran the whole gate and passed and no main run on it is red; a red main
+      # run fails this step, so a red SHA never releases. A pull_request run, a scoped run
+      # and a Guard-skipped run prove nothing. With no full run on main, the `test` job runs
+      # the full gate here, as before. scripts/ci/release-proof.sh is vendored from
+      # argus-config (argus#1190) and synced, never edited: this step passes what differs
+      # here as RELEASE_PROOF_* env (the workflow, its events, and the jobs that only a
+      # whole run executes: Build plus one Build (<package>) per nested package in
+      # scripts/ci.sh, read here because the script no longer reads it).
+      - name: Did main's CI already test this SHA in full?
+        id: proof
+        if: steps.anything.outputs.release == 'true'
+        run: |
+          if ! grep -q '^readonly nested_packages=(.*)$' scripts/ci.sh; then
+            echo "reuse=false" >> "$GITHUB_OUTPUT"
+            echo "release-proof: reuse=false (could not read nested_packages from scripts/ci.sh)"
+            exit 0
+          fi
+          nested=$(sed -n 's/^readonly nested_packages=(\(.*\))$/\1/p' scripts/ci.sh)
+          jobs="Build"
+          for package in $nested; do
+            jobs+=$'\n'"Build (${package})"
+          done
+          export RELEASE_PROOF_JOBS="$jobs"
+          bash scripts/ci/release-proof.sh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_PROOF_WORKFLOW: CI
+          RELEASE_PROOF_EVENTS: push
+
+  # The fallback: main has no full green run of the promoted SHA.
+  test:
+    name: Test before release (the full gate)
+    needs: gate
+    if: >-
+      github.ref == 'refs/heads/deploy'
+      && needs.gate.outputs.release == 'true'
+      && needs.gate.outputs.reuse != 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      # No `cache: pnpm` — see the note in ci.yml.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # The same definition of CI that runs on a PR and on main, over the whole repo.
+      - name: Full test gate
+        run: scripts/ci.sh
+
+  release:
+    name: Release
+    needs: [gate, test]
+    # Runs only after a passing test: main's green full run of this SHA (reuse, `test`
+    # skipped) or the full gate in `test`. `!cancelled()` lets it run when `test` was
+    # skipped. A promotion with nothing releasable skips it (argus#1168).
+    if: >-
+      !cancelled()
+      && github.ref == 'refs/heads/deploy'
+      && needs.gate.result == 'success'
+      && needs.gate.outputs.release == 'true'
+      && (needs.test.result == 'success'
+          || (needs.test.result == 'skipped' && needs.gate.outputs.reuse == 'true'))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The branch, not a detached SHA: semantic-release releases from `deploy`.
+          ref: deploy
+          fetch-depth: 0
+
+      # Release only what `test` vouched for. If another promotion moved deploy past this
+      # run's SHA, the run for that push tests and releases the newer tip.
+      - name: Check deploy is still the tested SHA
+        id: tested
+        run: |
+          if [[ "$(git rev-parse HEAD)" == "${GITHUB_SHA}" ]]; then
+            echo "current=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "current=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::deploy moved past ${GITHUB_SHA}; the run for the newer push releases it."
+          fi
+
+      - uses: pnpm/action-setup@v4
+        if: steps.tested.outputs.current == 'true'
+
+      - uses: actions/setup-node@v4
+        if: steps.tested.outputs.current == 'true'
+        with:
+          node-version: 22
+          # No `cache: pnpm` — see the note in ci.yml.
+
+      - name: Install dependencies
+        if: steps.tested.outputs.current == 'true'
+        run: pnpm install --frozen-lockfile
+
+      # One list, in release order: flat workspace members first, then the
+      # nested-workspace packages (each needing its own install), then the
+      # root monorepo version last. Adding a package is one line.
+      #
+      # Every semantic-release run first fast-forwards to the remote tip, since
+      # a promotion can land on deploy mid-run. semantic-release skips silently when
+      # local deploy is behind ("behind the remote one", #556) and still exits 0,
+      # so that message is caught and retried, and fails the job if it persists.
+      - name: Release workspace packages and argus
+        if: steps.tested.outputs.current == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          flat=(
+            apps/agent-cli
+            apps/agent-engine
+            apps/watchtower
+            apps/watchtower-collector
+            apps/watchtower-usage-shim
+            packages/watchtower-contract
+          )
+          nested=()
+
+          log="${RUNNER_TEMP}/semantic-release.log"
+
+          release() {
+            local dir="$1" install="$2" attempt
+            for attempt in 1 2 3; do
+              git pull --ff-only origin deploy
+              (
+                cd "${dir}"
+                if [[ "${install}" == true ]]; then
+                  pnpm install --frozen-lockfile
+                fi
+                pnpm exec semantic-release
+              ) 2>&1 | tee "${log}"
+              if ! grep -q "is behind the remote one" "${log}"; then
+                return 0
+              fi
+              echo "::warning::${dir}: local deploy was behind the remote (attempt ${attempt} of 3)"
+            done
+            echo "::error::${dir}: still behind the remote after 3 attempts, release skipped"
+            return 1
+          }
+
+          for dir in "${flat[@]}"; do
+            echo "::group::release ${dir}"
+            release "${dir}" false
+            echo "::endgroup::"
+          done
+
+          for dir in "${nested[@]}"; do
+            echo "::group::release ${dir}"
+            release "${dir}" true
+            echo "::endgroup::"
+          done
+
+          echo "::group::release argus (monorepo version)"
+          release . false
+          echo "::endgroup::"

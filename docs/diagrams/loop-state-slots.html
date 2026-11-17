@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Slot lifecycle</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --paper: var(--background, #f5f7f8);
+      --ink: var(--foreground, #241523);
+      --soft: var(--muted-foreground, #6f6873);
+      --teal: var(--primary, #0a6f75);
+      --rule: var(--border, #cdd4dc);
+      --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) {
+        --paper: var(--background, #14181c);
+        --ink: var(--foreground, #e8eaed);
+        --soft: var(--muted-foreground, #9aa3ad);
+        --teal: var(--primary, #4fc3c8);
+        --rule: var(--border, #2c343c);
+      }
+    }
+    :root[data-theme="dark"] {
+      --paper: var(--background, #14181c);
+      --ink: var(--foreground, #e8eaed);
+      --soft: var(--muted-foreground, #9aa3ad);
+      --teal: var(--primary, #4fc3c8);
+      --rule: var(--border, #2c343c);
+    }
+    body { font-family: var(--sans); background: var(--paper); color: var(--ink); padding: 16px; }
+    .frame { max-width: 360px; }
+    .eyebrow { font-family: var(--mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--soft); margin-bottom: 4px; }
+    h1 { font-size: 20px; font-weight: 600; line-height: 1.2; margin-bottom: 8px; }
+    .lede { font-size: 13px; line-height: 1.45; color: var(--soft); margin-bottom: 12px; }
+    .scroll { overflow-x: auto; }
+    svg { width: 100%; min-width: 320px; display: block; }
+    .src { font-size: 11px; line-height: 1.5; color: var(--soft); margin-top: 12px; }
+    .src a { color: var(--teal); }
+    .src code { font-family: var(--mono); font-size: 10px; }
+    .divider { stroke: var(--rule); stroke-width: 1; }
+    .lane { fill: var(--soft); font-family: var(--mono); font-size: 9px; letter-spacing: .12em; }
+    .flow { fill: none; stroke: var(--soft); stroke-width: 1.2; }
+    .dashed { stroke-dasharray: 5,4; }
+    .gate { fill: none; stroke: var(--teal); stroke-width: 1.6; }
+    .mask { fill: var(--paper); }
+    .tag { fill: var(--soft); font-family: var(--mono); font-size: 9px; letter-spacing: .08em; }
+    .tag.teal { fill: var(--teal); }
+    .node { fill: var(--paper); stroke: var(--ink); stroke-width: 1; }
+    .node.focal { fill: color-mix(in srgb, var(--teal) 14%, var(--paper)); stroke: var(--teal); stroke-width: 1.6; }
+    .node.ext { stroke-dasharray: 4,3; }
+    .step:target .node { stroke: var(--teal); stroke-width: 2.6; fill: color-mix(in srgb, var(--teal) 22%, var(--paper)); }
+    .name { fill: var(--ink); font-family: var(--sans); font-size: 12px; font-weight: 600; text-anchor: middle; }
+    .sub { fill: var(--soft); font-family: var(--mono); font-size: 9px; text-anchor: middle; }
+    .note { fill: var(--soft); font-family: var(--sans); font-size: 11px; font-style: italic; }
+    .key { fill: var(--soft); font-family: var(--sans); font-size: 10px; }
+    .head-soft { fill: var(--soft); }
+    .head-teal { fill: var(--teal); }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <p class="eyebrow">State machine</p>
+    <h1>Slot lifecycle</h1>
+    <p class="lede">The states one issue's slot passes through in loop-state, and the tool that moves it.</p>
+    <div class="scroll">
+    <svg viewBox="0 0 360 418" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="slots-title slots-desc">
+      <title id="slots-title">Slot lifecycle</title>
+      <desc id="slots-desc">A slot starts running. A worker waiting on CI moves it to awaiting_ci, and the orchestrator resumes it to running, or to ready when the caps are full. A parked slot waits for the owner, is unparked to ready, then started to running again. A verified close or a free deletes the row.</desc>
+      <defs>
+        <marker id="slots-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon class="head-soft" points="0 0, 8 3, 0 6"/></marker>
+        <marker id="slots-arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon class="head-teal" points="0 0, 8 3, 0 6"/></marker>
+      </defs>
+      <path class="flow" d="M 84,72 L 84,96" marker-end="url(#slots-arrow)"/>
+      <path class="flow" d="M 276,72 L 276,96" marker-end="url(#slots-arrow)"/>
+      <path class="flow" d="M 84,144 L 84,168" marker-end="url(#slots-arrow)"/>
+      <path class="flow" d="M 276,144 L 276,168" marker-end="url(#slots-arrow)"/>
+      <path class="flow" d="M 84,216 L 84,240" marker-end="url(#slots-arrow)"/>
+      <path class="flow dashed" d="M 200,192 L 188,192 Q 180,192 180,184 L 180,72" marker-end="url(#slots-arrow)"/>
+      <rect class="mask" x="88" y="78" width="40.4" height="12" rx="2"/>
+      <text class="tag" x="92" y="87" text-anchor="start">WORKER</text>
+      <rect class="mask" x="280" y="78" width="51.2" height="12" rx="2"/>
+      <text class="tag" x="284" y="87" text-anchor="start">AFK LOOP</text>
+      <rect class="mask" x="88" y="150" width="67.4" height="12" rx="2"/>
+      <text class="tag" x="92" y="159" text-anchor="start">CHECKS DONE</text>
+      <rect class="mask" x="184" y="150" width="62" height="12" rx="2"/>
+      <text class="tag" x="188" y="159" text-anchor="start">SLOT_START</text>
+      <g id="step-slots-running" class="step">
+      <rect class="node focal" x="8" y="24" width="344" height="48" rx="6"/>
+      <text class="name" x="180" y="45">running</text>
+      <text class="sub" x="180" y="60">slot_start · counts to the cap</text>
+      </g>
+      <g id="step-slots-awaiting" class="step">
+      <rect class="node" x="8" y="96" width="152" height="48" rx="6"/>
+      <text class="name" x="84" y="117">awaiting_ci</text>
+      <text class="sub" x="84" y="132">slot_await_ci</text>
+      </g>
+      <g id="step-slots-parked" class="step">
+      <rect class="node" x="200" y="96" width="152" height="48" rx="6"/>
+      <text class="name" x="276" y="117">parked</text>
+      <text class="sub" x="276" y="132">slot_park</text>
+      </g>
+      <g id="step-slots-resumed" class="step">
+      <rect class="node" x="8" y="168" width="152" height="48" rx="6"/>
+      <text class="name" x="84" y="189">running or ready</text>
+      <text class="sub" x="84" y="204">slot_resume_ci</text>
+      </g>
+      <g id="step-slots-ready" class="step">
+      <rect class="node" x="200" y="168" width="152" height="48" rx="6"/>
+      <text class="name" x="276" y="189">ready</text>
+      <text class="sub" x="276" y="204">slot_unpark</text>
+      </g>
+      <g id="step-slots-gone" class="step">
+      <rect class="node ext" x="8" y="240" width="344" height="48" rx="6"/>
+      <text class="name" x="180" y="261">gone</text>
+      <text class="sub" x="180" y="276">slot_close with a Verified line, or slot_free</text>
+      </g>
+      <text class="note" x="8" y="330">Only running slots count against the cap. A ready slot may</text>
+      <text class="note" x="8" y="344">be closed without a start.</text>
+      <text class="note" x="8" y="358">slot_report attaches a result to a running slot and leaves</text>
+      <text class="note" x="8" y="372">its state alone.</text>
+      <rect class="node" x="8" y="400" width="14" height="10" rx="2"/>
+      <text class="key" x="28" y="409">Step</text>
+      <rect class="node focal" x="65.6" y="400" width="14" height="10" rx="2"/>
+      <text class="key" x="85.6" y="409">Counts</text>
+      <rect class="node ext" x="134" y="400" width="14" height="10" rx="2"/>
+      <text class="key" x="154" y="409">Deleted</text>
+      <line class="flow" x1="207.8" y1="405" x2="231.8" y2="405" marker-end="url(#slots-arrow)"/>
+      <text class="key" x="237.8" y="409">Flow</text>
+      <line class="flow dashed" x1="275.4" y1="405" x2="299.4" y2="405" marker-end="url(#slots-arrow)"/>
+      <text class="key" x="305.4" y="409">Restart</text>
+    </svg>
+    </div>
+    <p class="src">Sources: <code>apps/loop-state-mcp/README.md</code> (Slots, Awaiting CI). The orchestrator resumes an awaiting slot, the AFK loop parks and closes. Not drawn: <code>slot_rebuild</code>, which resets slots from GitHub, and leases.</p>
+  </div>
+</body>
+</html>

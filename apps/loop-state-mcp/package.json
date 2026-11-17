@@ -1,0 +1,30 @@
+{
+  "name": "@argus/loop-state-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Loop-state MCP — slots, loop status and the quiet-tick gate shared by the AFK loop and Aquila, one SQLite db behind typed tools",
+  "type": "module",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@argus/bearer-auth": "workspace:*",
+    "@hono/node-server": "^1.19.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "hono": "^4.6.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "typescript": "~5.8.3",
+    "vitest": "^4.1.10"
+  }
+}

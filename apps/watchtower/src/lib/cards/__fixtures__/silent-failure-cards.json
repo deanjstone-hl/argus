@@ -1,0 +1,521 @@
+[
+  {
+    "service_key": "homelab:timers",
+    "host": "homelab",
+    "status": "degraded",
+    "detail": {
+      "host": "homelab",
+      "timers": [
+        {
+          "timer": "apsjobs-discovery.timer",
+          "service": "apsjobs-discovery.service",
+          "unitFileState": "enabled",
+          "activeState": "active",
+          "vendor": false,
+          "lastTrigger": "2026-10-15T20:30:48.000Z",
+          "nextTrigger": "2026-10-16T20:33:03.000Z",
+          "lastRun": {
+            "activeState": "inactive",
+            "result": "success",
+            "exitStatus": 0,
+            "startedAt": "2026-10-15T20:30:48.000Z",
+            "exitedAt": "2026-10-15T20:31:58.000Z"
+          },
+          "lastSuccessAt": "2026-10-15T20:31:58.000Z",
+          "problem": null
+        },
+        {
+          "timer": "argus-context-fetch-install.timer",
+          "service": "argus-context-fetch-install.service",
+          "unitFileState": "enabled",
+          "activeState": "active",
+          "vendor": false,
+          "lastTrigger": "2026-10-15T19:00:19.000Z",
+          "nextTrigger": "2026-10-16T19:00:00.000Z",
+          "lastRun": {
+            "activeState": "inactive",
+            "result": "success",
+            "exitStatus": 0,
+            "startedAt": "2026-10-15T19:00:19.000Z",
+            "exitedAt": "2026-10-15T19:00:26.000Z"
+          },
+          "lastSuccessAt": "2026-10-15T19:00:26.000Z",
+          "problem": null
+        },
+        {
+          "timer": "budget-api-cron.timer",
+          "service": "budget-api-cron.service",
+          "unitFileState": "enabled",
+          "activeState": "active",
+          "vendor": false,
+          "lastTrigger": "2026-10-16T09:00:11.000Z",
+          "nextTrigger": "2026-10-17T09:00:00.000Z",
+          "lastRun": {
+            "activeState": "inactive",
+            "result": "success",
+            "exitStatus": 0,
+            "startedAt": "2026-10-16T09:00:11.000Z",
+            "exitedAt": "2026-10-16T09:00:49.000Z"
+          },
+          "lastSuccessAt": "2026-10-16T09:00:49.000Z",
+          "problem": null
+        },
+        {
+          "timer": "github-collector.timer",
+          "service": "github-collector.service",
+          "unitFileState": "enabled",
+          "activeState": "active",
+          "vendor": false,
+          "lastTrigger": "2026-10-16T13:15:42.000Z",
+          "nextTrigger": "2026-10-16T13:30:07.000Z",
+          "lastRun": {
+            "activeState": "inactive",
+            "result": "success",
+            "exitStatus": 0,
+            "startedAt": "2026-10-16T13:15:42.000Z",
+            "exitedAt": "2026-10-16T13:16:05.000Z"
+          },
+          "lastSuccessAt": "2026-10-16T13:16:05.000Z",
+          "problem": null
+        },
+        {
+          "timer": "inbox-ingest.timer",
+          "service": "inbox-ingest.service",
+          "unitFileState": "enabled",
+          "activeState": "active",
+          "vendor": false,
+          "lastTrigger": "2026-10-15T21:30:19.000Z",
+          "nextTrigger": "2026-10-16T21:30:00.000Z",
+          "lastRun": {
+            "activeState": "inactive",
+            "result": "success",
+            "exitStatus": 0,
+            "startedAt": "2026-10-15T21:30:19.000Z",
+            "exitedAt": "2026-10-15T21:30:30.000Z"
+          },
+          "lastSuccessAt": "2026-10-15T21:30:30.000Z",
+          "problem": null
+        },
+        {
+          "timer": "launchpadlib-cache-clean.timer",
+          "service": "launchpadlib-cache-clean.service",
+          "unitFileState": "enabled",
+          "activeState": "active",
+          "vendor": true,
+          "lastTrigger": "2026-10-16T00:18:31.000Z",
+          "nextTrigger": null,
+          "lastRun": {
+            "activeState": "inactive",
+            "result": "success",
+            "exitStatus": 0,
+            "startedAt": null,
+            "exitedAt": null
+          },
+          "lastSuccessAt": null,
+          "problem": null
+        },
+        {
+          "timer": "repo-git-sync.timer",
+          "service": "repo-git-sync.service",
+          "unitFileState": "enabled",
+          "activeState": "active",
+          "vendor": false,
+          "lastTrigger": "2026-10-16T13:15:20.000Z",
+          "nextTrigger": "2026-10-16T13:30:27.000Z",
+          "lastRun": {
+            "activeState": "inactive",
+            "result": "success",
+            "exitStatus": 0,
+            "startedAt": "2026-10-16T13:15:20.000Z",
+            "exitedAt": "2026-10-16T13:15:37.000Z"
+          },
+          "lastSuccessAt": "2026-10-16T13:15:37.000Z",
+          "problem": null
+        },
+        {
+          "timer": "runner-git-config-prune.timer",
+          "service": "runner-git-config-prune.service",
+          "unitFileState": "enabled",
+          "activeState": "active",
+          "vendor": false,
+          "lastTrigger": "2026-10-16T13:18:47.000Z",
+          "nextTrigger": null,
+          "lastRun": {
+            "activeState": "inactive",
+            "result": "success",
+            "exitStatus": 0,
+            "startedAt": "2026-10-16T13:18:47.000Z",
+            "exitedAt": "2026-10-16T13:18:47.000Z"
+          },
+          "lastSuccessAt": "2026-10-16T13:18:47.000Z",
+          "problem": null
+        },
+        {
+          "timer": "runner-node-guard.timer",
+          "service": "runner-node-guard.service",
+          "unitFileState": "enabled",
+          "activeState": "active",
+          "vendor": false,
+          "lastTrigger": "2026-10-16T13:26:17.000Z",
+          "nextTrigger": null,
+          "lastRun": {
+            "activeState": "inactive",
+            "result": "success",
+            "exitStatus": 0,
+            "startedAt": "2026-10-16T13:26:17.000Z",
+            "exitedAt": "2026-10-16T13:26:18.000Z"
+          },
+          "lastSuccessAt": "2026-10-16T13:26:18.000Z",
+          "problem": null
+        },
+        {
+          "timer": "runner-prune.timer",
+          "service": "runner-prune.service",
+          "unitFileState": "enabled",
+          "activeState": "active",
+          "vendor": false,
+          "lastTrigger": "2026-10-15T17:44:19.000Z",
+          "nextTrigger": "2026-10-16T17:37:32.000Z",
+          "lastRun": {
+            "activeState": "inactive",
+            "result": "success",
+            "exitStatus": 0,
+            "startedAt": "2026-10-15T17:44:19.000Z",
+            "exitedAt": "2026-10-15T17:45:24.000Z"
+          },
+          "lastSuccessAt": "2026-10-15T17:45:24.000Z",
+          "problem": null
+        },
+        {
+          "timer": "runner-watchdog.timer",
+          "service": "runner-watchdog.service",
+          "unitFileState": "enabled",
+          "activeState": "active",
+          "vendor": false,
+          "lastTrigger": "2026-10-16T13:27:17.000Z",
+          "nextTrigger": null,
+          "lastRun": {
+            "activeState": "inactive",
+            "result": "success",
+            "exitStatus": 0,
+            "startedAt": "2026-10-16T13:27:17.000Z",
+            "exitedAt": "2026-10-16T13:27:27.000Z"
+          },
+          "lastSuccessAt": "2026-10-16T13:27:27.000Z",
+          "problem": null
+        },
+        {
+          "timer": "secret-scan.timer",
+          "service": "secret-scan.service",
+          "unitFileState": "enabled",
+          "activeState": "active",
+          "vendor": false,
+          "lastTrigger": null,
+          "nextTrigger": "2026-10-17T18:30:00.000Z",
+          "lastRun": {
+            "activeState": "inactive",
+            "result": "success",
+            "exitStatus": 0,
+            "startedAt": "2026-10-16T11:20:28.000Z",
+            "exitedAt": "2026-10-16T11:23:18.000Z"
+          },
+          "lastSuccessAt": "2026-10-16T11:23:18.000Z",
+          "problem": null
+        },
+        {
+          "timer": "session-tasks.timer",
+          "service": "session-tasks.service",
+          "unitFileState": "enabled",
+          "activeState": "active",
+          "vendor": false,
+          "lastTrigger": "2026-10-15T19:30:19.000Z",
+          "nextTrigger": "2026-10-16T19:30:00.000Z",
+          "lastRun": {
+            "activeState": "inactive",
+            "result": "success",
+            "exitStatus": 0,
+            "startedAt": "2026-10-15T19:30:19.000Z",
+            "exitedAt": "2026-10-15T19:44:05.000Z"
+          },
+          "lastSuccessAt": "2026-10-15T19:44:05.000Z",
+          "problem": null
+        },
+        {
+          "timer": "syncthing-drift-poller.timer",
+          "service": "syncthing-drift-poller.service",
+          "unitFileState": "enabled",
+          "activeState": "active",
+          "vendor": false,
+          "lastTrigger": "2026-10-08T23:55:01.000Z",
+          "nextTrigger": null,
+          "lastRun": {
+            "activeState": "inactive",
+            "result": "success",
+            "exitStatus": 0,
+            "startedAt": null,
+            "exitedAt": null
+          },
+          "lastSuccessAt": null,
+          "problem": "unscheduled"
+        },
+        {
+          "timer": "systemd-tmpfiles-clean.timer",
+          "service": "systemd-tmpfiles-clean.service",
+          "unitFileState": "disabled",
+          "activeState": "inactive",
+          "vendor": true,
+          "lastTrigger": null,
+          "nextTrigger": null,
+          "lastRun": {
+            "activeState": "inactive",
+            "result": "success",
+            "exitStatus": 0,
+            "startedAt": null,
+            "exitedAt": null
+          },
+          "lastSuccessAt": null,
+          "problem": null
+        },
+        {
+          "timer": "t3-auto-update.timer",
+          "service": "t3-auto-update.service",
+          "unitFileState": "enabled",
+          "activeState": "active",
+          "vendor": false,
+          "lastTrigger": "2026-10-16T13:15:17.000Z",
+          "nextTrigger": "2026-10-16T13:45:00.000Z",
+          "lastRun": {
+            "activeState": "inactive",
+            "result": "success",
+            "exitStatus": 0,
+            "startedAt": "2026-10-16T13:15:17.000Z",
+            "exitedAt": "2026-10-16T13:17:12.000Z"
+          },
+          "lastSuccessAt": "2026-10-16T13:17:12.000Z",
+          "problem": null
+        },
+        {
+          "timer": "vault-git-sync.timer",
+          "service": "vault-git-sync.service",
+          "unitFileState": "enabled",
+          "activeState": "active",
+          "vendor": false,
+          "lastTrigger": "2026-10-16T13:03:17.000Z",
+          "nextTrigger": "2026-10-16T14:04:55.000Z",
+          "lastRun": {
+            "activeState": "inactive",
+            "result": "success",
+            "exitStatus": 0,
+            "startedAt": "2026-10-16T13:03:17.000Z",
+            "exitedAt": "2026-10-16T13:03:21.000Z"
+          },
+          "lastSuccessAt": "2026-10-16T13:03:21.000Z",
+          "problem": null
+        }
+      ]
+    },
+    "checked_at": "2026-10-16T13:30:00.000Z"
+  },
+  {
+    "service_key": "lnv-lgn5:timers",
+    "host": "lnv-lgn5",
+    "status": "healthy",
+    "detail": {
+      "host": "lnv-lgn5",
+      "timers": [
+        {
+          "timer": "argus-context-fetch-install.timer",
+          "service": "argus-context-fetch-install.service",
+          "unitFileState": "enabled",
+          "activeState": "active",
+          "vendor": false,
+          "lastTrigger": "2026-10-15T22:34:08.000Z",
+          "nextTrigger": "2026-10-16T20:00:00.000Z",
+          "lastRun": {
+            "activeState": "inactive",
+            "result": "success",
+            "exitStatus": 0,
+            "startedAt": null,
+            "exitedAt": null
+          },
+          "lastSuccessAt": null,
+          "problem": null
+        },
+        {
+          "timer": "launchpadlib-cache-clean.timer",
+          "service": "launchpadlib-cache-clean.service",
+          "unitFileState": "enabled",
+          "activeState": "active",
+          "vendor": true,
+          "lastTrigger": "2026-10-16T07:32:09.000Z",
+          "nextTrigger": null,
+          "lastRun": {
+            "activeState": "inactive",
+            "result": "success",
+            "exitStatus": 0,
+            "startedAt": null,
+            "exitedAt": null
+          },
+          "lastSuccessAt": null,
+          "problem": null
+        },
+        {
+          "timer": "memory-reconcile.timer",
+          "service": "memory-reconcile.service",
+          "unitFileState": "enabled",
+          "activeState": "active",
+          "vendor": false,
+          "lastTrigger": "2026-10-16T13:27:06.000Z",
+          "nextTrigger": "2026-10-16T13:47:00.000Z",
+          "lastRun": {
+            "activeState": "inactive",
+            "result": "success",
+            "exitStatus": 0,
+            "startedAt": "2026-10-16T13:27:06.000Z",
+            "exitedAt": "2026-10-16T13:27:11.000Z"
+          },
+          "lastSuccessAt": "2026-10-16T13:27:11.000Z",
+          "problem": null
+        },
+        {
+          "timer": "systemd-tmpfiles-clean.timer",
+          "service": "systemd-tmpfiles-clean.service",
+          "unitFileState": "disabled",
+          "activeState": "inactive",
+          "vendor": true,
+          "lastTrigger": null,
+          "nextTrigger": null,
+          "lastRun": {
+            "activeState": "inactive",
+            "result": "success",
+            "exitStatus": 0,
+            "startedAt": null,
+            "exitedAt": null
+          },
+          "lastSuccessAt": null,
+          "problem": null
+        },
+        {
+          "timer": "t3-auto-update.timer",
+          "service": "t3-auto-update.service",
+          "unitFileState": "enabled",
+          "activeState": "active",
+          "vendor": false,
+          "lastTrigger": "2026-10-16T13:00:06.000Z",
+          "nextTrigger": "2026-10-16T13:30:00.000Z",
+          "lastRun": {
+            "activeState": "inactive",
+            "result": "success",
+            "exitStatus": 0,
+            "startedAt": "2026-10-16T13:00:06.000Z",
+            "exitedAt": "2026-10-16T13:00:08.000Z"
+          },
+          "lastSuccessAt": "2026-10-16T13:00:08.000Z",
+          "problem": null
+        },
+        {
+          "timer": "vault-sync.timer",
+          "service": "vault-sync.service",
+          "unitFileState": "enabled",
+          "activeState": "active",
+          "vendor": false,
+          "lastTrigger": "2026-10-16T13:15:06.000Z",
+          "nextTrigger": "2026-10-16T13:30:00.000Z",
+          "lastRun": {
+            "activeState": "inactive",
+            "result": "success",
+            "exitStatus": 0,
+            "startedAt": "2026-10-16T13:15:06.000Z",
+            "exitedAt": "2026-10-16T13:15:12.000Z"
+          },
+          "lastSuccessAt": "2026-10-16T13:15:12.000Z",
+          "problem": null
+        }
+      ]
+    },
+    "checked_at": "2026-10-16T13:30:00.000Z"
+  },
+  {
+    "service_key": "lnv-lgn5:memory-reconcile",
+    "host": "lnv-lgn5",
+    "status": "degraded",
+    "detail": {
+      "path": "/home/deanj/.argus/memory-reconcile-heartbeat.json",
+      "lastRunAt": "2026-10-16T13:27:11.964Z",
+      "ok": true,
+      "lastError": null,
+      "written": 0,
+      "deleted": 0,
+      "refusals": [
+        {
+          "key": "project-linux-server",
+          "reason": "hash-mismatch",
+          "seenAt": "2026-09-29T00:47:15.970Z"
+        }
+      ],
+      "staleAfterMs": 3600000
+    },
+    "checked_at": "2026-10-16T13:30:00.000Z"
+  },
+  {
+    "service_key": "lnv-lgn5:vault:CONTEXT",
+    "host": "lnv-lgn5",
+    "status": "degraded",
+    "detail": {
+      "vault": "CONTEXT",
+      "path": "/home/deanj/CONTEXT",
+      "checkout": true,
+      "lines": [
+        "Vault sync: CONTEXT has 3 unpublished commit(s), oldest 8h — publishing has stopped. Check the vault sync timer's journal."
+      ]
+    },
+    "checked_at": "2026-10-16T13:30:00.000Z"
+  },
+  {
+    "service_key": "lnv-lgn5:vault:CORTEX",
+    "host": "lnv-lgn5",
+    "status": "healthy",
+    "detail": {
+      "vault": "CORTEX",
+      "path": "/home/deanj/CORTEX",
+      "checkout": true,
+      "lines": []
+    },
+    "checked_at": "2026-10-16T13:30:00.000Z"
+  },
+  {
+    "service_key": "homelab:vault:CONTEXT",
+    "host": "homelab",
+    "status": "healthy",
+    "detail": {
+      "vault": "CONTEXT",
+      "path": "/home/srvr/CONTEXT",
+      "checkout": true,
+      "lines": []
+    },
+    "checked_at": "2026-10-16T13:30:00.000Z"
+  },
+  {
+    "service_key": "notice-board:queue",
+    "host": "homelab",
+    "status": "degraded",
+    "detail": {
+      "unacked": 2,
+      "oldestUnackedAt": "2026-10-15T09:10:00.000Z",
+      "dead": 1,
+      "recentDead": 1,
+      "recentDeadMs": 604800000,
+      "oldUnackedAfterMs": 86400000,
+      "repos": [
+        {
+          "repo": "github.com/deanjstone/argus",
+          "queued": 1,
+          "claimed": 1,
+          "dead": 1,
+          "oldestUnackedAt": "2026-10-15T09:10:00.000Z"
+        }
+      ]
+    },
+    "checked_at": "2026-10-16T13:30:00.000Z"
+  }
+]

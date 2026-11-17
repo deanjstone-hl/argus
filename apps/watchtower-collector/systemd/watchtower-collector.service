@@ -1,0 +1,37 @@
+[Unit]
+Description=Watchtower Collector
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/repos/argus/apps/watchtower-collector
+# The new env file loads after the old one, so it wins (argus-config#1267). Both are optional
+# while the old path is being retired; the server refuses to start without its secrets.
+EnvironmentFile=-%h/repos/argus/apps/watchtower-collector/.env
+EnvironmentFile=-%h/.config/argus/watchtower-collector.env
+# node is managed by fnm and not on the default non-interactive PATH — point
+# ExecStart at the fnm alias path directly rather than relying on a login
+# shell to resolve it. This is the stable alias, not a version-pinned path,
+# so it survives fnm default-version bumps without editing the unit.
+# The systemd-user PATH is minimal by default, but the collector's systemd
+# and ccusage adapters shell out to bare `systemctl`/`npx` — PATH must
+# include their location.
+Environment=PATH=%h/.local/share/fnm/aliases/default/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ExecStart=%h/.local/share/fnm/aliases/default/bin/node dist/index.js
+Restart=on-failure
+RestartSec=5
+# The cgroup holds the collector and every systemctl/ccusage child it spawns.
+# Steady state is ~350 MB (MemoryCurrent) with a 450 MB peak; a kill came at
+# 627-877 MB (argus#845). MemoryHigh makes the kernel reclaim and throttle the
+# unit past 512M instead of letting it grow until systemd-oomd kills it, and
+# deliberately has no MemoryMax: a hard cap would be a second way to be killed.
+MemoryHigh=512M
+# systemd-oomd reacts to pressure on the whole user slice and picked this unit
+# as a victim of other workloads' pressure (the same kill took three
+# t3code-claude-* scopes). `avoid` moves it to the back of the queue; it is
+# still killed if nothing else can relieve the pressure.
+ManagedOOMPreference=avoid
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,74 @@
+{
+  "api.myargus.cc": {
+    "valid_from": "Oct  4 04:45:22 2026 GMT",
+    "valid_to": "Jan  2 05:45:06 2027 GMT",
+    "issuer": {
+      "O": "Google Trust Services",
+      "CN": "WE1"
+    },
+    "subject": {
+      "CN": "myargus.cc"
+    },
+    "subjectaltname": "DNS:myargus.cc, DNS:*.myargus.cc"
+  },
+  "memory.myargus.cc": {
+    "valid_from": "Oct  4 04:45:22 2026 GMT",
+    "valid_to": "Jan  2 05:45:06 2027 GMT",
+    "issuer": {
+      "O": "Google Trust Services",
+      "CN": "WE1"
+    },
+    "subject": {
+      "CN": "myargus.cc"
+    },
+    "subjectaltname": "DNS:myargus.cc, DNS:*.myargus.cc"
+  },
+  "vault.myargus.cc": {
+    "valid_from": "Sep 13 03:37:33 2026 GMT",
+    "valid_to": "Dec 12 04:37:30 2026 GMT",
+    "issuer": {
+      "O": "Google Trust Services",
+      "CN": "WE1"
+    },
+    "subject": {
+      "CN": "myargus.cc"
+    },
+    "subjectaltname": "DNS:myargus.cc, DNS:vault.myargus.cc, DNS:*.vault.myargus.cc"
+  },
+  "mail.myargus.cc": {
+    "valid_from": "Oct  7 01:25:08 2026 GMT",
+    "valid_to": "Jan  5 02:24:56 2027 GMT",
+    "issuer": {
+      "O": "Google Trust Services",
+      "CN": "WE1"
+    },
+    "subject": {
+      "CN": "myargus.cc"
+    },
+    "subjectaltname": "DNS:myargus.cc, DNS:mail.myargus.cc, DNS:*.mail.myargus.cc"
+  },
+  "mcp.myargus.cc": {
+    "valid_from": "Oct  4 04:45:22 2026 GMT",
+    "valid_to": "Jan  2 05:45:06 2027 GMT",
+    "issuer": {
+      "O": "Google Trust Services",
+      "CN": "WE1"
+    },
+    "subject": {
+      "CN": "myargus.cc"
+    },
+    "subjectaltname": "DNS:myargus.cc, DNS:*.myargus.cc"
+  },
+  "watchtower.myargus.cc": {
+    "valid_from": "Sep  8 10:34:57 2026 GMT",
+    "valid_to": "Dec  7 11:34:53 2026 GMT",
+    "issuer": {
+      "O": "Google Trust Services",
+      "CN": "WE1"
+    },
+    "subject": {
+      "CN": "watchtower.myargus.cc"
+    },
+    "subjectaltname": "DNS:watchtower.myargus.cc"
+  }
+}

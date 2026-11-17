@@ -1,0 +1,59 @@
+{
+  "name": "@argus/watchtower",
+  "version": "1.4.0",
+  "private": true,
+  "description": "Watchtower infra dashboard — React/Vite UI plus its Cloudflare Worker API",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "packageManager": "pnpm@12.13.0",
+  "scripts": {
+    "dev": "vite",
+    "prebuild": "wrangler types",
+    "build": "tsc -b && vite build",
+    "lint": "oxlint --type-aware .",
+    "preview": "vite preview",
+    "pretypecheck": "wrangler types",
+    "typecheck": "tsc -b",
+    "worker:dev": "wrangler dev",
+    "worker:deploy": "bash ../../scripts/require-deploy-checkout.sh && bash scripts/with-d1-id.sh wrangler deploy",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@argus/bearer-auth": "workspace:*",
+    "@argus/watchtower-contract": "workspace:*",
+    "@base-ui/react": "^1.8.0",
+    "@fontsource-variable/ibm-plex-sans": "^5.3.0",
+    "@supabase/supabase-js": "^2.110.1",
+    "@tailwindcss/vite": "^4.3.2",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "cn": "^0.5.0",
+    "hono": "^4.6.0",
+    "jose": "^5.9.6",
+    "lucide-react": "^1.62.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "shadcn": "^4.21.0",
+    "tailwind-merge": "^3.7.0",
+    "tailwindcss": "^4.3.2",
+    "tw-animate-css": "^1.4.0"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.20.3",
+    "@semantic-release/github": "^11.0.1",
+    "@types/node": "^22.10.2",
+    "@types/react": "^19.1.2",
+    "@types/react-dom": "^19.1.2",
+    "@vitejs/plugin-react": "^4.4.1",
+    "oxlint": "1.78.0",
+    "oxlint-tsgolint": "7.0.2004",
+    "semantic-release": "^24.2.3",
+    "tsx": "^4.19.2",
+    "typescript": "~5.8.3",
+    "vite": "^6.3.5",
+    "vitest": "^4.1.10",
+    "wrangler": "^4.100.0"
+  }
+}

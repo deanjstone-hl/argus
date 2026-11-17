@@ -1,0 +1,84 @@
+name: Ecosystem skills
+
+# The ecosystem manifest's skill entries against the skills installed in argus-config and
+# sys-admin (argus#928). Until both are public it checks them out with SKILLS_READ_TOKEN, a
+# fine-grained PAT with read-only Contents on those two repos. Without the secret it posts a
+# notice and passes: a missing credential is not drift.
+#
+# It is its own workflow, with no pull_request trigger, because it reads that secret: a
+# workflow a pull request starts reads no secret but GITHUB_TOKEN (argus#1207,
+# scripts/public-safe.test.ts). It runs on a push to main that touches the manifest or the
+# code that reconciles it, weekly for drift that starts in the other repos, and on dispatch.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "ecosystem/**"
+      - "scripts/ecosystem/**"
+      - "scripts/ci.sh"
+      - ".github/workflows/ecosystem-skills.yml"
+  schedule:
+    - cron: "17 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  ecosystem-skills:
+    name: Ecosystem skills
+    runs-on: ubuntu-latest
+    steps:
+      - name: Look for SKILLS_READ_TOKEN
+        id: token
+        env:
+          SKILLS_READ_TOKEN: ${{ secrets.SKILLS_READ_TOKEN }}
+        run: |
+          if [ -n "$SKILLS_READ_TOKEN" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Ecosystem skills check skipped::SKILLS_READ_TOKEN is empty (the secret is not set), so argus-config and sys-admin cannot be read. This is not a failure."
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.token.outputs.present == 'true'
+
+      - name: Check out argus-config (skills)
+        if: steps.token.outputs.present == 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: deanjstone/argus-config
+          token: ${{ secrets.SKILLS_READ_TOKEN }}
+          path: .ecosystem-skills/argus-config
+          sparse-checkout: envs/wsl2/skills
+          persist-credentials: false
+
+      - name: Check out sys-admin (skills)
+        if: steps.token.outputs.present == 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: deanjstone/sys-admin
+          token: ${{ secrets.SKILLS_READ_TOKEN }}
+          path: .ecosystem-skills/sys-admin
+          sparse-checkout: skills
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@v4
+        if: steps.token.outputs.present == 'true'
+
+      - uses: actions/setup-node@v4
+        if: steps.token.outputs.present == 'true'
+        with:
+          node-version: 22
+
+      - name: CI (ecosystem skills)
+        if: steps.token.outputs.present == 'true'
+        run: >-
+          scripts/ci.sh ecosystem-skills
+          .ecosystem-skills/argus-config/envs/wsl2/skills
+          .ecosystem-skills/sys-admin/skills

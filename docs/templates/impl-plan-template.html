@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<!-- ╔══════════════════════════════════════════════════════════════════════╗
+     ║  IMPLEMENTATION PLAN TEMPLATE                                       ║
+     ║  Fill in the CONFIG block below. Everything else is auto-generated. ║
+     ╚══════════════════════════════════════════════════════════════════════╝ -->
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- ── CONFIG: change title ─────────────────────────────────── -->
+  <title>{{TITLE}} — Implementation Plan</title>
+  <!-- ─────────────────────────────────────────────────────────── -->
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      padding: 2rem;
+      min-height: 100vh;
+    }
+    header {
+      max-width: 820px;
+      margin: 0 auto 1.5rem;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+    header h1 { font-size: 1.75rem; font-weight: 700; color: #f8fafc; margin-bottom: 0.35rem; }
+    header p { color: #94a3b8; font-size: 0.9rem; }
+    .launch-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: #1e3a5f;
+      border: 1px solid #2563eb;
+      color: #93c5fd;
+      padding: 0.55rem 1rem;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .launch-btn:hover { background: #1e40af; }
+    .progress-bar-wrap {
+      max-width: 820px;
+      margin: 0 auto 1.5rem;
+    }
+    .progress-label { font-size: 0.8rem; color: #64748b; margin-bottom: 0.4rem; }
+    .progress-bar { height: 6px; background: #1e293b; border-radius: 999px; overflow: hidden; }
+    .progress-fill { height: 100%; background: #22c55e; border-radius: 999px; transition: width 0.3s ease; }
+    .steps { max-width: 820px; margin: 0 auto; display: flex; flex-direction: column; gap: 0.75rem; }
+    .step {
+      background: #13192a;
+      border: 1px solid #2d3148;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .step.done { border-color: #166534; background: #0f2718; }
+    .step-header {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.85rem 1rem;
+      cursor: pointer;
+      user-select: none;
+    }
+    .step-header:hover { background: rgba(255,255,255,0.02); }
+    .step.done .step-header:hover { background: rgba(255,255,255,0.01); }
+    .step-num {
+      width: 2rem; height: 2rem;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.85rem; font-weight: 700;
+      flex-shrink: 0;
+    }
+    .step-num.pending { background: #1e293b; color: #64748b; border: 1px solid #2d3148; }
+    .step-num.complete { background: #166534; color: #4ade80; border: 1px solid #22c55e; }
+    .step-title { flex: 1; font-size: 0.92rem; font-weight: 600; color: #e2e8f0; }
+    .step-title.done-title { color: #86efac; }
+    .badge {
+      font-size: 0.68rem;
+      font-weight: 700;
+      padding: 0.2rem 0.55rem;
+      border-radius: 999px;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      flex-shrink: 0;
+    }
+    .badge-done { background: #14532d; color: #4ade80; border: 1px solid #166534; }
+    .badge-wsl  { background: #1e3a5f; color: #93c5fd; border: 1px solid #2563eb; }
+    .badge-win  { background: #3b2e1e; color: #fb923c; border: 1px solid #c2410c; }
+    .badge-server { background: #2e1e3b; color: #c084fc; border: 1px solid #7c3aed; }
+    .badge-generic { background: #1e293b; color: #94a3b8; border: 1px solid #2d3148; }
+    .step-body { padding: 0 1rem 1rem; font-size: 0.88rem; line-height: 1.6; color: #cbd5e1; }
+    .step-body p { margin: 0.6rem 0; }
+    .step-body ul { margin: 0.5rem 0 0.5rem 1.5rem; }
+    .step-body li { margin: 0.3rem 0; }
+    pre {
+      background: #1a1f2e;
+      border: 1px solid #2d3148;
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      overflow-x: auto;
+      margin: 0.6rem 0;
+    }
+    pre code { font-family: "Cascadia Code", "Fira Code", monospace; font-size: 0.82rem; color: #7dd3fc; }
+    .inline-code {
+      background: #1a1f2e;
+      border: 1px solid #2d3148;
+      border-radius: 4px;
+      padding: 0.1rem 0.4rem;
+      font-size: 0.82rem;
+      font-family: "Cascadia Code", monospace;
+      color: #7dd3fc;
+    }
+    .note {
+      background: #1a2035;
+      border-left: 3px solid #3b82f6;
+      border-radius: 0 6px 6px 0;
+      padding: 0.6rem 0.85rem;
+      margin: 0.75rem 0;
+      font-size: 0.85rem;
+      color: #93c5fd;
+      line-height: 1.5;
+    }
+    .warn {
+      background: #1c1a10;
+      border-left: 3px solid #f59e0b;
+      border-radius: 0 6px 6px 0;
+      padding: 0.6rem 0.85rem;
+      margin: 0.75rem 0;
+      font-size: 0.85rem;
+      color: #fcd34d;
+      line-height: 1.5;
+    }
+    .divider { height: 1px; background: #2d3148; margin: 0.85rem 0; }
+    .complete-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+      margin: 0.5rem 0 0;
+      padding: 0.65rem 0.85rem;
+      background: #161b2a;
+      border: 1px solid #2d3148;
+      border-radius: 8px;
+    }
+    .complete-row input[type=checkbox] {
+      width: 1.1rem; height: 1.1rem;
+      accent-color: #22c55e;
+      cursor: pointer;
+      flex-shrink: 0;
+      margin-top: 0.1rem;
+    }
+    .complete-row .complete-label { flex: 1; }
+    .complete-row .complete-label .label-text {
+      font-size: 0.88rem;
+      color: #cbd5e1;
+      cursor: pointer;
+      line-height: 1.4;
+      display: block;
+    }
+    .complete-row .complete-label .timestamp {
+      font-size: 0.75rem;
+      color: #4ade80;
+      margin-top: 0.2rem;
+      display: none;
+      font-family: "Cascadia Code", monospace;
+    }
+    .complete-row .complete-label .timestamp.visible { display: block; }
+    .complete-row .undo-btn {
+      font-size: 0.72rem;
+      color: #475569;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+      white-space: nowrap;
+      align-self: center;
+      display: none;
+    }
+    .complete-row .undo-btn:hover { background: #2d3148; color: #94a3b8; }
+    .complete-row .undo-btn.visible { display: block; }
+    .predone-ts {
+      font-size: 0.75rem;
+      color: #4ade80;
+      font-family: "Cascadia Code", monospace;
+      padding: 0.35rem 1.25rem 0.6rem 4.25rem;
+    }
+    .toast {
+      position: fixed;
+      bottom: 1.5rem;
+      left: 50%;
+      transform: translateX(-50%) translateY(1rem);
+      background: #1e293b;
+      border: 1px solid #2d3148;
+      color: #e2e8f0;
+      padding: 0.65rem 1.25rem;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      opacity: 0;
+      transition: opacity 0.25s, transform 0.25s;
+      pointer-events: none;
+      white-space: nowrap;
+      max-width: 90vw;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  </style>
+</head>
+<body>
+
+<div id="app"></div>
+<div id="toast" class="toast"></div>
+
+<script>
+  /* ═══════════════════════════════════════════════════════════════════════
+     CONFIG — edit these values to customise the plan
+     ═══════════════════════════════════════════════════════════════════════ */
+
+  const PLAN_TITLE = '{{TITLE}}';
+  const PLAN_SUBTITLE = '{{SUBTITLE}}';
+
+  // Claude session to resume (get from: claude --list, copy session ID)
+  // Set to null to hide the "Resume session" button.
+  const SESSION_ID = '{{SESSION_ID}}';  // e.g. '00000000-0000-4000-8000-000000000025' or null
+
+  // localStorage key — change per plan to avoid collision across plans
+  const STORAGE_KEY = '{{STORAGE_KEY}}';  // e.g. 'my-plan-v1'
+
+  /* ═══════════════════════════════════════════════════════════════════════
+     STEPS — fill in the steps array
+     ─────────────────────────────────────────────────────────────────────
+     Each step is one of:
+       { type: 'predone', title, doneNote }
+         - Already completed before session; shown with ✓ badge and timestamp note
+         - doneNote: string shown below header, e.g. "Completed 23 Jun 2026 — details"
+
+       { type: 'user', title, badge?, checkLabel, content }
+         - User must check off; checkbox + undo + localStorage persistence
+         - badge: 'wsl' | 'win' | 'server' | 'generic' | null  (defaults to null = no badge)
+         - checkLabel: text next to checkbox (what to verify before checking)
+         - content: HTML string for the step body (instructions, code blocks, notes)
+           Use <pre><code>...</code></pre>, <p>, <ul><li>, .note, .warn, .divider, .inline-code
+     ═══════════════════════════════════════════════════════════════════════ */
+
+  const STEPS = [
+    /* Example pre-done step:
+    {
+      type: 'predone',
+      title: 'Install dependencies',
+      doneNote: 'Completed 27 Jun 2026 — npm install ran successfully',
+    },
+    */
+
+    /* Example user step:
+    {
+      type: 'user',
+      title: 'Configure environment variables',
+      badge: 'wsl',
+      checkLabel: '.env file created and verified with <code>cat .env</code>',
+      content: `
+        <p>Copy <span class="inline-code">.env.example</span> to <span class="inline-code">.env</span>:</p>
+        <pre><code>cp .env.example .env</code></pre>
+        <div class="note">Fill in the values from Bitwarden before continuing.</div>
+      `,
+    },
+    */
+
+    // ── REPLACE THE EXAMPLES ABOVE WITH ACTUAL STEPS ──
+  ];
+
+  /* ═══════════════════════════════════════════════════════════════════════
+     ENGINE — do not edit below this line
+     ═══════════════════════════════════════════════════════════════════════ */
+
+  const BADGE_LABELS = { wsl: 'WSL2', win: 'Windows', server: 'Server', generic: '' };
+  const BADGE_CLASSES = { wsl: 'badge-wsl', win: 'badge-win', server: 'badge-server', generic: 'badge-generic' };
+
+  const preDone = STEPS.filter(s => s.type === 'predone');
+  const userSteps = STEPS.filter(s => s.type === 'user');
+  const TOTAL = STEPS.length;
+  const PRE_DONE_COUNT = preDone.length;
+  const TRACKED = userSteps.map((_, i) => String(PRE_DONE_COUNT + i + 1));
+
+  function load() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch { return {}; }
+  }
+  function save(data) { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
+
+  function toggleBody(id) {
+    const body = document.getElementById('body' + id);
+    if (!body) return;
+    body.style.display = body.style.display === 'none' ? '' : 'none';
+  }
+
+  function markDone(n, checked) {
+    const data = load();
+    const ts = checked ? new Date().toLocaleString('en-AU', {
+      year: 'numeric', month: 'short', day: 'numeric',
+      hour: '2-digit', minute: '2-digit', second: '2-digit'
+    }) : null;
+    if (checked) data[n] = ts; else delete data[n];
+    save(data);
+    applyState(n, checked, ts);
+    recalc();
+  }
+
+  function applyState(n, checked, ts) {
+    const step = document.getElementById('s' + n);
+    const num = document.getElementById('num' + n);
+    const title = document.getElementById('title' + n);
+    const tsEl = document.getElementById('ts' + n);
+    const cb = document.getElementById('c' + n);
+    const undoBtn = document.getElementById('undo' + n);
+    if (!step) return;
+    cb.checked = checked;
+    if (checked) {
+      step.classList.add('done');
+      title.classList.add('done-title');
+      num.className = 'step-num complete';
+      num.textContent = '✓';
+      tsEl.textContent = 'Completed ' + ts;
+      tsEl.classList.add('visible');
+      undoBtn.classList.add('visible');
+    } else {
+      step.classList.remove('done');
+      title.classList.remove('done-title');
+      num.className = 'step-num pending';
+      num.textContent = n;
+      tsEl.textContent = '';
+      tsEl.classList.remove('visible');
+      undoBtn.classList.remove('visible');
+    }
+  }
+
+  function recalc() {
+    const data = load();
+    const done = PRE_DONE_COUNT + TRACKED.filter(n => data[n]).length;
+    const pct = Math.round((done / TOTAL) * 100);
+    document.getElementById('progress-fill').style.width = pct + '%';
+    document.getElementById('progress-label').textContent = done + ' of ' + TOTAL + ' steps complete';
+  }
+
+  function launchSession() {
+    const cmd = 'claude --resume ' + SESSION_ID;
+    navigator.clipboard.writeText(cmd).then(() => {
+      showToast('Copied: ' + cmd);
+    }).catch(() => {
+      showToast('Command: ' + cmd);
+    });
+  }
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2800);
+  }
+
+  function render() {
+    const app = document.getElementById('app');
+    let html = '';
+
+    // Header
+    html += `<header>
+      <div>
+        <h1>${PLAN_TITLE}</h1>
+        <p>${PLAN_SUBTITLE}</p>
+      </div>`;
+    if (SESSION_ID && SESSION_ID !== '{{SESSION_ID}}') {
+      html += `<button class="launch-btn" onclick="launchSession()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+        Resume session
+      </button>`;
+    }
+    html += `</header>`;
+
+    // Progress bar
+    html += `<div class="progress-bar-wrap">
+      <div class="progress-label" id="progress-label">0 of ${TOTAL} steps complete</div>
+      <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
+    </div>`;
+
+    // Steps
+    html += `<div class="steps">`;
+    let globalIdx = 0;
+
+    for (const step of STEPS) {
+      globalIdx++;
+      const n = String(globalIdx);
+      if (step.type === 'predone') {
+        html += `<div class="step done" id="s${n}">
+          <div class="step-header">
+            <div class="step-num complete">✓</div>
+            <span class="step-title done-title">${step.title}</span>
+            <span class="badge badge-done">Done</span>
+          </div>
+          <div class="predone-ts">${step.doneNote}</div>
+        </div>`;
+      } else {
+        const badgeClass = step.badge ? BADGE_CLASSES[step.badge] : null;
+        const badgeLabel = step.badge ? BADGE_LABELS[step.badge] : null;
+        const badgeHtml = badgeClass ? `<span class="badge ${badgeClass}">${badgeLabel}</span>` : '';
+        html += `<div class="step" id="s${n}">
+          <div class="step-header" onclick="toggleBody('${n}')">
+            <div class="step-num pending" id="num${n}">${n}</div>
+            <span class="step-title" id="title${n}">${step.title}</span>
+            ${badgeHtml}
+          </div>
+          <div class="step-body" id="body${n}">
+            ${step.content}
+            <div class="divider"></div>
+            <div class="complete-row">
+              <input type="checkbox" id="c${n}" onchange="markDone('${n}', this.checked)" />
+              <div class="complete-label">
+                <label class="label-text" for="c${n}">${step.checkLabel}</label>
+                <span class="timestamp" id="ts${n}"></span>
+              </div>
+              <button class="undo-btn" id="undo${n}" onclick="markDone('${n}', false)">undo</button>
+            </div>
+          </div>
+        </div>`;
+      }
+    }
+
+    html += `</div>`;
+    app.innerHTML = html;
+  }
+
+  function init() {
+    render();
+    const data = load();
+    TRACKED.forEach(n => {
+      if (data[n]) applyState(n, true, data[n]);
+    });
+    recalc();
+  }
+
+  init();
+</script>
+
+</body>
+</html>

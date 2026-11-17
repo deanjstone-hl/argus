@@ -1,0 +1,11 @@
+{
+  "_comment": "Hand-built in the shape of POST /accounts/{account}/d1/database/{id}/query: the collector's token lacks D1 Read, so the values were read on 2026-10-16 ~16:36 UTC with wrangler d1 execute --remote (the same statements, read-only). Two results: the user tables, then their counts.",
+  "tables": {
+    "result": [{ "results": [{ "name": "service_checks" }, { "name": "service_checks_latest" }], "success": true, "meta": { "rows_read": 10, "size_after": 36880384 } }],
+    "success": true, "errors": [], "messages": []
+  },
+  "counts": {
+    "result": [{ "results": [{ "name": "service_checks", "row_count": 59525 }, { "name": "service_checks_latest", "row_count": 14 }], "success": true, "meta": { "rows_read": 59539, "size_after": 36880384 } }],
+    "success": true, "errors": [], "messages": []
+  }
+}

@@ -1,0 +1,133 @@
+{
+  "cards": [
+    {
+      "service_key": "d1:argus-watchtower",
+      "host": "cloudflare",
+      "status": "healthy",
+      "detail": {
+        "database": "argus-watchtower",
+        "databaseId": "00000000-0000-4000-b000-000000000012",
+        "sizeBytes": 36880384,
+        "sizeSource": "query",
+        "limitBytes": 500000000,
+        "tables": [
+          {
+            "name": "service_checks",
+            "rows": 59525
+          },
+          {
+            "name": "service_checks_latest",
+            "rows": 14
+          }
+        ],
+        "totalRows": 59539,
+        "countedAt": "2026-10-16T16:36:30.000Z",
+        "rowsUnavailable": null,
+        "thresholds": {
+          "degradedAt": 0.8,
+          "downAt": 0.95
+        }
+      },
+      "checked_at": "2026-10-16T16:36:30Z"
+    },
+    {
+      "service_key": "supabase-usage:iyqhnvandyalaujyqbtj",
+      "host": "supabase",
+      "status": "healthy",
+      "detail": {
+        "ref": "iyqhnvandyalaujyqbtj",
+        "name": "myargus",
+        "plan": "free",
+        "dbSizeBytes": 108465299,
+        "dbLimitBytes": 500000000,
+        "egressBytes": null,
+        "egressLimitBytes": 5000000000,
+        "egressUnavailable": "The Management API does not report egress",
+        "thresholds": {
+          "degradedAt": 0.8,
+          "downAt": 0.95
+        }
+      },
+      "checked_at": "2026-10-16T16:36:30Z"
+    },
+    {
+      "service_key": "supabase-usage:centbxttgyenxtkknepx",
+      "host": "supabase",
+      "status": "healthy",
+      "detail": {
+        "ref": "centbxttgyenxtkknepx",
+        "name": "claude-memory",
+        "plan": "free",
+        "dbSizeBytes": 32369811,
+        "dbLimitBytes": 500000000,
+        "egressBytes": null,
+        "egressLimitBytes": 5000000000,
+        "egressUnavailable": "The Management API does not report egress",
+        "thresholds": {
+          "degradedAt": 0.8,
+          "downAt": 0.95
+        }
+      },
+      "checked_at": "2026-10-16T16:36:30Z"
+    },
+    {
+      "service_key": "claude-window",
+      "host": "multi",
+      "status": "healthy",
+      "detail": {
+        "hosts": [
+          {
+            "name": "homelab",
+            "status": "idle",
+            "startTime": null,
+            "endTime": null,
+            "lastActivity": null,
+            "totalTokens": 0,
+            "costUSD": 0,
+            "projectedCost": null,
+            "models": []
+          },
+          {
+            "name": "wsl2",
+            "status": "active",
+            "startTime": "2026-10-16T13:00:00.000Z",
+            "endTime": "2026-10-16T18:00:00.000Z",
+            "lastActivity": "2026-10-16T16:35:57.568Z",
+            "totalTokens": 70548661,
+            "costUSD": 29.868966999999987,
+            "projectedCost": 41.49,
+            "models": [
+              "claude-opus-5-5"
+            ]
+          }
+        ],
+        "totalTokens": 70548661,
+        "costUSD": 29.868966999999987,
+        "projectedCost": 41.49,
+        "endsAt": "2026-10-16T18:00:00.000Z"
+      },
+      "checked_at": "2026-10-16T16:36:30Z"
+    }
+  ],
+  "d1WithoutQueryScope": {
+    "service_key": "d1:argus-watchtower",
+    "host": "cloudflare",
+    "status": "healthy",
+    "detail": {
+      "database": "argus-watchtower",
+      "databaseId": "00000000-0000-4000-b000-000000000012",
+      "sizeBytes": 332271600,
+      "sizeSource": "analytics",
+      "limitBytes": 500000000,
+      "tables": null,
+      "totalRows": null,
+      "countedAt": null,
+      "rowsUnavailable": "The Cloudflare token cannot query D1 (needs Account > D1: Read)",
+      "thresholds": {
+        "degradedAt": 0.8,
+        "downAt": 0.95
+      }
+    },
+    "checked_at": "2026-10-16T16:36:30Z"
+  }
+}

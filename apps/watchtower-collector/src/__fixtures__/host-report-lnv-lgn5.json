@@ -1,0 +1,81 @@
+{
+  "reportedAt": "2026-10-16T11:28:23.034Z",
+  "disk": {
+    "path": "/mnt/c",
+    "totalBytes": 511054966784,
+    "freeBytes": 59013263360
+  },
+  "crashDumps": {
+    "wsl": {
+      "path": "/mnt/c/Users/deanj/AppData/Local/Temp/wsl-crashes",
+      "count": 2,
+      "totalBytes": 4708917248,
+      "newestAt": "2026-10-16T08:53:41.058Z"
+    },
+    "windows": {
+      "path": "/mnt/c/Users/deanj/AppData/Local/CrashDumps",
+      "count": 6,
+      "totalBytes": 109197166,
+      "newestAt": "2026-04-13T00:06:22.924Z"
+    }
+  },
+  "memory": {
+    "totalBytes": 6213464064,
+    "availableBytes": 3188649984,
+    "swapTotalBytes": 2147483648,
+    "swapFreeBytes": 539922432,
+    "pressure": {
+      "some": {
+        "avg10": 0,
+        "avg60": 0,
+        "avg300": 0.09
+      },
+      "full": {
+        "avg10": 0,
+        "avg60": 0,
+        "avg300": 0.08
+      }
+    }
+  },
+  "units": {
+    "agent-engine.service": {
+      "unit": {
+        "Result": "success",
+        "NRestarts": "0",
+        "ExecMainStartTimestamp": "Fri 2026-10-16 07:27:13 UTC",
+        "ExecMainExitTimestamp": "",
+        "ExecMainStatus": "0",
+        "Id": "agent-engine.service",
+        "LoadState": "loaded",
+        "ActiveState": "active",
+        "SubState": "running",
+        "ActiveEnterTimestamp": "Fri 2026-10-16 07:27:13 UTC"
+      }
+    },
+    "memory-reconcile.timer": {
+      "unit": {
+        "Unit": "memory-reconcile.service",
+        "NextElapseUSecRealtime": "Fri 2026-10-16 11:47:00 UTC",
+        "LastTriggerUSec": "Fri 2026-10-16 11:27:01 UTC",
+        "Result": "success",
+        "Id": "memory-reconcile.timer",
+        "LoadState": "loaded",
+        "ActiveState": "active",
+        "SubState": "waiting",
+        "ActiveEnterTimestamp": "Fri 2026-10-16 07:27:12 UTC"
+      },
+      "triggers": {
+        "Result": "success",
+        "NRestarts": "0",
+        "ExecMainStartTimestamp": "Fri 2026-10-16 11:27:01 UTC",
+        "ExecMainExitTimestamp": "Fri 2026-10-16 11:27:07 UTC",
+        "ExecMainStatus": "0",
+        "Id": "memory-reconcile.service",
+        "LoadState": "loaded",
+        "ActiveState": "inactive",
+        "SubState": "dead",
+        "ActiveEnterTimestamp": ""
+      }
+    }
+  }
+}

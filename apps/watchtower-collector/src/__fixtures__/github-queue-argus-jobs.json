@@ -1,0 +1,647 @@
+{
+  "38901686038": {
+    "total_count": 6,
+    "jobs": [
+      {
+        "id": 116975209100,
+        "run_id": 38901686038,
+        "run_attempt": 1,
+        "name": "Build",
+        "status": "queued",
+        "conclusion": null,
+        "created_at": "2026-10-16T12:36:18Z",
+        "started_at": "2026-10-16T12:36:18Z",
+        "completed_at": null,
+        "runner_name": "",
+        "labels": [
+          "self-hosted",
+          "homelab"
+        ],
+        "html_url": "https://github.com/deanjstone/argus/actions/runs/38901686038/job/116975209100"
+      },
+      {
+        "id": 116975209279,
+        "run_id": 38901686038,
+        "run_attempt": 1,
+        "name": "Build (vault-agent)",
+        "status": "queued",
+        "conclusion": null,
+        "created_at": "2026-10-16T12:36:18Z",
+        "started_at": "2026-10-16T12:36:18Z",
+        "completed_at": null,
+        "runner_name": "",
+        "labels": [
+          "self-hosted",
+          "homelab"
+        ],
+        "html_url": "https://github.com/deanjstone/argus/actions/runs/38901686038/job/116975209279"
+      },
+      {
+        "id": 116975209348,
+        "run_id": 38901686038,
+        "run_attempt": 1,
+        "name": "Build (memory-mcp)",
+        "status": "queued",
+        "conclusion": null,
+        "created_at": "2026-10-16T12:36:18Z",
+        "started_at": "2026-10-16T12:36:18Z",
+        "completed_at": null,
+        "runner_name": "",
+        "labels": [
+          "self-hosted",
+          "homelab"
+        ],
+        "html_url": "https://github.com/deanjstone/argus/actions/runs/38901686038/job/116975209348"
+      },
+      {
+        "id": 116975209358,
+        "run_id": 38901686038,
+        "run_attempt": 1,
+        "name": "Audit (wiki)",
+        "status": "queued",
+        "conclusion": null,
+        "created_at": "2026-10-16T12:36:18Z",
+        "started_at": "2026-10-16T12:36:18Z",
+        "completed_at": null,
+        "runner_name": "",
+        "labels": [
+          "self-hosted",
+          "homelab"
+        ],
+        "html_url": "https://github.com/deanjstone/argus/actions/runs/38901686038/job/116975209358"
+      },
+      {
+        "id": 116975209406,
+        "run_id": 38901686038,
+        "run_attempt": 1,
+        "name": "Build (email)",
+        "status": "queued",
+        "conclusion": null,
+        "created_at": "2026-10-16T12:36:18Z",
+        "started_at": "2026-10-16T12:36:18Z",
+        "completed_at": null,
+        "runner_name": "",
+        "labels": [
+          "self-hosted",
+          "homelab"
+        ],
+        "html_url": "https://github.com/deanjstone/argus/actions/runs/38901686038/job/116975209406"
+      },
+      {
+        "id": 116975209425,
+        "run_id": 38901686038,
+        "run_attempt": 1,
+        "name": "Build (wiki)",
+        "status": "queued",
+        "conclusion": null,
+        "created_at": "2026-10-16T12:36:18Z",
+        "started_at": "2026-10-16T12:36:18Z",
+        "completed_at": null,
+        "runner_name": "",
+        "labels": [
+          "self-hosted",
+          "homelab"
+        ],
+        "html_url": "https://github.com/deanjstone/argus/actions/runs/38901686038/job/116975209425"
+      }
+    ]
+  },
+  "38901067456": {
+    "total_count": 1,
+    "jobs": [
+      {
+        "id": 116973155666,
+        "run_id": 38901067456,
+        "run_attempt": 1,
+        "name": "Build & Deploy to Cloudflare Pages",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-10-16T12:31:05Z",
+        "started_at": "2026-10-16T12:31:09Z",
+        "completed_at": "2026-10-16T12:35:27Z",
+        "runner_name": "homelab-2",
+        "labels": [
+          "self-hosted",
+          "homelab"
+        ],
+        "html_url": "https://github.com/deanjstone/argus/actions/runs/38901067456/job/116973155666"
+      }
+    ]
+  },
+  "38901067441": {
+    "total_count": 1,
+    "jobs": [
+      {
+        "id": 116973156530,
+        "run_id": 38901067441,
+        "run_attempt": 1,
+        "name": "Release",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-10-16T12:31:06Z",
+        "started_at": "2026-10-16T12:35:31Z",
+        "completed_at": "2026-10-16T12:42:26Z",
+        "runner_name": "homelab-2",
+        "labels": [
+          "self-hosted",
+          "homelab"
+        ],
+        "html_url": "https://github.com/deanjstone/argus/actions/runs/38901067441/job/116973156530"
+      }
+    ]
+  },
+  "38901067413": {
+    "total_count": 6,
+    "jobs": [
+      {
+        "id": 116973156224,
+        "run_id": 38901067413,
+        "run_attempt": 1,
+        "name": "Audit (wiki)",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-10-16T12:31:06Z",
+        "started_at": "2026-10-16T12:34:31Z",
+        "completed_at": "2026-10-16T12:39:04Z",
+        "runner_name": "homelab",
+        "labels": [
+          "self-hosted",
+          "homelab"
+        ],
+        "html_url": "https://github.com/deanjstone/argus/actions/runs/38901067413/job/116973156224"
+      },
+      {
+        "id": 116973156331,
+        "run_id": 38901067413,
+        "run_attempt": 1,
+        "name": "Build (memory-mcp)",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-10-16T12:31:06Z",
+        "started_at": "2026-10-16T12:31:09Z",
+        "completed_at": "2026-10-16T12:34:27Z",
+        "runner_name": "homelab",
+        "labels": [
+          "self-hosted",
+          "homelab"
+        ],
+        "html_url": "https://github.com/deanjstone/argus/actions/runs/38901067413/job/116973156331"
+      },
+      {
+        "id": 116973156396,
+        "run_id": 38901067413,
+        "run_attempt": 1,
+        "name": "Build",
+        "status": "in_progress",
+        "conclusion": null,
+        "created_at": "2026-10-16T12:31:06Z",
+        "started_at": "2026-10-16T12:39:07Z",
+        "completed_at": null,
+        "runner_name": "homelab",
+        "labels": [
+          "self-hosted",
+          "homelab"
+        ],
+        "html_url": "https://github.com/deanjstone/argus/actions/runs/38901067413/job/116973156396"
+      },
+      {
+        "id": 116973156400,
+        "run_id": 38901067413,
+        "run_attempt": 1,
+        "name": "Build (email)",
+        "status": "in_progress",
+        "conclusion": null,
+        "created_at": "2026-10-16T12:31:06Z",
+        "started_at": "2026-10-16T12:42:36Z",
+        "completed_at": null,
+        "runner_name": "homelab-2",
+        "labels": [
+          "self-hosted",
+          "homelab"
+        ],
+        "html_url": "https://github.com/deanjstone/argus/actions/runs/38901067413/job/116973156400"
+      },
+      {
+        "id": 116973156585,
+        "run_id": 38901067413,
+        "run_attempt": 1,
+        "name": "Build (wiki)",
+        "status": "queued",
+        "conclusion": null,
+        "created_at": "2026-10-16T12:31:06Z",
+        "started_at": "2026-10-16T12:31:06Z",
+        "completed_at": null,
+        "runner_name": "",
+        "labels": [
+          "self-hosted",
+          "homelab"
+        ],
+        "html_url": "https://github.com/deanjstone/argus/actions/runs/38901067413/job/116973156585"
+      },
+      {
+        "id": 116973156595,
+        "run_id": 38901067413,
+        "run_attempt": 1,
+        "name": "Build (vault-agent)",
+        "status": "queued",
+        "conclusion": null,
+        "created_at": "2026-10-16T12:31:06Z",
+        "started_at": "2026-10-16T12:31:06Z",
+        "completed_at": null,
+        "runner_name": "",
+        "labels": [
+          "self-hosted",
+          "homelab"
+        ],
+        "html_url": "https://github.com/deanjstone/argus/actions/runs/38901067413/job/116973156595"
+      }
+    ]
+  },
+  "38895471160": {
+    "total_count": 6,
+    "jobs": [
+      {
+        "id": 116954783179,
+        "run_id": 38895471160,
+        "run_attempt": 1,
+        "name": "Audit (wiki)",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-10-16T11:41:47Z",
+        "started_at": "2026-10-16T12:00:03Z",
+        "completed_at": "2026-10-16T12:12:50Z",
+        "runner_name": "homelab-2",
+        "labels": [
+          "self-hosted",
+          "homelab"
+        ],
+        "html_url": "https://github.com/deanjstone/argus/actions/runs/38895471160/job/116954783179"
+      },
+      {
+        "id": 116954783609,
+        "run_id": 38895471160,
+        "run_attempt": 1,
+        "name": "Build (memory-mcp)",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-10-16T11:41:47Z",
+        "started_at": "2026-10-16T12:12:55Z",
+        "completed_at": "2026-10-16T12:21:54Z",
+        "runner_name": "homelab-2",
+        "labels": [
+          "self-hosted",
+          "homelab"
+        ],
+        "html_url": "https://github.com/deanjstone/argus/actions/runs/38895471160/job/116954783609"
+      },
+      {
+        "id": 116954783700,
+        "run_id": 38895471160,
+        "run_attempt": 1,
+        "name": "Build",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-10-16T11:41:47Z",
+        "started_at": "2026-10-16T12:21:58Z",
+        "completed_at": "2026-10-16T12:27:49Z",
+        "runner_name": "homelab-2",
+        "labels": [
+          "self-hosted",
+          "homelab"
+        ],
+        "html_url": "https://github.com/deanjstone/argus/actions/runs/38895471160/job/116954783700"
+      },
+      {
+        "id": 116954783712,
+        "run_id": 38895471160,
+        "run_attempt": 1,
+        "name": "Build (vault-agent)",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-10-16T11:41:47Z",
+        "started_at": "2026-10-16T12:03:10Z",
+        "completed_at": "2026-10-16T12:16:03Z",
+        "runner_name": "homelab",
+        "labels": [
+          "self-hosted",
+          "homelab"
+        ],
+        "html_url": "https://github.com/deanjstone/argus/actions/runs/38895471160/job/116954783712"
+      },
+      {
+        "id": 116954783837,
+        "run_id": 38895471160,
+        "run_attempt": 1,
+        "name": "Build (email)",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-10-16T11:41:47Z",
+        "started_at": "2026-10-16T12:18:27Z",
+        "completed_at": "2026-10-16T12:23:13Z",
+        "runner_name": "homelab",
+        "labels": [
+          "self-hosted",
+          "homelab"
+        ],
+        "html_url": "https://github.com/deanjstone/argus/actions/runs/38895471160/job/116954783837"
+      },
+      {
+        "id": 116954783866,
+        "run_id": 38895471160,
+        "run_attempt": 1,
+        "name": "Build (wiki)",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-10-16T11:41:47Z",
+        "started_at": "2026-10-16T12:23:16Z",
+        "completed_at": "2026-10-16T12:29:06Z",
+        "runner_name": "homelab",
+        "labels": [
+          "self-hosted",
+          "homelab"
+        ],
+        "html_url": "https://github.com/deanjstone/argus/actions/runs/38895471160/job/116954783866"
+      }
+    ]
+  },
+  "38892561462": {
+    "total_count": 1,
+    "jobs": [
+      {
+        "id": 116945311424,
+        "run_id": 38892561462,
+        "run_attempt": 1,
+        "name": "Build & Deploy to Cloudflare Pages",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-10-16T11:15:22Z",
+        "started_at": "2026-10-16T11:20:55Z",
+        "completed_at": "2026-10-16T11:24:58Z",
+        "runner_name": "homelab",
+        "labels": [
+          "self-hosted",
+          "homelab"
+        ],
+        "html_url": "https://github.com/deanjstone/argus/actions/runs/38892561462/job/116945311424"
+      }
+    ]
+  },
+  "38892561407": {
+    "total_count": 6,
+    "jobs": [
+      {
+        "id": 116945311929,
+        "run_id": 38892561407,
+        "run_attempt": 1,
+        "name": "Audit (wiki)",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-10-16T11:15:22Z",
+        "started_at": "2026-10-16T11:42:56Z",
+        "completed_at": "2026-10-16T11:51:46Z",
+        "runner_name": "homelab",
+        "labels": [
+          "self-hosted",
+          "homelab"
+        ],
+        "html_url": "https://github.com/deanjstone/argus/actions/runs/38892561407/job/116945311929"
+      },
+      {
+        "id": 116945311950,
+        "run_id": 38892561407,
+        "run_attempt": 1,
+        "name": "Build (wiki)",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-10-16T11:15:22Z",
+        "started_at": "2026-10-16T11:35:06Z",
+        "completed_at": "2026-10-16T11:43:37Z",
+        "runner_name": "homelab-2",
+        "labels": [
+          "self-hosted",
+          "homelab"
+        ],
+        "html_url": "https://github.com/deanjstone/argus/actions/runs/38892561407/job/116945311950"
+      },
+      {
+        "id": 116945312079,
+        "run_id": 38892561407,
+        "run_attempt": 1,
+        "name": "Build (memory-mcp)",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-10-16T11:15:22Z",
+        "started_at": "2026-10-16T11:51:56Z",
+        "completed_at": "2026-10-16T11:57:40Z",
+        "runner_name": "homelab",
+        "labels": [
+          "self-hosted",
+          "homelab"
+        ],
+        "html_url": "https://github.com/deanjstone/argus/actions/runs/38892561407/job/116945312079"
+      },
+      {
+        "id": 116945312107,
+        "run_id": 38892561407,
+        "run_attempt": 1,
+        "name": "Build",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-10-16T11:15:22Z",
+        "started_at": "2026-10-16T11:43:41Z",
+        "completed_at": "2026-10-16T11:55:33Z",
+        "runner_name": "homelab-2",
+        "labels": [
+          "self-hosted",
+          "homelab"
+        ],
+        "html_url": "https://github.com/deanjstone/argus/actions/runs/38892561407/job/116945312107"
+      },
+      {
+        "id": 116945312116,
+        "run_id": 38892561407,
+        "run_attempt": 1,
+        "name": "Build (vault-agent)",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-10-16T11:15:22Z",
+        "started_at": "2026-10-16T11:55:38Z",
+        "completed_at": "2026-10-16T11:59:59Z",
+        "runner_name": "homelab-2",
+        "labels": [
+          "self-hosted",
+          "homelab"
+        ],
+        "html_url": "https://github.com/deanjstone/argus/actions/runs/38892561407/job/116945312116"
+      },
+      {
+        "id": 116945312198,
+        "run_id": 38892561407,
+        "run_attempt": 1,
+        "name": "Build (email)",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-10-16T11:15:22Z",
+        "started_at": "2026-10-16T11:57:49Z",
+        "completed_at": "2026-10-16T12:03:06Z",
+        "runner_name": "homelab",
+        "labels": [
+          "self-hosted",
+          "homelab"
+        ],
+        "html_url": "https://github.com/deanjstone/argus/actions/runs/38892561407/job/116945312198"
+      }
+    ]
+  },
+  "38892561391": {
+    "total_count": 1,
+    "jobs": [
+      {
+        "id": 116945311267,
+        "run_id": 38892561391,
+        "run_attempt": 1,
+        "name": "Release",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-10-16T11:15:22Z",
+        "started_at": "2026-10-16T11:25:01Z",
+        "completed_at": "2026-10-16T11:34:03Z",
+        "runner_name": "homelab",
+        "labels": [
+          "self-hosted",
+          "homelab"
+        ],
+        "html_url": "https://github.com/deanjstone/argus/actions/runs/38892561391/job/116945311267"
+      }
+    ]
+  },
+  "38886604442": {
+    "total_count": 1,
+    "jobs": [
+      {
+        "id": 116925752462,
+        "run_id": 38886604442,
+        "run_attempt": 1,
+        "name": "Release",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-10-16T10:20:44Z",
+        "started_at": "2026-10-16T10:25:09Z",
+        "completed_at": "2026-10-16T10:30:47Z",
+        "runner_name": "homelab-2",
+        "labels": [
+          "self-hosted",
+          "homelab"
+        ],
+        "html_url": "https://github.com/deanjstone/argus/actions/runs/38886604442/job/116925752462"
+      }
+    ]
+  },
+  "38886604436": {
+    "total_count": 6,
+    "jobs": [
+      {
+        "id": 116925752186,
+        "run_id": 38886604436,
+        "run_attempt": 1,
+        "name": "Audit (wiki)",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-10-16T10:20:44Z",
+        "started_at": "2026-10-16T11:11:23Z",
+        "completed_at": "2026-10-16T11:17:17Z",
+        "runner_name": "homelab-2",
+        "labels": [
+          "self-hosted",
+          "homelab"
+        ],
+        "html_url": "https://github.com/deanjstone/argus/actions/runs/38886604436/job/116925752186"
+      },
+      {
+        "id": 116925752451,
+        "run_id": 38886604436,
+        "run_attempt": 1,
+        "name": "Build (email)",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-10-16T10:20:44Z",
+        "started_at": "2026-10-16T11:14:18Z",
+        "completed_at": "2026-10-16T11:20:50Z",
+        "runner_name": "homelab",
+        "labels": [
+          "self-hosted",
+          "homelab"
+        ],
+        "html_url": "https://github.com/deanjstone/argus/actions/runs/38886604436/job/116925752451"
+      },
+      {
+        "id": 116925752514,
+        "run_id": 38886604436,
+        "run_attempt": 1,
+        "name": "Build (memory-mcp)",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-10-16T10:20:44Z",
+        "started_at": "2026-10-16T11:17:28Z",
+        "completed_at": "2026-10-16T11:24:00Z",
+        "runner_name": "homelab-2",
+        "labels": [
+          "self-hosted",
+          "homelab"
+        ],
+        "html_url": "https://github.com/deanjstone/argus/actions/runs/38886604436/job/116925752514"
+      },
+      {
+        "id": 116925752730,
+        "run_id": 38886604436,
+        "run_attempt": 1,
+        "name": "Build (wiki)",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-10-16T10:20:44Z",
+        "started_at": "2026-10-16T11:29:52Z",
+        "completed_at": "2026-10-16T11:35:00Z",
+        "runner_name": "homelab-2",
+        "labels": [
+          "self-hosted",
+          "homelab"
+        ],
+        "html_url": "https://github.com/deanjstone/argus/actions/runs/38886604436/job/116925752730"
+      },
+      {
+        "id": 116925752736,
+        "run_id": 38886604436,
+        "run_attempt": 1,
+        "name": "Build",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-10-16T10:20:44Z",
+        "started_at": "2026-10-16T11:24:04Z",
+        "completed_at": "2026-10-16T11:29:46Z",
+        "runner_name": "homelab-2",
+        "labels": [
+          "self-hosted",
+          "homelab"
+        ],
+        "html_url": "https://github.com/deanjstone/argus/actions/runs/38886604436/job/116925752736"
+      },
+      {
+        "id": 116925752816,
+        "run_id": 38886604436,
+        "run_attempt": 1,
+        "name": "Build (vault-agent)",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-10-16T10:20:44Z",
+        "started_at": "2026-10-16T11:34:10Z",
+        "completed_at": "2026-10-16T11:42:49Z",
+        "runner_name": "homelab",
+        "labels": [
+          "self-hosted",
+          "homelab"
+        ],
+        "html_url": "https://github.com/deanjstone/argus/actions/runs/38886604436/job/116925752816"
+      }
+    ]
+  }
+}

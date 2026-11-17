@@ -1,0 +1,64 @@
+{
+  "Self": {
+    "HostName": "homelab",
+    "DNSName": "homelab.tailnet-example.ts.net.",
+    "OS": "linux",
+    "Online": true,
+    "LastSeen": "0001-01-01T00:00:00Z",
+    "TailscaleIPs": [
+      "100.64.0.2",
+      "fd7a:115c:a1e0::c35:dd32"
+    ],
+    "KeyExpiry": null
+  },
+  "Peer": {
+    "peer-1": {
+      "HostName": "aperture",
+      "DNSName": "aperture.tailnet-example.ts.net.",
+      "OS": "linux",
+      "Online": true,
+      "LastSeen": "2026-10-16T10:19:52.1Z",
+      "TailscaleIPs": [
+        "100.64.0.11",
+        "fd7a:115c:a1e0::4f35:f06a"
+      ],
+      "KeyExpiry": "2027-02-23T20:59:48Z"
+    },
+    "peer-2": {
+      "HostName": "LNV-LGN5",
+      "DNSName": "lnv-lgn5.tailnet-example.ts.net.",
+      "OS": "windows",
+      "Online": true,
+      "LastSeen": "0001-01-01T00:00:00Z",
+      "TailscaleIPs": [
+        "100.64.0.3",
+        "fd7a:115c:a1e0::5a35:2831"
+      ],
+      "KeyExpiry": null
+    },
+    "peer-3": {
+      "HostName": "DJ15",
+      "DNSName": "dj15.tailnet-example.ts.net.",
+      "OS": "iOS",
+      "Online": false,
+      "LastSeen": "2026-10-16T10:40:00.1Z",
+      "TailscaleIPs": [
+        "100.64.0.13",
+        "fd7a:115c:a1e0::4735:1a03"
+      ],
+      "KeyExpiry": null
+    },
+    "peer-4": {
+      "HostName": "lnv-lgn5-wsl",
+      "DNSName": "lnv-lgn5-wsl.tailnet-example.ts.net.",
+      "OS": "linux",
+      "Online": true,
+      "LastSeen": "0001-01-01T00:00:00Z",
+      "TailscaleIPs": [
+        "100.64.0.1",
+        "fd7a:115c:a1e0::c635:5d2a"
+      ],
+      "KeyExpiry": null
+    }
+  }
+}

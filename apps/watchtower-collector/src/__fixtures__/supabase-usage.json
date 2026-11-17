@@ -1,0 +1,12 @@
+{
+  "_comment": "Captured 2026-10-16 ~16:35 UTC with the Management API PAT: GET /v1/projects/{ref} (trimmed to the fields read), GET /v1/organizations/{slug} and POST /v1/projects/{ref}/database/query/read-only with select pg_database_size(current_database()) as bytes.",
+  "organization": { "id": "dsxrmczmxtvfsbfmpahx", "name": "ArgusDev", "plan": "free" },
+  "projects": {
+    "iyqhnvandyalaujyqbtj": { "ref": "iyqhnvandyalaujyqbtj", "name": "myargus", "status": "ACTIVE_HEALTHY", "organization_slug": "dsxrmczmxtvfsbfmpahx" },
+    "centbxttgyenxtkknepx": { "ref": "centbxttgyenxtkknepx", "name": "claude-memory", "status": "ACTIVE_HEALTHY", "organization_slug": "dsxrmczmxtvfsbfmpahx" }
+  },
+  "sizes": {
+    "iyqhnvandyalaujyqbtj": [{ "bytes": 108465299 }],
+    "centbxttgyenxtkknepx": [{ "bytes": 32369811 }]
+  }
+}

@@ -1,0 +1,10 @@
+[Unit]
+Description=Argus live-notes tick (refresh the live notes that are due)
+After=agent-engine.service
+
+[Service]
+Type=oneshot
+# One tick runs up to ten notes one after another, each a model call, so allow
+# it well past the engine's per-call timeout. The route answers 503 until
+# SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are in agent-engine's .env.
+ExecStart=/usr/bin/curl --fail-with-body --silent --show-error --max-time 1500 -X POST http://127.0.0.1:3747/task/live-notes/tick

@@ -1,0 +1,147 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# This repository is public (argus#1207): a fork's pull request runs this file. So every job
+# here runs on a GitHub-hosted runner and reads no secret but the read-only GITHUB_TOKEN;
+# scripts/public-safe.test.ts pins both rules. The deploy workflows are the only ones on the
+# owner's hosts, and only a push to `deploy` starts them.
+
+# A new push to a PR supersedes the run in flight. On main every commit gets its own group
+# (keyed on the SHA), because a group holds only one pending run: keyed on the ref, a second
+# merge queued behind a busy runner would cancel the first merge's pending run, leaving that
+# commit with no CI at all.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  # Decides which jobs below this change needs (scripts/ci-changes.ts). A job its `if:`
+  # skips never starts a runner. It fetches that one script through the API instead of
+  # checking out.
+  #
+  # Every push to main runs it, whoever made the push and whatever its subject says:
+  # agents push straight to main (trunk-based development, argus-config#1183), so nothing
+  # may skip a main push.
+  changes:
+    name: Changes
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      root: ${{ steps.plan.outputs.root }}
+      nested: ${{ steps.plan.outputs.nested }}
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Fetch scripts/ci-changes.ts
+        run: >-
+          curl --fail --silent --show-error --location
+          --header "Authorization: Bearer $GITHUB_TOKEN"
+          --header "Accept: application/vnd.github.raw"
+          --output "$RUNNER_TEMP/ci-changes.ts"
+          "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/contents/scripts/ci-changes.ts?ref=$SCRIPT_REF"
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          SCRIPT_REF: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - id: plan
+        run: node "$RUNNER_TEMP/ci-changes.ts"
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+  build:
+    name: Build
+    needs: changes
+    # !cancelled() and the result test: a failed Changes must build nothing.
+    if: ${{ !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.root == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      # A PR run checks only what the PR touches (`scripts/ci.sh --changed`), which
+      # needs the history to find the merge base with main. A run on main stays
+      # shallow and checks everything. The 0 sits last because it is falsy in an
+      # expression, so putting it in the middle always yields 1 (the first attempt, argus#1043).
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: ${{ github.event_name != 'pull_request' && 1 || 0 }}
+
+      - uses: pnpm/action-setup@v4
+
+      # No `cache: pnpm`: its post-job save step has errored on a path the build never made.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # The scrub scan in scripts/public-safe.test.ts needs gitleaks (argus#1207). A pinned
+      # release, checked against its published sha256, never a moving download.
+      - name: Install gitleaks
+        env:
+          GITLEAKS_VERSION: 8.30.1
+          GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/gitleaks.tar.gz" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  $RUNNER_TEMP/gitleaks.tar.gz" | sha256sum --check -
+          mkdir -p "$HOME/.local/bin"
+          tar -xzf "$RUNNER_TEMP/gitleaks.tar.gz" -C "$HOME/.local/bin" gitleaks
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      # Every check lives in scripts/ci.sh, shared with the .githooks/pre-push
+      # gate so local and GitHub CI cannot drift. Why the tests run serialized
+      # is recorded there. On a PR it narrows to the packages the change touches
+      # and their dependants; a change to the root config files (or to ci.sh
+      # itself) still checks the whole root workspace. Before this, every PR ran
+      # all 15 root packages for 17-19 minutes (argus#1009).
+      - name: CI (root workspace)
+        run: scripts/ci.sh ${{ github.event_name == 'pull_request' && '--changed' || '' }} root
+
+  # The packages that carry their own nested pnpm workspace and are excluded
+  # from the root one (see pnpm-workspace.yaml). Each installs and builds from
+  # its own directory against its own lockfile.
+  nested:
+    name: Build (${{ matrix.package }})
+    needs: changes
+    # See Build: Changes must have succeeded.
+    if: ${{ !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.nested != '[]' }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Only the packages this change touches. Per-package lint script and
+        # smoke test live in scripts/ci.sh.
+        package: ${{ fromJSON(needs.changes.outputs.nested) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: CI (${{ matrix.package }})
+        run: scripts/ci.sh nested ${{ matrix.package }}
+
+  # The release scripts in scripts/ci are vendored from argus-config and synced, never edited
+  # here (argus#1190, argus-config#1269): this fails a push or pull request that hand-edited a
+  # copy. Its own job, with no `needs:` or `if:`, so it runs on every push and pull request
+  # whatever Changes decides.
+  release-scripts:
+    name: Release scripts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Release scripts match their lock
+        run: bash scripts/ci/release-scripts-check.sh

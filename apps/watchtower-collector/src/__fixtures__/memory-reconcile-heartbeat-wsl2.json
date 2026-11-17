@@ -1,0 +1,15 @@
+{
+  "lastRunAt": "2026-10-16T13:27:11.964Z",
+  "ok": true,
+  "written": 0,
+  "deleted": 0,
+  "committed": false,
+  "refusals": [
+    {
+      "key": "project-linux-server",
+      "reason": "hash-mismatch",
+      "detail": "/home/deanj/CONTEXT/02.MEMORY/project_linux_server.md no longer hashes to the body the store recorded",
+      "seenAt": "2026-09-29T00:47:15.970Z"
+    }
+  ]
+}

@@ -1,0 +1,378 @@
+[
+  {
+    "service_key": "ai-usage",
+    "host": "multi",
+    "status": "degraded",
+    "detail": {
+      "totalTokens": 860319582,
+      "totalCost": 541.6285711099999,
+      "hosts": [
+        {
+          "name": "homelab",
+          "status": "healthy",
+          "totalTokens": 860319582,
+          "totalCost": 541.6285711099999,
+          "latestPeriod": "2026-10-16"
+        },
+        {
+          "name": "wsl2",
+          "status": "unreachable",
+          "totalTokens": 0,
+          "totalCost": 0,
+          "latestPeriod": null,
+          "error": "fetch failed"
+        }
+      ]
+    },
+    "checked_at": "2026-10-16T07:26:17.935Z"
+  },
+  {
+    "service_key": "cloudflare:argus-memory-mcp",
+    "host": "cloudflare",
+    "status": "healthy",
+    "detail": {
+      "defaultEnvironment": {
+        "environment": "production",
+        "script_tag": "00000000000000000000000000000017",
+        "created_on": "2026-06-11T02:52:49.107368Z",
+        "modified_on": "2026-10-14T18:50:49.021601Z",
+        "script": {
+          "created_on": "2026-06-11T02:52:49.107368Z",
+          "modified_on": "2026-10-14T18:50:49.021601Z",
+          "id": "argus-memory-mcp",
+          "tag": "00000000000000000000000000000017",
+          "tags": [],
+          "deployment_id": "",
+          "tail_consumers": null,
+          "logpush": false,
+          "observability": {
+            "enabled": true,
+            "head_sampling_rate": 1,
+            "redact_query_string": false,
+            "logs": {
+              "enabled": true,
+              "head_sampling_rate": 1,
+              "persist": true,
+              "invocation_logs": true
+            },
+            "traces": {
+              "enabled": false,
+              "persist": true,
+              "head_sampling_rate": 1
+            }
+          },
+          "has_assets": false,
+          "has_modules": true,
+          "etag": "0000000000000000000000000000000000000000000000000000000000000018",
+          "handlers": [
+            "get",
+            "post",
+            "put",
+            "delete",
+            "options",
+            "patch",
+            "all",
+            "on",
+            "use",
+            "router",
+            "getPath",
+            "_basePath",
+            "routes",
+            "errorHandler",
+            "onError",
+            "notFound",
+            "fetch",
+            "request",
+            "fire",
+            "route",
+            "basePath",
+            "mount"
+          ],
+          "placement_mode": "smart",
+          "placement_status": "INSUFFICIENT_INVOCATIONS",
+          "placement": {
+            "mode": "smart",
+            "status": "INSUFFICIENT_INVOCATIONS",
+            "last_analyzed_at": "2026-10-16T08:25:58.629615Z"
+          },
+          "last_deployed_from": "wrangler",
+          "compatibility_date": "2025-03-01",
+          "compatibility_flags": [
+            "nodejs_compat"
+          ],
+          "usage_model": "standard"
+        }
+      },
+      "modifiedOn": "2026-10-14T18:50:49.021601Z"
+    },
+    "checked_at": "2026-10-16T09:36:08.397Z"
+  },
+  {
+    "service_key": "cloudflare:knowledge",
+    "host": "cloudflare",
+    "status": "healthy",
+    "detail": {
+      "deploymentId": "00000000-0000-4000-8000-000000000010",
+      "stageStatus": "success",
+      "environment": "production"
+    },
+    "checked_at": "2026-10-16T09:36:08.443Z"
+  },
+  {
+    "service_key": "cloudflare:myargus",
+    "host": "cloudflare",
+    "status": "down",
+    "detail": {
+      "deploymentId": "00000000-0000-4000-8000-000000000015",
+      "stageStatus": "active",
+      "environment": "preview"
+    },
+    "checked_at": "2026-10-16T05:31:07.613Z"
+  },
+  {
+    "service_key": "cloudflare:reader-api",
+    "host": "cloudflare",
+    "status": "healthy",
+    "detail": {
+      "defaultEnvironment": {
+        "environment": "production",
+        "script_tag": "00000000000000000000000000000011",
+        "created_on": "2026-06-28T01:40:18.959061Z",
+        "modified_on": "2026-10-08T00:47:30.508843Z",
+        "script": {
+          "created_on": "2026-06-28T01:40:18.959061Z",
+          "modified_on": "2026-10-08T00:47:30.508843Z",
+          "id": "reader-api",
+          "tag": "00000000000000000000000000000011",
+          "tags": [],
+          "deployment_id": "",
+          "tail_consumers": null,
+          "logpush": false,
+          "has_assets": false,
+          "has_modules": true,
+          "etag": "0000000000000000000000000000000000000000000000000000000000000019",
+          "handlers": [
+            "get",
+            "post",
+            "put",
+            "delete",
+            "options",
+            "patch",
+            "all",
+            "on",
+            "use",
+            "router",
+            "getPath",
+            "_basePath",
+            "routes",
+            "errorHandler",
+            "onError",
+            "notFound",
+            "fetch",
+            "request",
+            "fire",
+            "route",
+            "basePath",
+            "mount"
+          ],
+          "last_deployed_from": "wrangler",
+          "compatibility_date": "2026-03-24",
+          "compatibility_flags": [
+            "nodejs_compat"
+          ],
+          "usage_model": "standard"
+        }
+      },
+      "modifiedOn": "2026-10-08T00:47:30.508843Z"
+    },
+    "checked_at": "2026-10-16T09:36:08.298Z"
+  },
+  {
+    "service_key": "cloudflare:stockade",
+    "host": "cloudflare",
+    "status": "healthy",
+    "detail": {
+      "deploymentId": "00000000-0000-4000-9000-000000000016",
+      "stageStatus": "success",
+      "environment": "production"
+    },
+    "checked_at": "2026-10-16T09:36:08.421Z"
+  },
+  {
+    "service_key": "homelab:disk:/",
+    "host": "homelab",
+    "status": "healthy",
+    "detail": {
+      "path": "/",
+      "pctUsed": 75
+    },
+    "checked_at": "2026-10-16T09:36:07.878Z"
+  },
+  {
+    "service_key": "homelab:uptime",
+    "host": "homelab",
+    "status": "healthy",
+    "detail": {
+      "uptimeSeconds": 638906
+    },
+    "checked_at": "2026-10-16T09:36:07.889Z"
+  },
+  {
+    "service_key": "printer",
+    "host": "homelab",
+    "status": "healthy",
+    "detail": {
+      "state": "idle",
+      "reasons": [],
+      "message": null,
+      "model": "EPSON WF-3820 Series",
+      "markers": [
+        {
+          "name": "Black ink",
+          "color": "#000000",
+          "level": 17,
+          "lowLevel": 15,
+          "low": false
+        },
+        {
+          "name": "Cyan ink",
+          "color": "#00FFFF",
+          "level": 49,
+          "lowLevel": 15,
+          "low": false
+        },
+        {
+          "name": "Magenta ink",
+          "color": "#FF00FF",
+          "level": 48,
+          "lowLevel": 15,
+          "low": false
+        },
+        {
+          "name": "Yellow ink",
+          "color": "#FFFF00",
+          "level": 49,
+          "lowLevel": 15,
+          "low": false
+        }
+      ],
+      "queue": [],
+      "recentJobs": [
+        {
+          "id": 4,
+          "name": "Microsoft Word - Resume - Dean Johnstone.docx",
+          "user": "LNV-LGN5\\deanj",
+          "state": "completed",
+          "pages": 1,
+          "at": "2026-10-09T05:55:10.834Z"
+        },
+        {
+          "id": 3,
+          "name": "Client details form (6)",
+          "user": "mobile",
+          "state": "completed",
+          "pages": 2,
+          "at": "2026-10-09T05:21:42.834Z"
+        }
+      ],
+      "clockSkewSeconds": 32415
+    },
+    "checked_at": "2026-10-16T09:40:43.868Z"
+  },
+  {
+    "service_key": "scanner",
+    "host": "homelab",
+    "status": "healthy",
+    "detail": {
+      "state": "idle",
+      "adfState": "empty",
+      "recentScans": [
+        {
+          "id": "00000000-0000-4000-a000-000000000013",
+          "state": "completed",
+          "images": 1,
+          "at": "2026-10-09T08:39:05.401Z"
+        },
+        {
+          "id": "00000000-0000-4000-b000-000000000014",
+          "state": "completed",
+          "images": 3,
+          "at": "2026-10-09T08:22:53.401Z"
+        }
+      ]
+    },
+    "checked_at": "2026-10-16T09:40:43.432Z"
+  },
+  {
+    "service_key": "supabase:centbxttgyenxtkknepx",
+    "host": "supabase",
+    "status": "healthy",
+    "detail": {
+      "name": "claude-memory",
+      "projectStatus": "ACTIVE_HEALTHY",
+      "region": "ap-southeast-1"
+    },
+    "checked_at": "2026-10-16T09:36:08.377Z"
+  },
+  {
+    "service_key": "supabase:iyqhnvandyalaujyqbtj",
+    "host": "supabase",
+    "status": "healthy",
+    "detail": {
+      "name": "myargus",
+      "projectStatus": "ACTIVE_HEALTHY",
+      "region": "ap-southeast-2"
+    },
+    "checked_at": "2026-10-16T09:36:08.288Z"
+  },
+  {
+    "service_key": "syncthing",
+    "host": "homelab",
+    "status": "degraded",
+    "detail": {
+      "folders": [
+        {
+          "id": "CONTEXT",
+          "state": "idle",
+          "errors": 0,
+          "needTotalItems": 0
+        },
+        {
+          "id": "CORTEX",
+          "state": "idle",
+          "errors": 0,
+          "needTotalItems": 0
+        },
+        {
+          "id": "claude-sessions-wsl2",
+          "state": "syncing",
+          "errors": 0,
+          "needTotalItems": 2
+        }
+      ],
+      "totalErrors": 0,
+      "totalOutOfSync": 2
+    },
+    "checked_at": "2026-10-16T09:25:41.770Z"
+  },
+  {
+    "service_key": "systemd:agent-engine.service",
+    "host": "homelab",
+    "status": "healthy",
+    "detail": {
+      "activeState": "active",
+      "subState": "running"
+    },
+    "checked_at": "2026-10-16T09:40:42.446Z"
+  },
+  {
+    "service_key": "systemd:ccbot.service",
+    "host": "homelab",
+    "status": "down",
+    "detail": {
+      "activeState": "inactive",
+      "subState": "dead"
+    },
+    "checked_at": "2026-09-24T04:53:01.579Z"
+  }
+]

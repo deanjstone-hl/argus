@@ -1,0 +1,23 @@
+{
+  "name": "argus",
+  "version": "3.27.2",
+  "private": true,
+  "description": "Argus monorepo — agent CLI and agent-engine HTTP server",
+  "packageManager": "pnpm@12.13.0",
+  "scripts": {
+    "typecheck": "pnpm -r --if-present run typecheck",
+    "lint": "pnpm -r --if-present run lint",
+    "build": "pnpm -r --if-present run build",
+    "test": "pnpm -r --if-present run test",
+    "test:scripts": "vitest run --dir scripts --testTimeout=30000 --hookTimeout=30000",
+    "check": "bash scripts/ci.sh --changed",
+    "docs:list": "node scripts/docs-list.ts"
+  },
+  "devDependencies": {
+    "@oxlint/plugins": "1.78.0",
+    "@semantic-release/github": "^11.0.1",
+    "semantic-release": "^24.2.3",
+    "semantic-release-monorepo": "^8.0.2",
+    "vitest": "^4.1.10"
+  }
+}

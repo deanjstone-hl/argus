@@ -1,0 +1,21 @@
+{
+  "_note": "Hand-built: the collector's token could not read zone analytics on 2026-10-16 (see cloudflare-zone-authz.json), so this is the documented httpRequestsAdaptiveGroups shape with counts sized to the real 1h invocations, plus a #675-style run of 401s on the watchtower API.",
+  "data": {
+    "viewer": {
+      "zones": [
+        {
+          "argus_watchtower_api": [
+            { "count": 452, "dimensions": { "edgeResponseStatus": 200 } },
+            { "count": 58, "dimensions": { "edgeResponseStatus": 401 } }
+          ],
+          "argus_memory_mcp": [{ "count": 1, "dimensions": { "edgeResponseStatus": 200 } }],
+          "argus_vault_agent_relay": [{ "count": 2, "dimensions": { "edgeResponseStatus": 101 } }],
+          "argus_agent_email_mcp": [{ "count": 1, "dimensions": { "edgeResponseStatus": 200 } }],
+          "argus_email": [],
+          "reader_api": [{ "count": 1, "dimensions": { "edgeResponseStatus": 404 } }]
+        }
+      ]
+    }
+  },
+  "errors": null
+}

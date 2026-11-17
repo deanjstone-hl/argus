@@ -1,0 +1,57 @@
+name: Watchtower Deploy
+
+# Production deploys only from the deploy branch (argus-config#600, docs/deploy-branch.md).
+# A merge to main builds and tests but deploys nothing; scripts/promote.sh moves deploy.
+# A dispatch is still a deploy: an owner step, never run by an agent. It redeploys this target at the head of `deploy`.
+on:
+  push:
+    branches: [deploy]
+    paths:
+      - "apps/watchtower/**"
+      # Bundled into the dashboard, so a contract change is a dashboard change.
+      - "packages/watchtower-contract/**"
+      - ".github/workflows/watchtower-deploy.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One deploy at a time. A newer promotion replaces a pending older run and never cancels one in
+# progress (argus-config#1293, argus#1176).
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build & Deploy to Cloudflare Pages
+    # A dispatch can name any branch or tag; only `deploy` ships.
+    if: github.ref == 'refs/heads/deploy'
+    runs-on: ubuntu-latest
+    env:
+      VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+      VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+      VITE_API_BASE_URL: https://api.myargus.cc/watchtower
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          # No `cache: pnpm` — see the note in ci.yml.
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm --filter @argus/watchtower run build
+
+      - name: Deploy → watchtower
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: apps/watchtower
+          command: pages deploy dist --project-name=watchtower --branch=main

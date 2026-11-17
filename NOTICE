@@ -1,0 +1,25 @@
+argus
+Copyright 2026 Dean Stone
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE). It was published
+on 16 November 2026 as a fresh-history public repository (argus#1207); the earlier history,
+with every old issue, pull request, release and tag, stays private in the argus-archive
+repository of the same owner.
+
+Third-party code in this tree keeps its own licence:
+
+  tools/oxlint/anti-slop   Copyright (c) 2026 Dillon Mulroy, MIT (tools/oxlint/anti-slop/LICENSE,
+                           origin in tools/oxlint/anti-slop/UPSTREAM.md)
+
+Contributors. A fresh history drops the commit authors, so they are named here. These people
+authored or co-authored commits in the earlier history that touched files still in this tree,
+most of them through subtree merges of upstream open-source projects whose packages have since
+moved to their own repositories. Their commits are in argus-archive:
+
+  Abhishek Ranjan, amrrs, Brace Sproul, Brad Huffman, Christian Bromann, Colin Francis, CY2,
+  Greg Land, Harsh, HwangJohn, John Kennedy, jyje, Krish, Malik Williams, SadriG91,
+  Victor Mico, Yassine Mhirsi, zan22ye
+
+Every other commit was written by the owner, or by an automation acting for the owner
+(semantic-release, Dependabot, GitHub Actions, Claude). Third-party software this repository
+installs or configures is not included and keeps its own licence.

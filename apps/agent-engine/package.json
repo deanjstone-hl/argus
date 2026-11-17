@@ -1,0 +1,35 @@
+{
+  "name": "@argus/agent-engine",
+  "version": "1.4.0",
+  "description": "Argus agent-engine — HTTP server (port 3747) for chat, vector search, and the context API",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "main": "dist/server/http.js",
+  "exports": {
+    ".": "./dist/server/http.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/server/http.js",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.106.0",
+    "@huggingface/transformers": "^4.3.1",
+    "@supabase/supabase-js": "^2.112.2",
+    "axios": "^1.7.0",
+    "better-sqlite3": "^12.11.1",
+    "hono": "^4.6.0",
+    "jose": "^6.2.8",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^22.0.0",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.9"
+  }
+}

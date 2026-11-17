@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Watchtower" />
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f5f7f8" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#17212b" />
+    <title>Watchtower</title>
+    <script>(function(){var d=document,r=d.documentElement,n="ds-theme",themes=["default","t3-chat","grove","ocean","ember","iris"],modes=["light","dark","system"],raw=null;try{var m=d.cookie.match(new RegExp("(?:^|; )"+n+"=([^;]*)"));if(m)raw=decodeURIComponent(m[1])}catch(e){raw=null}if(raw===null){try{raw=localStorage.getItem(n)}catch(e){raw=null}}var p=(raw||"").split("."),t=p.length===2&&themes.indexOf(p[0])>-1?p[0]:"ocean",o=p.length===2&&modes.indexOf(p[1])>-1?p[1]:"system",s=false;try{s=!!(window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)}catch(e){s=false}var dark=o==="dark"||(o==="system"&&s);r.setAttribute("data-theme",t);if(dark){r.classList.add("dark")}else{r.classList.remove("dark")}})();</script>
+    <script>
+      (function () {
+        if (typeof matchMedia !== "function") return
+        var root = document.documentElement
+        var system = matchMedia("(prefers-color-scheme: dark)")
+        var declared = document.querySelectorAll('meta[name="theme-color"]')
+        var colors = {}
+        for (var index = 0; index < declared.length; index++) {
+          var media = declared[index].getAttribute("media") || ""
+          var content = declared[index].getAttribute("content")
+          if (media.indexOf("dark") > -1) colors.dark = content
+          else if (media.indexOf("light") > -1) colors.light = content
+        }
+        if (!colors.light || !colors.dark) return
+        var apply = function () {
+          var mode = (root.hasAttribute("data-theme") ? root.classList.contains("dark") : system.matches) ? "dark" : "light"
+          var stale = document.querySelectorAll('meta[name="theme-color"]')
+          for (var position = 0; position < stale.length; position++) stale[position].parentNode.removeChild(stale[position])
+          var tag = document.createElement("meta")
+          tag.setAttribute("name", "theme-color")
+          tag.setAttribute("content", colors[mode])
+          document.head.appendChild(tag)
+          root.style.colorScheme = mode
+        }
+        apply()
+        addEventListener("pageshow", apply)
+        document.addEventListener("visibilitychange", apply)
+        system.addEventListener("change", apply)
+        if (typeof MutationObserver === "function") new MutationObserver(apply).observe(root, { attributes: true, attributeFilter: ["class", "data-theme"] })
+      })()
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

@@ -1,0 +1,775 @@
+[
+  {
+    "service_key": "systemd:agent-engine.service",
+    "host": "homelab",
+    "status": "healthy",
+    "detail": {
+      "scope": "user",
+      "loadState": "loaded",
+      "activeState": "active",
+      "subState": "running",
+      "result": "success",
+      "activeSince": "2026-10-13T20:35:52.000Z",
+      "restarts": 3
+    },
+    "checked_at": "2026-10-16T11:40:00.000Z"
+  },
+  {
+    "service_key": "systemd:notice-board.service",
+    "host": "homelab",
+    "status": "healthy",
+    "detail": {
+      "scope": "user",
+      "loadState": "loaded",
+      "activeState": "active",
+      "subState": "running",
+      "result": "success",
+      "activeSince": "2026-10-10T23:58:26.000Z",
+      "restarts": 2
+    },
+    "checked_at": "2026-10-16T11:40:00.000Z"
+  },
+  {
+    "service_key": "systemd:watchtower-collector.service",
+    "host": "homelab",
+    "status": "healthy",
+    "detail": {
+      "scope": "user",
+      "loadState": "loaded",
+      "activeState": "active",
+      "subState": "running",
+      "result": "success",
+      "activeSince": "2026-10-14T23:46:01.000Z",
+      "restarts": 1
+    },
+    "checked_at": "2026-10-16T11:40:00.000Z"
+  },
+  {
+    "service_key": "systemd:budget-api.service",
+    "host": "homelab",
+    "status": "healthy",
+    "detail": {
+      "scope": "user",
+      "loadState": "loaded",
+      "activeState": "active",
+      "subState": "running",
+      "result": "success",
+      "activeSince": "2026-10-09T00:13:03.000Z",
+      "restarts": 0
+    },
+    "checked_at": "2026-10-16T11:40:00.000Z"
+  },
+  {
+    "service_key": "systemd:t3code.service",
+    "host": "homelab",
+    "status": "healthy",
+    "detail": {
+      "scope": "user",
+      "loadState": "loaded",
+      "activeState": "active",
+      "subState": "running",
+      "result": "success",
+      "activeSince": "2026-10-16T06:45:59.000Z",
+      "restarts": 0
+    },
+    "checked_at": "2026-10-16T11:40:00.000Z"
+  },
+  {
+    "service_key": "systemd:taskview-web.service",
+    "host": "homelab",
+    "status": "healthy",
+    "detail": {
+      "scope": "user",
+      "loadState": "loaded",
+      "activeState": "active",
+      "subState": "running",
+      "result": "success",
+      "activeSince": "2026-10-09T00:13:11.000Z",
+      "restarts": 0
+    },
+    "checked_at": "2026-10-16T11:40:00.000Z"
+  },
+  {
+    "service_key": "systemd:budget-api-cron.timer",
+    "host": "homelab",
+    "status": "healthy",
+    "detail": {
+      "scope": "user",
+      "loadState": "loaded",
+      "activeState": "active",
+      "subState": "waiting",
+      "result": "success",
+      "activeSince": "2026-10-09T00:13:02.000Z",
+      "restarts": null,
+      "timer": {
+        "service": "budget-api-cron.service",
+        "lastTrigger": "2026-10-16T09:00:11.000Z",
+        "nextTrigger": "2026-10-17T09:00:00.000Z",
+        "lastRun": {
+          "activeState": "inactive",
+          "result": "success",
+          "exitStatus": 0,
+          "startedAt": "2026-10-16T09:00:11.000Z",
+          "exitedAt": "2026-10-16T09:00:49.000Z"
+        }
+      }
+    },
+    "checked_at": "2026-10-16T11:40:00.000Z"
+  },
+  {
+    "service_key": "systemd:argus-context-fetch-install.timer",
+    "host": "homelab",
+    "status": "healthy",
+    "detail": {
+      "scope": "user",
+      "loadState": "loaded",
+      "activeState": "active",
+      "subState": "waiting",
+      "result": "success",
+      "activeSince": "2026-10-09T00:13:02.000Z",
+      "restarts": null,
+      "timer": {
+        "service": "argus-context-fetch-install.service",
+        "lastTrigger": "2026-10-15T19:00:19.000Z",
+        "nextTrigger": "2026-10-16T19:00:00.000Z",
+        "lastRun": {
+          "activeState": "inactive",
+          "result": "success",
+          "exitStatus": 0,
+          "startedAt": "2026-10-15T19:00:19.000Z",
+          "exitedAt": "2026-10-15T19:00:26.000Z"
+        }
+      }
+    },
+    "checked_at": "2026-10-16T11:40:00.000Z"
+  },
+  {
+    "service_key": "systemd:session-tasks.timer",
+    "host": "homelab",
+    "status": "healthy",
+    "detail": {
+      "scope": "user",
+      "loadState": "loaded",
+      "activeState": "active",
+      "subState": "waiting",
+      "result": "success",
+      "activeSince": "2026-10-09T00:13:02.000Z",
+      "restarts": null,
+      "timer": {
+        "service": "session-tasks.service",
+        "lastTrigger": "2026-10-15T19:30:19.000Z",
+        "nextTrigger": "2026-10-16T19:30:00.000Z",
+        "lastRun": {
+          "activeState": "inactive",
+          "result": "success",
+          "exitStatus": 0,
+          "startedAt": "2026-10-15T19:30:19.000Z",
+          "exitedAt": "2026-10-15T19:44:05.000Z"
+        }
+      }
+    },
+    "checked_at": "2026-10-16T11:40:00.000Z"
+  },
+  {
+    "service_key": "systemd:inbox-ingest.timer",
+    "host": "homelab",
+    "status": "healthy",
+    "detail": {
+      "scope": "user",
+      "loadState": "loaded",
+      "activeState": "active",
+      "subState": "waiting",
+      "result": "success",
+      "activeSince": "2026-10-09T00:13:02.000Z",
+      "restarts": null,
+      "timer": {
+        "service": "inbox-ingest.service",
+        "lastTrigger": "2026-10-15T21:30:19.000Z",
+        "nextTrigger": "2026-10-16T21:30:00.000Z",
+        "lastRun": {
+          "activeState": "inactive",
+          "result": "success",
+          "exitStatus": 0,
+          "startedAt": "2026-10-15T21:30:19.000Z",
+          "exitedAt": "2026-10-15T21:30:30.000Z"
+        }
+      }
+    },
+    "checked_at": "2026-10-16T11:40:00.000Z"
+  },
+  {
+    "service_key": "systemd:github-collector.timer",
+    "host": "homelab",
+    "status": "healthy",
+    "detail": {
+      "scope": "user",
+      "loadState": "loaded",
+      "activeState": "active",
+      "subState": "waiting",
+      "result": "success",
+      "activeSince": "2026-10-11T06:48:01.000Z",
+      "restarts": null,
+      "timer": {
+        "service": "github-collector.service",
+        "lastTrigger": "2026-10-16T11:31:14.000Z",
+        "nextTrigger": "2026-10-16T11:45:00.000Z",
+        "lastRun": {
+          "activeState": "inactive",
+          "result": "success",
+          "exitStatus": 0,
+          "startedAt": "2026-10-16T11:31:14.000Z",
+          "exitedAt": "2026-10-16T11:31:36.000Z"
+        }
+      }
+    },
+    "checked_at": "2026-10-16T11:40:00.000Z"
+  },
+  {
+    "service_key": "systemd:repo-git-sync.timer",
+    "host": "homelab",
+    "status": "healthy",
+    "detail": {
+      "scope": "user",
+      "loadState": "loaded",
+      "activeState": "active",
+      "subState": "waiting",
+      "result": "success",
+      "activeSince": "2026-10-09T00:13:02.000Z",
+      "restarts": null,
+      "timer": {
+        "service": "repo-git-sync.service",
+        "lastTrigger": "2026-10-16T11:31:14.000Z",
+        "nextTrigger": "2026-10-16T11:45:24.000Z",
+        "lastRun": {
+          "activeState": "inactive",
+          "result": "success",
+          "exitStatus": 0,
+          "startedAt": "2026-10-16T11:31:14.000Z",
+          "exitedAt": "2026-10-16T11:31:28.000Z"
+        }
+      }
+    },
+    "checked_at": "2026-10-16T11:40:00.000Z"
+  },
+  {
+    "service_key": "systemd:vault-git-sync.timer",
+    "host": "homelab",
+    "status": "healthy",
+    "detail": {
+      "scope": "user",
+      "loadState": "loaded",
+      "activeState": "active",
+      "subState": "waiting",
+      "result": "success",
+      "activeSince": "2026-10-09T00:13:02.000Z",
+      "restarts": null,
+      "timer": {
+        "service": "vault-git-sync.service",
+        "lastTrigger": "2026-10-16T11:02:44.000Z",
+        "nextTrigger": "2026-10-16T12:01:31.000Z",
+        "lastRun": {
+          "activeState": "inactive",
+          "result": "success",
+          "exitStatus": 0,
+          "startedAt": "2026-10-16T11:02:44.000Z",
+          "exitedAt": "2026-10-16T11:02:49.000Z"
+        }
+      }
+    },
+    "checked_at": "2026-10-16T11:40:00.000Z"
+  },
+  {
+    "service_key": "systemd:runner-watchdog.timer",
+    "host": "homelab",
+    "status": "healthy",
+    "detail": {
+      "scope": "user",
+      "loadState": "loaded",
+      "activeState": "active",
+      "subState": "waiting",
+      "result": "success",
+      "activeSince": "2026-10-09T00:13:02.000Z",
+      "restarts": null,
+      "timer": {
+        "service": "runner-watchdog.service",
+        "lastTrigger": "2026-10-16T11:32:14.000Z",
+        "nextTrigger": null,
+        "lastRun": {
+          "activeState": "inactive",
+          "result": "success",
+          "exitStatus": 0,
+          "startedAt": "2026-10-16T11:32:14.000Z",
+          "exitedAt": "2026-10-16T11:32:22.000Z"
+        }
+      }
+    },
+    "checked_at": "2026-10-16T11:40:00.000Z"
+  },
+  {
+    "service_key": "systemd:cloudflared.service",
+    "host": "homelab",
+    "status": "healthy",
+    "detail": {
+      "scope": "system",
+      "loadState": "loaded",
+      "activeState": "active",
+      "subState": "running",
+      "result": "success",
+      "activeSince": "2026-10-09T00:13:32.000Z",
+      "restarts": 4
+    },
+    "checked_at": "2026-10-16T11:40:00.000Z"
+  },
+  {
+    "service_key": "systemd:tailscaled.service",
+    "host": "homelab",
+    "status": "healthy",
+    "detail": {
+      "scope": "system",
+      "loadState": "loaded",
+      "activeState": "active",
+      "subState": "running",
+      "result": "success",
+      "activeSince": "2026-10-09T00:12:32.000Z",
+      "restarts": 0
+    },
+    "checked_at": "2026-10-16T11:40:00.000Z"
+  },
+  {
+    "service_key": "systemd:postgresql@16-main.service",
+    "host": "homelab",
+    "status": "healthy",
+    "detail": {
+      "scope": "system",
+      "loadState": "loaded",
+      "activeState": "active",
+      "subState": "running",
+      "result": "success",
+      "activeSince": "2026-10-14T19:48:28.000Z",
+      "restarts": 0
+    },
+    "checked_at": "2026-10-16T11:40:00.000Z"
+  },
+  {
+    "service_key": "systemd:borgmatic.timer",
+    "host": "homelab",
+    "status": "healthy",
+    "detail": {
+      "scope": "system",
+      "loadState": "loaded",
+      "activeState": "active",
+      "subState": "waiting",
+      "result": "success",
+      "activeSince": "2026-10-09T00:02:02.000Z",
+      "restarts": null,
+      "timer": {
+        "service": "borgmatic.service",
+        "lastTrigger": "2026-10-15T13:49:17.000Z",
+        "nextTrigger": "2026-10-16T15:10:29.000Z",
+        "lastRun": {
+          "activeState": "inactive",
+          "result": "success",
+          "exitStatus": 0,
+          "startedAt": "2026-10-15T13:50:17.000Z",
+          "exitedAt": "2026-10-15T13:51:08.000Z"
+        }
+      }
+    },
+    "checked_at": "2026-10-16T11:40:00.000Z"
+  },
+  {
+    "service_key": "github-runner:argus/homelab",
+    "host": "github-runners",
+    "status": "healthy",
+    "detail": {
+      "repo": "argus",
+      "name": "homelab",
+      "online": true,
+      "busy": true,
+      "version": "2.337.0",
+      "labels": [
+        "self-hosted",
+        "Linux",
+        "X64",
+        "homelab"
+      ]
+    },
+    "checked_at": "2026-10-16T11:40:00.000Z"
+  },
+  {
+    "service_key": "github-runner:argus/homelab-2",
+    "host": "github-runners",
+    "status": "healthy",
+    "detail": {
+      "repo": "argus",
+      "name": "homelab-2",
+      "online": true,
+      "busy": true,
+      "version": "2.337.0",
+      "labels": [
+        "self-hosted",
+        "Linux",
+        "X64",
+        "homelab"
+      ]
+    },
+    "checked_at": "2026-10-16T11:40:00.000Z"
+  },
+  {
+    "service_key": "github-runner:argus-config/homelab-argus-config",
+    "host": "github-runners",
+    "status": "healthy",
+    "detail": {
+      "repo": "argus-config",
+      "name": "homelab-argus-config",
+      "online": true,
+      "busy": true,
+      "version": "2.337.0",
+      "labels": [
+        "self-hosted",
+        "Linux",
+        "X64",
+        "homelab"
+      ]
+    },
+    "checked_at": "2026-10-16T11:40:00.000Z"
+  },
+  {
+    "service_key": "github-runner:atto1/homelab-atto1",
+    "host": "github-runners",
+    "status": "healthy",
+    "detail": {
+      "repo": "atto1",
+      "name": "homelab-atto1",
+      "online": true,
+      "busy": false,
+      "version": "2.337.0",
+      "labels": [
+        "self-hosted",
+        "Linux",
+        "X64",
+        "homelab"
+      ]
+    },
+    "checked_at": "2026-10-16T11:40:00.000Z"
+  },
+  {
+    "service_key": "github-runner:budget/homelab-budget",
+    "host": "github-runners",
+    "status": "healthy",
+    "detail": {
+      "repo": "budget",
+      "name": "homelab-budget",
+      "online": true,
+      "busy": false,
+      "version": "2.337.0",
+      "labels": [
+        "self-hosted",
+        "Linux",
+        "X64",
+        "homelab"
+      ]
+    },
+    "checked_at": "2026-10-16T11:40:00.000Z"
+  },
+  {
+    "service_key": "github-runner:context/homelab-context",
+    "host": "github-runners",
+    "status": "healthy",
+    "detail": {
+      "repo": "context",
+      "name": "homelab-context",
+      "online": true,
+      "busy": false,
+      "version": "2.337.0",
+      "labels": [
+        "self-hosted",
+        "Linux",
+        "X64",
+        "homelab"
+      ]
+    },
+    "checked_at": "2026-10-16T11:40:00.000Z"
+  },
+  {
+    "service_key": "github-runner:homelab/homelab-homelab",
+    "host": "github-runners",
+    "status": "healthy",
+    "detail": {
+      "repo": "homelab",
+      "name": "homelab-homelab",
+      "online": true,
+      "busy": false,
+      "version": "2.337.0",
+      "labels": [
+        "self-hosted",
+        "Linux",
+        "X64",
+        "homelab"
+      ]
+    },
+    "checked_at": "2026-10-16T11:40:00.000Z"
+  },
+  {
+    "service_key": "github-runner:myargus/homelab-myargus",
+    "host": "github-runners",
+    "status": "healthy",
+    "detail": {
+      "repo": "myargus",
+      "name": "homelab-myargus",
+      "online": true,
+      "busy": false,
+      "version": "2.337.0",
+      "labels": [
+        "self-hosted",
+        "Linux",
+        "X64",
+        "homelab"
+      ]
+    },
+    "checked_at": "2026-10-16T11:40:00.000Z"
+  },
+  {
+    "service_key": "github-runner:pkm-vault/homelab-pkm-vault",
+    "host": "github-runners",
+    "status": "healthy",
+    "detail": {
+      "repo": "pkm-vault",
+      "name": "homelab-pkm-vault",
+      "online": true,
+      "busy": false,
+      "version": "2.337.0",
+      "labels": [
+        "self-hosted",
+        "Linux",
+        "X64",
+        "homelab"
+      ]
+    },
+    "checked_at": "2026-10-16T11:40:00.000Z"
+  },
+  {
+    "service_key": "github-runner:pocketfm_downloader/homelab-pocketfm_downloader",
+    "host": "github-runners",
+    "status": "healthy",
+    "detail": {
+      "repo": "pocketfm_downloader",
+      "name": "homelab-pocketfm_downloader",
+      "online": true,
+      "busy": false,
+      "version": "2.337.0",
+      "labels": [
+        "self-hosted",
+        "Linux",
+        "X64",
+        "homelab"
+      ]
+    },
+    "checked_at": "2026-10-16T11:40:00.000Z"
+  },
+  {
+    "service_key": "github-runner:scriptable-private/homelab-scriptable-private",
+    "host": "github-runners",
+    "status": "healthy",
+    "detail": {
+      "repo": "scriptable-private",
+      "name": "homelab-scriptable-private",
+      "online": true,
+      "busy": false,
+      "version": "2.337.0",
+      "labels": [
+        "self-hosted",
+        "Linux",
+        "X64",
+        "homelab"
+      ]
+    },
+    "checked_at": "2026-10-16T11:40:00.000Z"
+  },
+  {
+    "service_key": "github-runner:slate-reader/homelab-slate-reader",
+    "host": "github-runners",
+    "status": "healthy",
+    "detail": {
+      "repo": "slate-reader",
+      "name": "homelab-slate-reader",
+      "online": true,
+      "busy": false,
+      "version": "2.337.0",
+      "labels": [
+        "self-hosted",
+        "Linux",
+        "X64",
+        "homelab"
+      ]
+    },
+    "checked_at": "2026-10-16T11:40:00.000Z"
+  },
+  {
+    "service_key": "github-runner:sys-admin/homelab-sys-admin",
+    "host": "github-runners",
+    "status": "healthy",
+    "detail": {
+      "repo": "sys-admin",
+      "name": "homelab-sys-admin",
+      "online": true,
+      "busy": false,
+      "version": "2.337.0",
+      "labels": [
+        "self-hosted",
+        "Linux",
+        "X64",
+        "homelab"
+      ]
+    },
+    "checked_at": "2026-10-16T11:40:00.000Z"
+  },
+  {
+    "service_key": "lnv-lgn5:disk:C:",
+    "host": "lnv-lgn5",
+    "status": "healthy",
+    "detail": {
+      "path": "C:",
+      "totalBytes": 511054966784,
+      "freeBytes": 59013263360,
+      "pctUsed": 88
+    },
+    "checked_at": "2026-10-16T11:40:00.000Z"
+  },
+  {
+    "service_key": "lnv-lgn5:crash-dumps",
+    "host": "lnv-lgn5",
+    "status": "degraded",
+    "detail": {
+      "wsl": {
+        "path": "/mnt/c/Users/deanj/AppData/Local/Temp/wsl-crashes",
+        "count": 2,
+        "totalBytes": 4708917248,
+        "newestAt": "2026-10-16T08:53:41.058Z"
+      },
+      "windows": {
+        "path": "/mnt/c/Users/deanj/AppData/Local/CrashDumps",
+        "count": 6,
+        "totalBytes": 109197166,
+        "newestAt": "2026-04-13T00:06:22.924Z"
+      }
+    },
+    "checked_at": "2026-10-16T11:40:00.000Z"
+  },
+  {
+    "service_key": "lnv-lgn5:memory",
+    "host": "lnv-lgn5",
+    "status": "healthy",
+    "detail": {
+      "totalBytes": 6213464064,
+      "availableBytes": 3188649984,
+      "swapTotalBytes": 2147483648,
+      "swapFreeBytes": 539922432,
+      "pressure": {
+        "some": {
+          "avg10": 0,
+          "avg60": 0,
+          "avg300": 0.09
+        },
+        "full": {
+          "avg10": 0,
+          "avg60": 0,
+          "avg300": 0.08
+        }
+      }
+    },
+    "checked_at": "2026-10-16T11:40:00.000Z"
+  },
+  {
+    "service_key": "lnv-lgn5:systemd:agent-engine.service",
+    "host": "lnv-lgn5",
+    "status": "healthy",
+    "detail": {
+      "scope": "user",
+      "loadState": "loaded",
+      "activeState": "active",
+      "subState": "running",
+      "result": "success",
+      "activeSince": "2026-10-16T07:27:13.000Z",
+      "restarts": 0
+    },
+    "checked_at": "2026-10-16T11:40:00.000Z"
+  },
+  {
+    "service_key": "lnv-lgn5:systemd:memory-reconcile.timer",
+    "host": "lnv-lgn5",
+    "status": "healthy",
+    "detail": {
+      "scope": "user",
+      "loadState": "loaded",
+      "activeState": "active",
+      "subState": "waiting",
+      "result": "success",
+      "activeSince": "2026-10-16T07:27:12.000Z",
+      "restarts": null,
+      "timer": {
+        "service": "memory-reconcile.service",
+        "lastTrigger": "2026-10-16T11:27:01.000Z",
+        "nextTrigger": "2026-10-16T11:47:00.000Z",
+        "lastRun": {
+          "activeState": "inactive",
+          "result": "success",
+          "exitStatus": 0,
+          "startedAt": "2026-10-16T11:27:01.000Z",
+          "exitedAt": "2026-10-16T11:27:07.000Z"
+        }
+      }
+    },
+    "checked_at": "2026-10-16T11:40:00.000Z"
+  },
+  {
+    "service_key": "cloudflare:argus-agent-email",
+    "host": "cloudflare",
+    "status": "healthy",
+    "detail": {
+      "defaultEnvironment": "production",
+      "modifiedOn": "2026-08-10T05:27:38.231034Z"
+    },
+    "checked_at": "2026-10-16T11:40:00.000Z"
+  },
+  {
+    "service_key": "cloudflare:argus-agent-email-mcp",
+    "host": "cloudflare",
+    "status": "healthy",
+    "detail": {
+      "defaultEnvironment": "production",
+      "modifiedOn": "2026-08-10T21:30:59.192568Z"
+    },
+    "checked_at": "2026-10-16T11:40:00.000Z"
+  },
+  {
+    "service_key": "cloudflare:argus-email",
+    "host": "cloudflare",
+    "status": "healthy",
+    "detail": {
+      "defaultEnvironment": "production",
+      "modifiedOn": "2026-10-12T03:06:19.193097Z"
+    },
+    "checked_at": "2026-10-16T11:40:00.000Z"
+  },
+  {
+    "service_key": "cloudflare:argus-vault-agent-relay",
+    "host": "cloudflare",
+    "status": "healthy",
+    "detail": {
+      "defaultEnvironment": "production",
+      "modifiedOn": "2026-10-02T14:32:56.602702Z"
+    },
+    "checked_at": "2026-10-16T11:40:00.000Z"
+  },
+  {
+    "service_key": "cloudflare:argus-watchtower-api",
+    "host": "cloudflare",
+    "status": "healthy",
+    "detail": {
+      "defaultEnvironment": "production",
+      "modifiedOn": "2026-10-16T11:10:38.11754Z"
+    },
+    "checked_at": "2026-10-16T11:40:00.000Z"
+  }
+]

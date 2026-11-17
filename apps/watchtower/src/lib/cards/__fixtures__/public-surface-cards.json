@@ -1,0 +1,405 @@
+[
+  {
+    "service_key": "endpoint:api.myargus.cc",
+    "host": "myargus.cc",
+    "status": "healthy",
+    "detail": {
+      "url": "https://api.myargus.cc/watchtower/checks",
+      "expected": 401,
+      "expectedRedirectHost": null,
+      "statusCode": 401,
+      "redirectHost": null,
+      "latencyMs": 234,
+      "slowAfterMs": 3000
+    },
+    "checked_at": "2026-10-16T15:42:30Z"
+  },
+  {
+    "service_key": "endpoint:memory.myargus.cc",
+    "host": "myargus.cc",
+    "status": "healthy",
+    "detail": {
+      "url": "https://memory.myargus.cc/mcp",
+      "expected": 401,
+      "expectedRedirectHost": null,
+      "statusCode": 401,
+      "redirectHost": null,
+      "latencyMs": 191,
+      "slowAfterMs": 3000
+    },
+    "checked_at": "2026-10-16T15:42:30Z"
+  },
+  {
+    "service_key": "endpoint:vault.myargus.cc",
+    "host": "myargus.cc",
+    "status": "healthy",
+    "detail": {
+      "url": "https://vault.myargus.cc/mcp",
+      "expected": 401,
+      "expectedRedirectHost": null,
+      "statusCode": 401,
+      "redirectHost": null,
+      "latencyMs": 179,
+      "slowAfterMs": 3000
+    },
+    "checked_at": "2026-10-16T15:42:30Z"
+  },
+  {
+    "service_key": "endpoint:mail.myargus.cc",
+    "host": "myargus.cc",
+    "status": "healthy",
+    "detail": {
+      "url": "https://mail.myargus.cc/",
+      "expected": 302,
+      "expectedRedirectHost": "cloudflareaccess.com",
+      "statusCode": 302,
+      "redirectHost": "team.cloudflareaccess.com",
+      "latencyMs": 185,
+      "slowAfterMs": 3000
+    },
+    "checked_at": "2026-10-16T15:42:30Z"
+  },
+  {
+    "service_key": "endpoint:mcp.myargus.cc",
+    "host": "myargus.cc",
+    "status": "healthy",
+    "detail": {
+      "url": "https://mcp.myargus.cc/email/mcp",
+      "expected": 401,
+      "expectedRedirectHost": null,
+      "statusCode": 401,
+      "redirectHost": null,
+      "latencyMs": 276,
+      "slowAfterMs": 3000
+    },
+    "checked_at": "2026-10-16T15:42:30Z"
+  },
+  {
+    "service_key": "endpoint:watchtower.myargus.cc",
+    "host": "myargus.cc",
+    "status": "healthy",
+    "detail": {
+      "url": "https://watchtower.myargus.cc/",
+      "expected": 200,
+      "expectedRedirectHost": null,
+      "statusCode": 200,
+      "redirectHost": null,
+      "latencyMs": 201,
+      "slowAfterMs": 3000
+    },
+    "checked_at": "2026-10-16T15:42:30Z"
+  },
+  {
+    "service_key": "tls:api.myargus.cc",
+    "host": "myargus.cc",
+    "status": "healthy",
+    "detail": {
+      "host": "api.myargus.cc",
+      "validFrom": "2026-10-04T04:45:22.000Z",
+      "validTo": "2027-01-02T05:45:06.000Z",
+      "daysLeft": 77,
+      "issuer": "Google Trust Services WE1",
+      "subject": "myargus.cc",
+      "names": [
+        "myargus.cc",
+        "*.myargus.cc"
+      ],
+      "degradedBelowDays": 21,
+      "downBelowDays": 7
+    },
+    "checked_at": "2026-10-16T15:42:30Z"
+  },
+  {
+    "service_key": "tls:memory.myargus.cc",
+    "host": "myargus.cc",
+    "status": "healthy",
+    "detail": {
+      "host": "memory.myargus.cc",
+      "validFrom": "2026-10-04T04:45:22.000Z",
+      "validTo": "2027-01-02T05:45:06.000Z",
+      "daysLeft": 77,
+      "issuer": "Google Trust Services WE1",
+      "subject": "myargus.cc",
+      "names": [
+        "myargus.cc",
+        "*.myargus.cc"
+      ],
+      "degradedBelowDays": 21,
+      "downBelowDays": 7
+    },
+    "checked_at": "2026-10-16T15:42:30Z"
+  },
+  {
+    "service_key": "tls:vault.myargus.cc",
+    "host": "myargus.cc",
+    "status": "healthy",
+    "detail": {
+      "host": "vault.myargus.cc",
+      "validFrom": "2026-09-13T03:37:33.000Z",
+      "validTo": "2026-12-12T04:37:30.000Z",
+      "daysLeft": 56,
+      "issuer": "Google Trust Services WE1",
+      "subject": "myargus.cc",
+      "names": [
+        "myargus.cc",
+        "vault.myargus.cc",
+        "*.vault.myargus.cc"
+      ],
+      "degradedBelowDays": 21,
+      "downBelowDays": 7
+    },
+    "checked_at": "2026-10-16T15:42:30Z"
+  },
+  {
+    "service_key": "tls:mail.myargus.cc",
+    "host": "myargus.cc",
+    "status": "healthy",
+    "detail": {
+      "host": "mail.myargus.cc",
+      "validFrom": "2026-10-07T01:25:08.000Z",
+      "validTo": "2027-01-05T02:24:56.000Z",
+      "daysLeft": 80,
+      "issuer": "Google Trust Services WE1",
+      "subject": "myargus.cc",
+      "names": [
+        "myargus.cc",
+        "mail.myargus.cc",
+        "*.mail.myargus.cc"
+      ],
+      "degradedBelowDays": 21,
+      "downBelowDays": 7
+    },
+    "checked_at": "2026-10-16T15:42:30Z"
+  },
+  {
+    "service_key": "tls:mcp.myargus.cc",
+    "host": "myargus.cc",
+    "status": "healthy",
+    "detail": {
+      "host": "mcp.myargus.cc",
+      "validFrom": "2026-10-04T04:45:22.000Z",
+      "validTo": "2027-01-02T05:45:06.000Z",
+      "daysLeft": 77,
+      "issuer": "Google Trust Services WE1",
+      "subject": "myargus.cc",
+      "names": [
+        "myargus.cc",
+        "*.myargus.cc"
+      ],
+      "degradedBelowDays": 21,
+      "downBelowDays": 7
+    },
+    "checked_at": "2026-10-16T15:42:30Z"
+  },
+  {
+    "service_key": "tls:watchtower.myargus.cc",
+    "host": "myargus.cc",
+    "status": "healthy",
+    "detail": {
+      "host": "watchtower.myargus.cc",
+      "validFrom": "2026-09-08T10:34:57.000Z",
+      "validTo": "2026-12-07T11:34:53.000Z",
+      "daysLeft": 51,
+      "issuer": "Google Trust Services WE1",
+      "subject": "watchtower.myargus.cc",
+      "names": [
+        "watchtower.myargus.cc"
+      ],
+      "degradedBelowDays": 21,
+      "downBelowDays": 7
+    },
+    "checked_at": "2026-10-16T15:42:30Z"
+  },
+  {
+    "service_key": "worker-traffic:reader-api",
+    "host": "cloudflare",
+    "status": "healthy",
+    "detail": {
+      "script": "reader-api",
+      "windowMinutes": 60,
+      "api": true,
+      "route": "api.read.myargus.cc",
+      "invocations": {
+        "requests": 1,
+        "errors": 0,
+        "byStatus": {
+          "success": 1
+        }
+      },
+      "http": null,
+      "httpUnavailable": "The Cloudflare token cannot read zone analytics (needs Zone > Analytics: Read on myargus.cc)",
+      "thresholds": {
+        "minRequests": 20,
+        "serverErrorRateDegraded": 0.02,
+        "serverErrorRateDown": 0.2,
+        "clientErrorRateDegraded": 0.1,
+        "minClientErrors": 10
+      }
+    },
+    "checked_at": "2026-10-16T15:42:30Z"
+  },
+  {
+    "service_key": "worker-traffic:argus-memory-mcp",
+    "host": "cloudflare",
+    "status": "healthy",
+    "detail": {
+      "script": "argus-memory-mcp",
+      "windowMinutes": 60,
+      "api": true,
+      "route": "memory.myargus.cc",
+      "invocations": {
+        "requests": 1,
+        "errors": 0,
+        "byStatus": {
+          "success": 1
+        }
+      },
+      "http": null,
+      "httpUnavailable": "The Cloudflare token cannot read zone analytics (needs Zone > Analytics: Read on myargus.cc)",
+      "thresholds": {
+        "minRequests": 20,
+        "serverErrorRateDegraded": 0.02,
+        "serverErrorRateDown": 0.2,
+        "clientErrorRateDegraded": 0.1,
+        "minClientErrors": 10
+      }
+    },
+    "checked_at": "2026-10-16T15:42:30Z"
+  },
+  {
+    "service_key": "worker-traffic:argus-agent-email",
+    "host": "cloudflare",
+    "status": "healthy",
+    "detail": {
+      "script": "argus-agent-email",
+      "windowMinutes": 60,
+      "api": false,
+      "route": null,
+      "invocations": {
+        "requests": 0,
+        "errors": 0,
+        "byStatus": {}
+      },
+      "http": null,
+      "httpUnavailable": "Not routed over HTTP",
+      "thresholds": {
+        "minRequests": 20,
+        "serverErrorRateDegraded": 0.02,
+        "serverErrorRateDown": 0.2,
+        "clientErrorRateDegraded": 0.1,
+        "minClientErrors": 10
+      }
+    },
+    "checked_at": "2026-10-16T15:42:30Z"
+  },
+  {
+    "service_key": "worker-traffic:argus-agent-email-mcp",
+    "host": "cloudflare",
+    "status": "healthy",
+    "detail": {
+      "script": "argus-agent-email-mcp",
+      "windowMinutes": 60,
+      "api": true,
+      "route": "mcp.myargus.cc/email/*",
+      "invocations": {
+        "requests": 1,
+        "errors": 0,
+        "byStatus": {
+          "success": 1
+        }
+      },
+      "http": null,
+      "httpUnavailable": "The Cloudflare token cannot read zone analytics (needs Zone > Analytics: Read on myargus.cc)",
+      "thresholds": {
+        "minRequests": 20,
+        "serverErrorRateDegraded": 0.02,
+        "serverErrorRateDown": 0.2,
+        "clientErrorRateDegraded": 0.1,
+        "minClientErrors": 10
+      }
+    },
+    "checked_at": "2026-10-16T15:42:30Z"
+  },
+  {
+    "service_key": "worker-traffic:argus-email",
+    "host": "cloudflare",
+    "status": "healthy",
+    "detail": {
+      "script": "argus-email",
+      "windowMinutes": 60,
+      "api": false,
+      "route": "mail.myargus.cc",
+      "invocations": {
+        "requests": 0,
+        "errors": 0,
+        "byStatus": {}
+      },
+      "http": null,
+      "httpUnavailable": "The Cloudflare token cannot read zone analytics (needs Zone > Analytics: Read on myargus.cc)",
+      "thresholds": {
+        "minRequests": 20,
+        "serverErrorRateDegraded": 0.02,
+        "serverErrorRateDown": 0.2,
+        "clientErrorRateDegraded": 0.1,
+        "minClientErrors": 10
+      }
+    },
+    "checked_at": "2026-10-16T15:42:30Z"
+  },
+  {
+    "service_key": "worker-traffic:argus-vault-agent-relay",
+    "host": "cloudflare",
+    "status": "healthy",
+    "detail": {
+      "script": "argus-vault-agent-relay",
+      "windowMinutes": 60,
+      "api": true,
+      "route": "vault.myargus.cc",
+      "invocations": {
+        "requests": 2,
+        "errors": 0,
+        "byStatus": {
+          "success": 2
+        }
+      },
+      "http": null,
+      "httpUnavailable": "The Cloudflare token cannot read zone analytics (needs Zone > Analytics: Read on myargus.cc)",
+      "thresholds": {
+        "minRequests": 20,
+        "serverErrorRateDegraded": 0.02,
+        "serverErrorRateDown": 0.2,
+        "clientErrorRateDegraded": 0.1,
+        "minClientErrors": 10
+      }
+    },
+    "checked_at": "2026-10-16T15:42:30Z"
+  },
+  {
+    "service_key": "worker-traffic:argus-watchtower-api",
+    "host": "cloudflare",
+    "status": "healthy",
+    "detail": {
+      "script": "argus-watchtower-api",
+      "windowMinutes": 60,
+      "api": true,
+      "route": "api.myargus.cc/watchtower/*",
+      "invocations": {
+        "requests": 452,
+        "errors": 0,
+        "byStatus": {
+          "success": 452
+        }
+      },
+      "http": null,
+      "httpUnavailable": "The Cloudflare token cannot read zone analytics (needs Zone > Analytics: Read on myargus.cc)",
+      "thresholds": {
+        "minRequests": 20,
+        "serverErrorRateDegraded": 0.02,
+        "serverErrorRateDown": 0.2,
+        "clientErrorRateDegraded": 0.1,
+        "minClientErrors": 10
+      }
+    },
+    "checked_at": "2026-10-16T15:42:30Z"
+  }
+]

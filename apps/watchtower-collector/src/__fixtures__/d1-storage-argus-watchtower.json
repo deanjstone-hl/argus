@@ -1,0 +1,29 @@
+{
+  "data": {
+    "viewer": {
+      "accounts": [
+        {
+          "d1StorageAdaptiveGroups": [
+            {
+              "dimensions": {
+                "date": "2026-10-16"
+              },
+              "max": {
+                "databaseSizeBytes": 332271600
+              }
+            },
+            {
+              "dimensions": {
+                "date": "2026-10-15"
+              },
+              "max": {
+                "databaseSizeBytes": 328355840
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "errors": null
+}

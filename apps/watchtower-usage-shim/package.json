@@ -1,0 +1,27 @@
+{
+  "name": "@argus/watchtower-usage-shim",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Watchtower usage shim \u2014 exposes local AI usage stats to the watchtower collector",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@argus/bearer-auth": "workspace:*",
+    "@argus/watchtower-contract": "workspace:*",
+    "ccusage": "20.0.17"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "typescript": "~5.8.3",
+    "vitest": "^4.1.10"
+  }
+}

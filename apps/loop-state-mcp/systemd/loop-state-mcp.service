@@ -1,0 +1,28 @@
+[Unit]
+Description=Argus loop-state MCP (slots, loop status and the quiet-tick gate; loopback, published to the tailnet by tailscale serve)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/repos/argus/apps/loop-state-mcp
+# The new env file loads after the old one, so it wins (argus-config#1267). Both are optional
+# while the old path is being retired; the server refuses to start without its secrets.
+EnvironmentFile=-%h/repos/argus/apps/loop-state-mcp/.env
+EnvironmentFile=-%h/.config/argus/loop-state-mcp.env
+# node is managed by fnm and not on the non-interactive PATH, so ExecStart uses
+# the stable fnm alias path rather than a version-pinned one.
+ExecStart=%h/.local/share/fnm/aliases/default/bin/node dist/index.js
+Restart=on-failure
+RestartSec=5
+# Binds 127.0.0.1 (LOOP_STATE_HOST in the env file); `tailscale serve --https=3791` publishes it.
+NoNewPrivileges=yes
+PrivateTmp=yes
+# systemd-oomd killed this unit at 14 MB on 7 Nov 2026 (homelab#424): it was one of the
+# app.slice candidates under memory pressure, and every slot and tick stalled until it
+# restarted. `omit` takes it out of oomd's candidate list, so oomd kills an agent or a CI
+# scope first. Read at unit start, so a change needs a daemon-reload and a restart.
+ManagedOOMPreference=omit
+
+[Install]
+WantedBy=default.target

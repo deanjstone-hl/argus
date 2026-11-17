@@ -1,0 +1,49 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "argus-watchtower-api",
+  "main": "src/worker/index.ts",
+  "compatibility_date": "2026-08-01",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // Reuses the api.myargus.cc/<app> base already hardcoded (but previously
+  // unused) as VITE_API_BASE_URL in .env.example / watchtower-deploy.yml —
+  // a REST data API, distinct from the mcp.myargus.cc/<app> taxonomy used
+  // by MCP-protocol Workers (the retired email-mcp Worker was the example).
+  "routes": [
+    { "pattern": "api.myargus.cc/watchtower/*", "zone_name": "myargus.cc" }
+  ],
+
+  // Public Supabase project URL (the myargus project). The GET /checks JWT is
+  // verified against ${SUPABASE_URL}/auth/v1/.well-known/jwks.json, so no
+  // signing secret is needed.
+  "vars": {
+    "SUPABASE_URL": "https://iyqhnvandyalaujyqbtj.supabase.co"
+  },
+
+  // Hourly history retention (argus#676): the scheduled handler prunes
+  // service_checks rows older than RETENTION_DAYS in bounded batches.
+  "triggers": {
+    "crons": ["17 * * * *"]
+  },
+
+  "observability": {
+    "enabled": true
+  },
+
+  // The id below is a placeholder (argus#1207): the real one is the BWS secret
+  // ARGUS_D1_WATCHTOWER_DATABASE_ID, put in by scripts/with-d1-id.sh for a deploy.
+  // D1: service_checks table. Real database, created via
+  // `wrangler d1 create argus-watchtower` during argus#252's live-provisioning
+  // phase (2026-08-14) — migrations already applied via --remote.
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "argus-watchtower",
+      "database_id": "00000000-0000-4000-8000-0000000000d1",
+      "migrations_dir": "./migrations"
+    }
+  ]
+
+  // Secrets — set via `wrangler secret put` once this config is deployed:
+  //   wrangler secret put WATCHTOWER_COLLECTOR_TOKEN
+}

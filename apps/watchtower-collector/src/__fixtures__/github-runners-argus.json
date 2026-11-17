@@ -1,0 +1,65 @@
+{
+  "total_count": 2,
+  "runners": [
+    {
+      "id": 21,
+      "name": "homelab",
+      "os": "Linux",
+      "status": "online",
+      "busy": true,
+      "version": "2.337.0",
+      "labels": [
+        {
+          "id": 0,
+          "name": "self-hosted",
+          "type": "read-only"
+        },
+        {
+          "id": 0,
+          "name": "Linux",
+          "type": "read-only"
+        },
+        {
+          "id": 0,
+          "name": "X64",
+          "type": "read-only"
+        },
+        {
+          "id": 0,
+          "name": "homelab",
+          "type": "custom"
+        }
+      ]
+    },
+    {
+      "id": 22,
+      "name": "homelab-2",
+      "os": "Linux",
+      "status": "online",
+      "busy": true,
+      "version": "2.337.0",
+      "labels": [
+        {
+          "id": 0,
+          "name": "self-hosted",
+          "type": "read-only"
+        },
+        {
+          "id": 0,
+          "name": "Linux",
+          "type": "read-only"
+        },
+        {
+          "id": 0,
+          "name": "X64",
+          "type": "read-only"
+        },
+        {
+          "id": 0,
+          "name": "homelab",
+          "type": "custom"
+        }
+      ]
+    }
+  ]
+}

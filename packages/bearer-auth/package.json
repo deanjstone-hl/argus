@@ -1,0 +1,24 @@
+{
+  "name": "@argus/bearer-auth",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Fail-closed, constant-time inbound bearer check shared by the Workers and Node services",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "default": "./src/index.js"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "typescript": "~5.8.3",
+    "vitest": "^4.1.10"
+  }
+}

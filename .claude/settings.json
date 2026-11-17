@@ -1,0 +1,11 @@
+{
+  "theme": "custom:argus",
+  "permissions": {
+    "allow": [
+      "Bash(npm run typecheck *)",
+      "Bash(npm run test *)",
+      "Bash(ssh -T git@github.com *)",
+      "Bash(systemctl --user status *)"
+    ]
+  }
+}

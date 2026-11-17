@@ -1,0 +1,14 @@
+{
+  "data": null,
+  "errors": [
+    {
+      "message": "Actor 'com.cloudflare.api.token.00000000000000000000000000000008' does not have permission 'com.cloudflare.api.account.zone.analytics.read' for zone 00000000000000000000000000000009",
+      "path": null,
+      "extensions": {
+        "code": "authz",
+        "timestamp": "2026-10-16T15:41:07.587569626Z",
+        "ray_id": "a4b82a795f055735-PDX"
+      }
+    }
+  ]
+}

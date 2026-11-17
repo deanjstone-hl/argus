@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>t3-peer-mcp call</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --paper: var(--background, #f5f7f8);
+      --ink: var(--foreground, #241523);
+      --soft: var(--muted-foreground, #6f6873);
+      --teal: var(--primary, #0a6f75);
+      --rule: var(--border, #cdd4dc);
+      --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) {
+        --paper: var(--background, #14181c);
+        --ink: var(--foreground, #e8eaed);
+        --soft: var(--muted-foreground, #9aa3ad);
+        --teal: var(--primary, #4fc3c8);
+        --rule: var(--border, #2c343c);
+      }
+    }
+    :root[data-theme="dark"] {
+      --paper: var(--background, #14181c);
+      --ink: var(--foreground, #e8eaed);
+      --soft: var(--muted-foreground, #9aa3ad);
+      --teal: var(--primary, #4fc3c8);
+      --rule: var(--border, #2c343c);
+    }
+    body { font-family: var(--sans); background: var(--paper); color: var(--ink); padding: 16px; }
+    .frame { max-width: 360px; }
+    .eyebrow { font-family: var(--mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--soft); margin-bottom: 4px; }
+    h1 { font-size: 20px; font-weight: 600; line-height: 1.2; margin-bottom: 8px; }
+    .lede { font-size: 13px; line-height: 1.45; color: var(--soft); margin-bottom: 12px; }
+    .scroll { overflow-x: auto; }
+    svg { width: 100%; min-width: 320px; display: block; }
+    .src { font-size: 11px; line-height: 1.5; color: var(--soft); margin-top: 12px; }
+    .src a { color: var(--teal); }
+    .src code { font-family: var(--mono); font-size: 10px; }
+    .divider { stroke: var(--rule); stroke-width: 1; }
+    .lane { fill: var(--soft); font-family: var(--mono); font-size: 9px; letter-spacing: .12em; }
+    .flow { fill: none; stroke: var(--soft); stroke-width: 1.2; }
+    .dashed { stroke-dasharray: 5,4; }
+    .gate { fill: none; stroke: var(--teal); stroke-width: 1.6; }
+    .mask { fill: var(--paper); }
+    .tag { fill: var(--soft); font-family: var(--mono); font-size: 9px; letter-spacing: .08em; }
+    .tag.teal { fill: var(--teal); }
+    .node { fill: var(--paper); stroke: var(--ink); stroke-width: 1; }
+    .node.focal { fill: color-mix(in srgb, var(--teal) 14%, var(--paper)); stroke: var(--teal); stroke-width: 1.6; }
+    .node.ext { stroke-dasharray: 4,3; }
+    .step:target .node { stroke: var(--teal); stroke-width: 2.6; fill: color-mix(in srgb, var(--teal) 22%, var(--paper)); }
+    .name { fill: var(--ink); font-family: var(--sans); font-size: 12px; font-weight: 600; text-anchor: middle; }
+    .sub { fill: var(--soft); font-family: var(--mono); font-size: 9px; text-anchor: middle; }
+    .note { fill: var(--soft); font-family: var(--sans); font-size: 11px; font-style: italic; }
+    .key { fill: var(--soft); font-family: var(--sans); font-size: 10px; }
+    .head-soft { fill: var(--soft); }
+    .head-teal { fill: var(--teal); }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <p class="eyebrow">Request</p>
+    <h1>t3-peer-mcp call</h1>
+    <p class="lede">How a thread on one host reaches a T3 server on the other, with nothing stored and nothing new exposed.</p>
+    <div class="scroll">
+    <svg viewBox="0 0 360 590" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="peer-title peer-desc">
+      <title id="peer-title">t3-peer-mcp call</title>
+      <desc id="peer-desc">A peer tool call mints a 15 minute session by running t3 auth over ssh, opens a local forward to the peer's loopback T3, then reads over HTTP or writes over a WebSocket RPC. The session is reused for 12 minutes, then revoked and minted again.</desc>
+      <defs>
+        <marker id="peer-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon class="head-soft" points="0 0, 8 3, 0 6"/></marker>
+        <marker id="peer-arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon class="head-teal" points="0 0, 8 3, 0 6"/></marker>
+      </defs>
+      <path class="flow" d="M 164,72 L 164,96" marker-end="url(#peer-arrow)"/>
+      <path class="flow" d="M 164,144 L 164,168" marker-end="url(#peer-arrow)"/>
+      <path class="flow" d="M 82,216 L 82,240" marker-end="url(#peer-arrow)"/>
+      <path class="flow" d="M 246,216 L 246,240" marker-end="url(#peer-arrow)"/>
+      <path class="flow" d="M 82,288 L 82,312" marker-end="url(#peer-arrow)"/>
+      <path class="flow" d="M 246,288 L 246,312" marker-end="url(#peer-arrow)"/>
+      <path class="flow" d="M 164,360 L 164,384" marker-end="url(#peer-arrow)"/>
+      <path class="flow dashed" d="M 320,408 L 330,408 Q 338,408 338,400 L 338,128 Q 338,120 330,120 L 320,120" marker-end="url(#peer-arrow)"/>
+      <rect class="mask" x="168" y="150" width="89" height="12" rx="2"/>
+      <text class="tag" x="172" y="159" text-anchor="start">TOKEN IN MEMORY</text>
+      <rect class="mask" x="274" y="294" width="62" height="12" rx="2"/>
+      <text class="tag" x="332" y="303" text-anchor="end">MINT AGAIN</text>
+      <g id="step-peer-call" class="step">
+      <rect class="node" x="8" y="24" width="312" height="48" rx="6"/>
+      <text class="name" x="164" y="45">Peer tool call</text>
+      <text class="sub" x="164" y="60">peer_thread_send, _list, _read, _launch</text>
+      </g>
+      <g id="step-peer-mint" class="step">
+      <rect class="node focal" x="8" y="96" width="312" height="48" rx="6"/>
+      <text class="name" x="164" y="117">Mint a short-lived session</text>
+      <text class="sub" x="164" y="132">ssh peer, t3 auth session issue --ttl 15m</text>
+      </g>
+      <g id="step-peer-tunnel" class="step">
+      <rect class="node" x="8" y="168" width="312" height="48" rx="6"/>
+      <text class="name" x="164" y="189">Open a local forward</text>
+      <text class="sub" x="164" y="204">ssh -N -L to the peer's loopback T3</text>
+      </g>
+      <g id="step-peer-read" class="step">
+      <rect class="node" x="8" y="240" width="148" height="48" rx="6"/>
+      <text class="name" x="82" y="261">Read</text>
+      <text class="sub" x="82" y="276">HTTP orchestration API</text>
+      </g>
+      <g id="step-peer-write" class="step">
+      <rect class="node" x="172" y="240" width="148" height="48" rx="6"/>
+      <text class="name" x="246" y="261">Write</text>
+      <text class="sub" x="246" y="276">WebSocket RPC command</text>
+      </g>
+      <g id="step-peer-peer" class="step">
+      <rect class="node ext" x="8" y="312" width="312" height="48" rx="6"/>
+      <text class="name" x="164" y="333">Peer T3 server</text>
+      <text class="sub" x="164" y="348">binds loopback only, nothing new exposed</text>
+      </g>
+      <g id="step-peer-reuse" class="step">
+      <rect class="node" x="8" y="384" width="312" height="48" rx="6"/>
+      <text class="name" x="164" y="405">Session reuse</text>
+      <text class="sub" x="164" y="420">12 minutes, then revoked</text>
+      </g>
+      <text class="note" x="8" y="474">Every message ends with a line naming the sending</text>
+      <text class="note" x="8" y="488">environment.</text>
+      <text class="note" x="8" y="502">Launched threads run in full-access mode with nobody</text>
+      <text class="note" x="8" y="516">watching.</text>
+      <text class="note" x="8" y="530">Each host holds a peers.json naming itself and the other,</text>
+      <text class="note" x="8" y="544">from argus-config.</text>
+      <rect class="node" x="8" y="572" width="14" height="10" rx="2"/>
+      <text class="key" x="28" y="581">Step</text>
+      <rect class="node focal" x="65.6" y="572" width="14" height="10" rx="2"/>
+      <text class="key" x="85.6" y="581">Secret</text>
+      <rect class="node ext" x="134" y="572" width="14" height="10" rx="2"/>
+      <text class="key" x="154" y="581">Peer</text>
+      <line class="flow" x1="191.6" y1="577" x2="215.6" y2="577" marker-end="url(#peer-arrow)"/>
+      <text class="key" x="221.6" y="581">Flow</text>
+      <line class="flow dashed" x1="259.2" y1="577" x2="283.2" y2="577" marker-end="url(#peer-arrow)"/>
+      <text class="key" x="289.2" y="581">Renew</text>
+    </svg>
+    </div>
+    <p class="src">Sources: <code>apps/t3-peer-mcp/README.md</code> (How it reaches the peer, Configuration), <code>src/peer-connection.ts</code>. The seven tools are in the README. Not drawn: the ssh <code>BatchMode</code> host-key requirement, and the content-type check for an unknown <code>/api</code> route.</p>
+  </div>
+</body>
+</html>

@@ -1,0 +1,35 @@
+{
+  "capturedAt": "2026-10-16T15:42:27.177Z",
+  "probes": {
+    "https://api.myargus.cc/watchtower/checks": {
+      "status": 401,
+      "location": null,
+      "latencyMs": 234
+    },
+    "https://memory.myargus.cc/mcp": {
+      "status": 401,
+      "location": null,
+      "latencyMs": 191
+    },
+    "https://vault.myargus.cc/mcp": {
+      "status": 401,
+      "location": null,
+      "latencyMs": 179
+    },
+    "https://mail.myargus.cc/": {
+      "status": 302,
+      "location": "https://team.cloudflareaccess.com/cdn-cgi/access/login/mail.myargus.cc",
+      "latencyMs": 185
+    },
+    "https://mcp.myargus.cc/email/mcp": {
+      "status": 401,
+      "location": null,
+      "latencyMs": 276
+    },
+    "https://watchtower.myargus.cc/": {
+      "status": 200,
+      "location": null,
+      "latencyMs": 201
+    }
+  }
+}

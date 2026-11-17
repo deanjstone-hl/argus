@@ -1,0 +1,14 @@
+[Unit]
+Description=Argus Agent Engine
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/.argus/agent-engine
+EnvironmentFile=%h/.argus/agent-engine/.env
+ExecStart=node dist/server/http.js
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

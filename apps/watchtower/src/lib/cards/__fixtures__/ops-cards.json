@@ -1,0 +1,273 @@
+[
+  {
+    "service_key": "homelab:load",
+    "host": "homelab",
+    "status": "healthy",
+    "detail": {
+      "load1": 6.19,
+      "load5": 4.21,
+      "load15": 4.04,
+      "cpus": 4
+    },
+    "checked_at": "2026-10-16T12:45:00.000Z"
+  },
+  {
+    "service_key": "homelab:memory",
+    "host": "homelab",
+    "status": "healthy",
+    "detail": {
+      "totalBytes": 8213626880,
+      "availableBytes": 5864505344,
+      "swapTotalBytes": 4294963200,
+      "swapFreeBytes": 2709020672,
+      "pressure": {
+        "some": {
+          "avg10": 0.14,
+          "avg60": 1.05,
+          "avg300": 1.8
+        },
+        "full": {
+          "avg10": 0.12,
+          "avg60": 0.59,
+          "avg300": 1.34
+        }
+      }
+    },
+    "checked_at": "2026-10-16T12:45:00.000Z"
+  },
+  {
+    "service_key": "github-ci:argus-config",
+    "host": "github-ci",
+    "status": "degraded",
+    "detail": {
+      "repo": "deanjstone/argus-config",
+      "branch": "main",
+      "workflows": [
+        {
+          "name": "Lint",
+          "conclusion": "failure",
+          "completedAt": "2026-10-15T04:53:10Z",
+          "headSha": "1e00c371237cb3b6f8567d60acbcdc2491854adc",
+          "runUrl": "https://github.com/deanjstone/argus-config/actions/runs/38683201639",
+          "running": false,
+          "failedJobs": [
+            "Bats tests"
+          ]
+        }
+      ]
+    },
+    "checked_at": "2026-10-16T12:45:00.000Z"
+  },
+  {
+    "service_key": "github-ci:budget",
+    "host": "github-ci",
+    "status": "healthy",
+    "detail": {
+      "repo": "deanjstone/budget",
+      "branch": "main",
+      "workflows": [
+        {
+          "name": "CI",
+          "conclusion": "success",
+          "completedAt": "2026-10-15T23:01:48Z",
+          "headSha": "0a74da12b9a41319113f01f5459dedef08624827",
+          "runUrl": "https://github.com/deanjstone/budget/actions/runs/38819876155",
+          "running": false,
+          "failedJobs": []
+        },
+        {
+          "name": "Notify on failure",
+          "conclusion": "success",
+          "completedAt": "2026-10-15T04:00:05Z",
+          "headSha": "b3681103e8f57e94ed8dc40793bd302f16c9522b",
+          "runUrl": "https://github.com/deanjstone/budget/actions/runs/38679044082",
+          "running": false,
+          "failedJobs": []
+        },
+        {
+          "name": "Release",
+          "conclusion": "success",
+          "completedAt": "2026-10-15T22:52:02Z",
+          "headSha": "0a74da12b9a41319113f01f5459dedef08624827",
+          "runUrl": "https://github.com/deanjstone/budget/actions/runs/38819876185",
+          "running": false,
+          "failedJobs": []
+        },
+        {
+          "name": "Secret Scanning",
+          "conclusion": "success",
+          "completedAt": "2026-10-15T22:52:31Z",
+          "headSha": "0a74da12b9a41319113f01f5459dedef08624827",
+          "runUrl": "https://github.com/deanjstone/budget/actions/runs/38819876366",
+          "running": false,
+          "failedJobs": []
+        }
+      ]
+    },
+    "checked_at": "2026-10-16T12:45:00.000Z"
+  },
+  {
+    "service_key": "github-ci:ledger-spa",
+    "host": "github-ci",
+    "status": "healthy",
+    "detail": {
+      "repo": "deanjstone/ledger-spa",
+      "branch": "main",
+      "workflows": []
+    },
+    "checked_at": "2026-10-16T12:45:00.000Z"
+  },
+  {
+    "service_key": "github-runners:queue",
+    "host": "github-runners",
+    "status": "degraded",
+    "detail": {
+      "windowHours": 24,
+      "waiting": 8,
+      "oldestWaiting": {
+        "repo": "deanjstone/argus",
+        "workflow": "CI",
+        "job": "Build (wiki)",
+        "since": "2026-10-16T12:31:06Z",
+        "url": "https://github.com/deanjstone/argus/actions/runs/38901067413/job/116973156585"
+      },
+      "repos": [
+        {
+          "repo": "deanjstone/argus",
+          "waiting": 8,
+          "oldestWaiting": {
+            "repo": "deanjstone/argus",
+            "workflow": "CI",
+            "job": "Build (wiki)",
+            "since": "2026-10-16T12:31:06Z",
+            "url": "https://github.com/deanjstone/argus/actions/runs/38901067413/job/116973156585"
+          },
+          "jobs": 27,
+          "medianWaitSeconds": 1699,
+          "p90WaitSeconds": 3800,
+          "maxWaitSeconds": 4406
+        },
+        {
+          "repo": "deanjstone/pkm-vault",
+          "waiting": 0,
+          "oldestWaiting": null,
+          "jobs": 0,
+          "medianWaitSeconds": null,
+          "p90WaitSeconds": null,
+          "maxWaitSeconds": null
+        }
+      ]
+    },
+    "checked_at": "2026-10-16T12:45:00.000Z"
+  },
+  {
+    "service_key": "tailscale:homelab",
+    "host": "tailscale",
+    "status": "healthy",
+    "detail": {
+      "name": "homelab",
+      "dnsName": "homelab.tailnet-example.ts.net",
+      "os": "linux",
+      "self": true,
+      "online": true,
+      "lastSeen": null,
+      "ips": [
+        "100.64.0.2",
+        "fd7a:115c:a1e0::c35:dd32"
+      ],
+      "keyExpiry": null,
+      "offlineAfterMs": 3600000,
+      "companion": null,
+      "companionOnline": null
+    },
+    "checked_at": "2026-10-16T12:45:00.000Z"
+  },
+  {
+    "service_key": "tailscale:aperture",
+    "host": "tailscale",
+    "status": "healthy",
+    "detail": {
+      "name": "aperture",
+      "dnsName": "aperture.tailnet-example.ts.net",
+      "os": "linux",
+      "self": false,
+      "online": true,
+      "lastSeen": "2026-10-16T10:19:52.1Z",
+      "ips": [
+        "100.64.0.11",
+        "fd7a:115c:a1e0::4f35:f06a"
+      ],
+      "keyExpiry": "2027-02-23T20:59:48Z",
+      "offlineAfterMs": 43200000,
+      "companion": null,
+      "companionOnline": null
+    },
+    "checked_at": "2026-10-16T12:45:00.000Z"
+  },
+  {
+    "service_key": "tailscale:LNV-LGN5",
+    "host": "tailscale",
+    "status": "healthy",
+    "detail": {
+      "name": "LNV-LGN5",
+      "dnsName": "lnv-lgn5.tailnet-example.ts.net",
+      "os": "windows",
+      "self": false,
+      "online": true,
+      "lastSeen": null,
+      "ips": [
+        "100.64.0.3",
+        "fd7a:115c:a1e0::5a35:2831"
+      ],
+      "keyExpiry": null,
+      "offlineAfterMs": 43200000,
+      "companion": null,
+      "companionOnline": null
+    },
+    "checked_at": "2026-10-16T12:45:00.000Z"
+  },
+  {
+    "service_key": "tailscale:lnv-lgn5-wsl",
+    "host": "tailscale",
+    "status": "degraded",
+    "detail": {
+      "name": "lnv-lgn5-wsl",
+      "dnsName": "lnv-lgn5-wsl.tailnet-example.ts.net",
+      "os": "linux",
+      "self": false,
+      "online": false,
+      "lastSeen": "2026-10-16T12:05:00Z",
+      "ips": [
+        "100.64.0.1",
+        "fd7a:115c:a1e0::c635:5d2a"
+      ],
+      "keyExpiry": null,
+      "offlineAfterMs": 43200000,
+      "companion": "LNV-LGN5",
+      "companionOnline": true
+    },
+    "checked_at": "2026-10-16T12:45:00.000Z"
+  },
+  {
+    "service_key": "tailscale:DJ15",
+    "host": "tailscale",
+    "status": "healthy",
+    "detail": {
+      "name": "DJ15",
+      "dnsName": "dj15.tailnet-example.ts.net",
+      "os": "iOS",
+      "self": false,
+      "online": false,
+      "lastSeen": "2026-10-16T10:40:00.1Z",
+      "ips": [
+        "100.64.0.13",
+        "fd7a:115c:a1e0::4735:1a03"
+      ],
+      "keyExpiry": null,
+      "offlineAfterMs": 604800000,
+      "companion": null,
+      "companionOnline": null
+    },
+    "checked_at": "2026-10-16T12:45:00.000Z"
+  }
+]

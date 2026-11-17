@@ -1,0 +1,87 @@
+name: agent-engine Deploy (WSL2)
+
+# A dispatch is still a deploy: an owner step, never run by an agent. It redeploys this target at the head of `deploy`.
+# agent-engine runs as the `agent-engine.service` user unit on WSL2.
+# The owner approves a promotion card on the ops hub, the hub fast-forwards `deploy`, and
+# this push runs apps/agent-engine/deploy.sh on the WSL2 deploy runner (argus#1025,
+# argus-config#1048). Merging to `main` deploys nothing (docs/deploy-branch.md).
+#
+# It runs deploy.sh itself, from the deploy copy at `origin/deploy`, so the approval and the
+# by-hand break-glass path (`bash apps/agent-engine/deploy.sh` from a checkout at origin/deploy)
+# cannot drift apart, and the copy a unit runs from is the copy that gets built.
+#
+# The runner is the owner's own machine (argus-config docs/runbooks/wsl2-deploy-runner.md):
+# no pull_request trigger, no CI job, and no secret reaches the job through GitHub. It is
+# online only while the laptop is awake, so a run queues until it wakes.
+on:
+  push:
+    branches: [deploy]
+    paths:
+      - "apps/agent-engine/**"
+      - ".github/workflows/agent-engine-deploy.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One deploy at a time. A newer promotion replaces a pending older run and never cancels one in
+# progress (argus-config#1293, argus#1176).
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy agent-engine on WSL2
+    # Only a push to `deploy` ships; the same file on any other ref does not. The runner cannot
+    # filter by branch, so this line is the filter.
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/deploy'
+    runs-on: [self-hosted, wsl2-deploy]
+    timeout-minutes: 30
+    steps:
+      # The runner is a `systemd --user` unit with an explicit PATH (fnm's alias bin, then
+      # ~/.local/bin). It reaches the user manager through XDG_RUNTIME_DIR; set it here so a
+      # change to the unit cannot silently break `systemctl --user`.
+      - name: Reach the host tools and the user systemd manager
+        run: |
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          echo "XDG_RUNTIME_DIR=/run/user/$(id -u)" >> "$GITHUB_ENV"
+          echo "JOB_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
+
+      # What runs is the deploy copy, so that is what is moved, not a fresh checkout. A newer
+      # promotion may have landed since this run started; the copy then takes the newer
+      # `deploy`, which is what deploy.sh's guard requires anyway.
+      - name: Move the deploy copy to deploy
+        run: |
+          cd "$HOME/repos/argus"
+          git fetch --quiet origin deploy
+          git switch --detach origin/deploy
+          echo "deploy copy at $(git rev-parse HEAD); this run was started by ${GITHUB_SHA}"
+
+      - name: Install dependencies
+        run: |
+          cd "$HOME/repos/argus"
+          pnpm install --frozen-lockfile --filter @argus/agent-engine...
+
+      - name: Deploy
+        run: |
+          cd "$HOME/repos/argus"
+          bash apps/agent-engine/deploy.sh
+
+      # The effect, not deploy.sh's word for it: it only warns when the unit is not installed,
+      # so require the unit to have been restarted after this job began, and the engine to answer.
+      - name: Read health back after the restart
+        run: |
+          healthy=false
+          for _ in $(seq 1 60); do
+            if curl -fsS "http://127.0.0.1:${ARGUS_PORT:-3747}/health" > /dev/null 2>&1; then healthy=true; break; fi
+            sleep 1
+          done
+          "$healthy" || { echo "::error::agent-engine does not answer /health after the restart"; exit 1; }
+          systemctl --user show agent-engine.service -p ActiveState,SubState,MainPID,ActiveEnterTimestamp
+          started="$(date -d "$(systemctl --user show agent-engine.service -p ActiveEnterTimestamp --value)" +%s)"
+          if (( started < JOB_STARTED_AT )); then
+            echo "::error::agent-engine.service was started before this job began: it was not restarted"
+            exit 1
+          fi
+          echo "agent-engine restarted and healthy at $(git -C "$HOME/repos/argus" rev-parse --short HEAD)"

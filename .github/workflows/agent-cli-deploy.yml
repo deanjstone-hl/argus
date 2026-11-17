@@ -1,0 +1,77 @@
+name: agent-cli Deploy (WSL2)
+
+# A dispatch is still a deploy: an owner step, never run by an agent. It redeploys this target at the head of `deploy`.
+# agent-cli is the `agent` CLI, synced to ~/.argus/agent-cli and shimmed at ~/bin/agent.
+# The owner approves a promotion card on the ops hub, the hub fast-forwards `deploy`, and
+# this push runs apps/agent-cli/deploy.sh on the WSL2 deploy runner (argus#1025,
+# argus-config#1048). Merging to `main` deploys nothing (docs/deploy-branch.md).
+#
+# It runs deploy.sh itself, from the deploy copy at `origin/deploy`, so the approval and the
+# by-hand break-glass path (`bash apps/agent-cli/deploy.sh` from a checkout at origin/deploy)
+# cannot drift apart, and the copy a unit runs from is the copy that gets built.
+#
+# The runner is the owner's own machine (argus-config docs/runbooks/wsl2-deploy-runner.md):
+# no pull_request trigger, no CI job, and no secret reaches the job through GitHub. It is
+# online only while the laptop is awake, so a run queues until it wakes.
+on:
+  push:
+    branches: [deploy]
+    paths:
+      - "apps/agent-cli/**"
+      - ".github/workflows/agent-cli-deploy.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One deploy at a time. A newer promotion replaces a pending older run and never cancels one in
+# progress (argus-config#1293, argus#1176).
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy agent-cli on WSL2
+    # Only a push to `deploy` ships; the same file on any other ref does not. The runner cannot
+    # filter by branch, so this line is the filter.
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/deploy'
+    runs-on: [self-hosted, wsl2-deploy]
+    timeout-minutes: 30
+    steps:
+      # The runner is a `systemd --user` unit with an explicit PATH (fnm's alias bin, then
+      # ~/.local/bin). It reaches the user manager through XDG_RUNTIME_DIR; set it here so a
+      # change to the unit cannot silently break `systemctl --user`.
+      - name: Reach the host tools and the user systemd manager
+        run: |
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          echo "XDG_RUNTIME_DIR=/run/user/$(id -u)" >> "$GITHUB_ENV"
+          echo "JOB_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
+
+      # What runs is the deploy copy, so that is what is moved, not a fresh checkout. A newer
+      # promotion may have landed since this run started; the copy then takes the newer
+      # `deploy`, which is what deploy.sh's guard requires anyway.
+      - name: Move the deploy copy to deploy
+        run: |
+          cd "$HOME/repos/argus"
+          git fetch --quiet origin deploy
+          git switch --detach origin/deploy
+          echo "deploy copy at $(git rev-parse HEAD); this run was started by ${GITHUB_SHA}"
+
+      - name: Install dependencies
+        run: |
+          cd "$HOME/repos/argus"
+          pnpm install --frozen-lockfile --filter @argus/agent-cli...
+
+      - name: Deploy
+        run: |
+          cd "$HOME/repos/argus"
+          bash apps/agent-cli/deploy.sh
+
+      # The effect: the installed build is the one just built, and the shim still runs it.
+      - name: Read the installed CLI back
+        run: |
+          cd "$HOME/repos/argus"
+          cmp apps/agent-cli/dist/index.js "$HOME/.argus/agent-cli/dist/index.js"
+          "$HOME/bin/agent" --version
+          echo "agent-cli installed at $(git rev-parse --short HEAD)"

@@ -1,0 +1,51 @@
+name: Deploy dry run
+
+# What the pull request used to run as the `dry-run` job of each host deploy workflow
+# (loop-state-mcp, t3-peer-mcp, watchtower-collector): the deploy script parses and the
+# package builds. It changes nothing. It lives apart from those workflows because they hold
+# a job on the owner's host and only a push to `deploy` may start them (argus#1207); this
+# one runs on a GitHub-hosted runner and reads no secret.
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "apps/loop-state-mcp/**"
+      - "apps/t3-peer-mcp/**"
+      - "apps/watchtower-collector/**"
+      - ".github/workflows/deploy-dry-run.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  dry-run:
+    name: Dry run (${{ matrix.app }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - app: loop-state-mcp
+            package: "@argus/loop-state-mcp"
+          - app: t3-peer-mcp
+            package: "@argus/t3-peer-mcp"
+          - app: watchtower-collector
+            package: "@argus/watchtower-collector"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - run: bash -n apps/${{ matrix.app }}/deploy.sh
+
+      - run: pnpm install --frozen-lockfile --filter "${{ matrix.package }}..."
+
+      - run: pnpm --filter "${{ matrix.package }}" run build

@@ -1,0 +1,63 @@
+{
+  "data": {
+    "viewer": {
+      "accounts": [
+        {
+          "workersInvocationsAdaptive": [
+            {
+              "dimensions": {
+                "scriptName": "reader-api",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 1
+              }
+            },
+            {
+              "dimensions": {
+                "scriptName": "argus-watchtower-api",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 452
+              }
+            },
+            {
+              "dimensions": {
+                "scriptName": "argus-agent-email-mcp",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 1
+              }
+            },
+            {
+              "dimensions": {
+                "scriptName": "argus-vault-agent-relay",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 2
+              }
+            },
+            {
+              "dimensions": {
+                "scriptName": "argus-memory-mcp",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 1
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "errors": null
+}

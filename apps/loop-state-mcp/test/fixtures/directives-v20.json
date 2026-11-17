@@ -1,0 +1,50 @@
+{
+  "version": 20,
+  "cadence_minutes": 30,
+  "max_slots": 2,
+  "host_caps": {
+    "homelab": 1,
+    "wsl2": 2
+  },
+  "reserve_percent": 5,
+  "max_memory_pressure": 20,
+  "repo_holds": [
+    {
+      "repo": "deanjstone/budget",
+      "reason": "Owner hold, 2026-10-23 05:53 AEDT: all budget issues held. Homelab overload overnight."
+    },
+    {
+      "repo": "deanjstone/provably",
+      "reason": "Owner hold, 2026-11-03 11:20 AEDT: hold all work for provably."
+    }
+  ],
+  "take_next": [],
+  "ordering": [
+    "Homelab efficiency first (owner, 3 Nov 2026 20:12 AEDT: \"Any issues that provides an efficiency gain for homelab is to be prioritised, always.\"). An issue labelled `efficiency:homelab` (any repo) is taken ahead of every order group, bugs included, oldest first among them. Ready slots, `next` and take_next still come first, and the Skip rules still apply. Aquila labels an issue `efficiency:homelab` when it cuts homelab load, memory, disk or CI time.",
+    "Owner, 2 Nov 2026 06:45 AEDT. Take takeable issues in this order, each group ahead of the next: (1) bugs (label `bug`, GitHub issue type Bug, or a `fix:` title), (2) issues in deanjstone/homelab, (3) sub-issues of a map (parent labelled `wayfinder:map`), (4) everything else.",
+    "Within a group keep the queue order (wave, then oldest). Ready slots, `next` and take_next still come first, and the Skip rules still apply.",
+    "Map order (owner, 2 Nov 2026 08:33 and 08:40 AEDT; grilling finished, the map hold is lifted): within group (3), take map sub-issues in this map order: deanjstone/design-system#136, deanjstone/argus-config#1048, deanjstone/argus-config#1005, deanjstone/argus-config#1030, deanjstone/argus#931, deanjstone/context#295, then any other map. Bugs (group 1) and homelab issues (group 2) still come first, whatever their map.",
+    "Research runs in subagents (owner, 2 Nov 2026 09:03 AEDT): a research issue (label `wayfinder:research`, or a `Research:` title) never takes a worker slot. Aquila runs it as a `delegate_task` research child (Sonnet or Haiku, `child_start` with its taskId), at most one research child at a time, under the same load, quiet-window and budget gates as a slot. The child posts its findings and the Resolution on the issue; Aquila verifies and records it with `child_close`. Research issues keep their place in this order when picking the next child."
+  ],
+  "order_groups": [
+    "bug",
+    "homelab",
+    "map_child",
+    "rest"
+  ],
+  "map_order": [
+    "deanjstone/design-system#136",
+    "deanjstone/argus-config#1048",
+    "deanjstone/argus-config#1005",
+    "deanjstone/argus-config#1030",
+    "deanjstone/argus#931",
+    "deanjstone/context#295"
+  ],
+  "trunk_repos": [
+    "deanjstone/design-system",
+    "deanjstone/context"
+  ],
+  "budget_exempt_repos": [
+    "deanjstone/design-system"
+  ]
+}
