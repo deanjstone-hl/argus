@@ -26,6 +26,12 @@
 #     notice-board queue card (argus#686); while it is missing the card stays
 #     unregistered.
 #
+#   "notice-board-token-watchtower-collector" (personal-machine-secrets project)
+#     — the collector's own device token on the ops hub, written as
+#     WATCHTOWER_HUB_TOKEN (argus#52). The hub's deploy.sh reads the same secret
+#     into its NOTICE_BOARD_TOKENS. Optional: while it is missing the hub is not
+#     written and the collector logs that at start.
+#
 # Non-secret config (project refs, unit lists) is set via the env overrides below or by editing
 # the CONFIG block. The private values (tailnet addresses, Cloudflare account, zone and D1 ids)
 # are in BWS under ARGUS_TAILSCALE_IP_HOMELAB, ARGUS_TAILSCALE_IP_WSL2, ARGUS_CLOUDFLARE_ACCOUNT_ID,
@@ -79,6 +85,7 @@ AI_USAGE_WSL2_TOKEN=$(bws_secret "watchtower-usage-shim-token-wsl2")
 GITHUB_RUNNERS_TOKEN=$(bws_secret "watchtower-github-runners-token")
 GITHUB_ACTIONS_TOKEN=$(bws_secret "myargus GitHub app: collector PAT")
 NOTICE_BOARD_TOKEN=$(bws_secret "notice-board-token-homelab")
+WATCHTOWER_HUB_TOKEN=$(bws_secret "notice-board-token-watchtower-collector")
 
 secret_ok WATCHTOWER_COLLECTOR_TOKEN "watchtower-collector-token"
 secret_ok SYNCTHING_API_KEY          "syncthing-homelab-api-key"
@@ -88,6 +95,7 @@ secret_ok AI_USAGE_WSL2_TOKEN        "watchtower-usage-shim-token-wsl2"
 [[ -n "$GITHUB_RUNNERS_TOKEN" ]] && ok "watchtower-github-runners-token" || ok "watchtower-github-runners-token — not set, runner adapters stay inert"
 secret_ok GITHUB_ACTIONS_TOKEN       "myargus GitHub app: collector PAT"
 secret_ok NOTICE_BOARD_TOKEN         "notice-board-token-homelab"
+[[ -n "$WATCHTOWER_HUB_TOKEN" ]] && ok "notice-board-token-watchtower-collector" || warn "notice-board-token-watchtower-collector — missing in BWS; the ops hub is not written until it exists"
 
 # ── non-secret config — override via env if these change ────────────────────
 # User units bare, system units as system:<unit>. A timer reports its last
@@ -144,7 +152,9 @@ NOTICE_BOARD_URL="${NOTICE_BOARD_URL:-http://127.0.0.1:3790}"
 # (argus#252 cutover), not Supabase directly — see worker-client.ts.
 WATCHTOWER_WORKER_URL="${WATCHTOWER_WORKER_URL:-https://api.myargus.cc}"
 # The ops hub gets every check too (argus#1200), once WATCHTOWER_HUB_TOKEN is
-# in the env file (owner step, argus#1202). WATCHTOWER_D1 / WATCHTOWER_HUB set
+# in the env file: deploy.sh writes it from the BWS secret
+# notice-board-token-watchtower-collector (argus#52; the secret is an owner
+# step, argus#1202). WATCHTOWER_D1 / WATCHTOWER_HUB set
 # to off turn a store off; unset leaves each on its default.
 WATCHTOWER_HUB_URL="${WATCHTOWER_HUB_URL:-$NOTICE_BOARD_URL}"
 # The USB printer, shared by ipp-usb on homelab. localhost, not an IP: the
@@ -161,6 +171,7 @@ chmod 600 "$ENV_FILE"
   echo "WATCHTOWER_WORKER_URL=${WATCHTOWER_WORKER_URL}"
   echo "WATCHTOWER_COLLECTOR_TOKEN=${WATCHTOWER_COLLECTOR_TOKEN}"
   echo "WATCHTOWER_HUB_URL=${WATCHTOWER_HUB_URL}"
+  [[ -n "$WATCHTOWER_HUB_TOKEN" ]] && echo "WATCHTOWER_HUB_TOKEN=${WATCHTOWER_HUB_TOKEN}"
   [[ -n "${WATCHTOWER_D1:-}" ]] && echo "WATCHTOWER_D1=${WATCHTOWER_D1}"
   [[ -n "${WATCHTOWER_HUB:-}" ]] && echo "WATCHTOWER_HUB=${WATCHTOWER_HUB}"
   echo "SYSTEMD_UNITS=${SYSTEMD_UNITS}"

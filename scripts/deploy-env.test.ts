@@ -172,6 +172,59 @@ describe.each(["watchtower-collector", "watchtower-usage-shim"])("%s deploy.sh w
   });
 });
 
+// The ops hub gets every check once WATCHTOWER_HUB_TOKEN is in the env file. deploy.sh rewrites that
+// file from BWS on every run, so it carries the token itself (argus#52); a hand-added one was dropped.
+describe("watchtower-collector deploy.sh writes the hub token (argus#52)", () => {
+  const hubSecret = "notice-board-token-watchtower-collector";
+  const privateValues = Object.entries({
+    ARGUS_TAILSCALE_IP_HOMELAB: "100.64.0.2",
+    ARGUS_TAILSCALE_IP_WSL2: "100.64.0.1",
+    ARGUS_CLOUDFLARE_ACCOUNT_ID: "0000000000000000000000000000a001",
+    ARGUS_CLOUDFLARE_ZONE_ID: "0000000000000000000000000000a002",
+    ARGUS_D1_WATCHTOWER_DATABASE_ID: "00000000-0000-4000-8000-0000000000d1",
+  }).map(([key, value]) => ({ key, value }));
+  const secretsWith = (extra: { key: string; value: string }[]) => JSON.stringify([...privateValues, ...extra]);
+
+  beforeEach(async () => {
+    await install("watchtower-collector");
+  });
+
+  it("writes WATCHTOWER_HUB_TOKEN from the BWS secret", async () => {
+    await runDeploy("watchtower-collector", {
+      FAKE_BWS_SECRETS: secretsWith([{ key: hubSecret, value: "SECRET-VALUE-hub-0123456789" }]),
+    });
+
+    expect(await readFile(newEnv("watchtower-collector"), "utf8")).toContain("WATCHTOWER_HUB_TOKEN=SECRET-VALUE-hub-0123456789\n");
+  });
+
+  it("writes no WATCHTOWER_HUB_TOKEN line while the secret is missing, says so, and does not fail", async () => {
+    const result = await runDeploy("watchtower-collector", { FAKE_BWS_SECRETS: secretsWith([]) });
+
+    expect(await readFile(newEnv("watchtower-collector"), "utf8")).not.toContain("WATCHTOWER_HUB_TOKEN");
+    expect(output(result)).toContain(hubSecret);
+    expect(output(result)).toMatch(/missing|not set/i);
+  });
+
+  it("does not write the homelab device token as the hub token", async () => {
+    await runDeploy("watchtower-collector", {
+      FAKE_BWS_SECRETS: secretsWith([{ key: "notice-board-token-homelab", value: "SECRET-VALUE-homelab-0123456789" }]),
+    });
+
+    const written = await readFile(newEnv("watchtower-collector"), "utf8");
+    expect(written).toContain("NOTICE_BOARD_TOKEN=SECRET-VALUE-homelab-0123456789\n");
+    expect(written).not.toContain("WATCHTOWER_HUB_TOKEN");
+  });
+
+  it("never prints the token value", async () => {
+    const result = await runDeploy("watchtower-collector", {
+      FAKE_BWS_SECRETS: secretsWith([{ key: hubSecret, value: "SECRET-VALUE-hub-0123456789" }]),
+    });
+
+    expect(output(result)).toContain(hubSecret);
+    expect(output(result)).not.toContain("SECRET-VALUE");
+  });
+});
+
 describe("units read the new path", () => {
   const read = (path: string) => readFile(join(root, path), "utf8");
 
