@@ -39,7 +39,7 @@ pnpm run typecheck
 pnpm run lint
 pnpm run build
 pnpm run test                    # every root-workspace package
-pnpm run test:scripts            # the repo-level tests under scripts/
+pnpm run test:scripts            # the repo-level tests under scripts/ (ci.sh adds --maxWorkers=1 outside GitHub Actions)
 pnpm run docs:list               # every doc under docs/ with its summary and read_when
 python3 scripts/check-deploy-concurrency.py   # every deploy-push workflow has a workflow-level concurrency block (needs PyYAML; also runs in test:scripts)
 ```

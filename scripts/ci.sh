@@ -130,7 +130,15 @@ run_repo_scripts() {
 
   step "Docs index" node scripts/docs-list.ts --check
   step "Install (scripts)" pnpm install --frozen-lockfile
-  step "Test (scripts)" pnpm run test:scripts
+  # Unbounded, vitest forks one worker per core and each gets the full heap cap. On
+  # the 7.8 GB homelab, shared with production, that peak is what systemd-oomd kills
+  # sessions for under memory pressure (argus#41). One worker locally; GitHub Actions
+  # runners are dedicated, so CI keeps the parallelism.
+  local scripts_test_args=()
+  if [[ -z "${GITHUB_ACTIONS:-}" ]]; then
+    scripts_test_args=(--maxWorkers=1)
+  fi
+  step "Test (scripts)" pnpm run test:scripts "${scripts_test_args[@]}"
 }
 
 run_nested() {

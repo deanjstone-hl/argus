@@ -21,7 +21,7 @@ function git(cwd: string, ...args: string[]): void {
 
 // A scratch repo whose origin/main holds one commit and whose HEAD adds `changedFile`;
 // returns the pnpm calls `ci.sh --changed root` makes.
-function pnpmCalls(changedFile: string): string[] {
+function pnpmCalls(changedFile: string, extraEnv: Record<string, string> = {}): string[] {
   const root = mkdtempSync(join(tmpdir(), "ci-changed-"));
   const origin = join(root, "origin.git");
   const work = join(root, "work");
@@ -64,6 +64,7 @@ function pnpmCalls(changedFile: string): string[] {
       CI_TEST_LOG: log,
       GIT_CONFIG_GLOBAL: "/dev/null",
       GIT_CONFIG_SYSTEM: "/dev/null",
+      ...extraEnv,
     },
   });
   if (result.status !== 0) throw new Error(`ci.sh exited ${result.status}: ${result.stdout}${result.stderr}`);
@@ -74,11 +75,19 @@ describe("ci.sh --changed root", () => {
   it("runs the scripts tests when only a workflow changed", () => {
     // scripts/workflow-gates.test.ts reads .github/workflows/*.yml, so a workflow
     // edit can break a scripts test.
-    expect(pnpmCalls(".github/workflows/deploy.yml")).toContain("pnpm run test:scripts");
+    expect(pnpmCalls(".github/workflows/deploy.yml")).toContain("pnpm run test:scripts --maxWorkers=1");
+  });
+
+  it("bounds the scripts tests to one worker outside GitHub Actions, and only there", () => {
+    // Unbounded, vitest forks one worker per core, each with the full heap cap; on the
+    // 7.8 GB homelab that peak got sessions killed under memory pressure (argus#41).
+    const testCalls = (calls: string[]) => calls.filter((call) => call.startsWith("pnpm run test:scripts"));
+    expect(testCalls(pnpmCalls("scripts/other.test.ts"))).toEqual(["pnpm run test:scripts --maxWorkers=1"]);
+    expect(testCalls(pnpmCalls("scripts/other.test.ts", { GITHUB_ACTIONS: "true" }))).toEqual(["pnpm run test:scripts"]);
   });
 
   it("runs the scripts tests when scripts/ changed", () => {
-    expect(pnpmCalls("scripts/other.test.ts")).toContain("pnpm run test:scripts");
+    expect(pnpmCalls("scripts/other.test.ts")).toContain("pnpm run test:scripts --maxWorkers=1");
   });
 
   it("skips the scripts tests and the root workspace for an unrelated file", () => {
