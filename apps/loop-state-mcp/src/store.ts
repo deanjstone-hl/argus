@@ -555,6 +555,15 @@ export const MIGRATIONS = [
   DROP TABLE slots;
   ALTER TABLE slots_v2 RENAME TO slots;
   `,
+  // argus#50: the last time a lease's holder was seen working (an owner turn, a directives write, a child or a slot
+  // write), so an owner-busy holder whose tick prompts queue behind the conversation is not read as stalled.
+  `
+  CREATE TABLE holder_activity (
+    role      TEXT PRIMARY KEY CHECK (role IN ('afk', 'direction')),
+    thread_id TEXT NOT NULL,
+    at        INTEGER NOT NULL
+  );
+  `,
 ]
 
 /** What an awaiting_ci slot waits on: a PR URL, or the SHA of a push to a trunk repo's main. */
@@ -783,6 +792,10 @@ export function openStore(options: StoreOptions) {
   const selectWakeRequestLast = db.prepare("SELECT MAX(at) AS at FROM events WHERE kind = 'wake_requested' AND issue = ?")
   const selectWakeRequestsSince = db.prepare("SELECT at FROM events WHERE kind = 'wake_requested' AND at > ? ORDER BY at")
   const selectLease = db.prepare('SELECT * FROM leases WHERE role = ?')
+  const selectActivity = db.prepare('SELECT * FROM holder_activity WHERE role = ?')
+  const upsertActivity = db.prepare(`
+    INSERT INTO holder_activity (role, thread_id, at) VALUES (?, ?, ?)
+    ON CONFLICT (role) DO UPDATE SET thread_id = excluded.thread_id, at = excluded.at`)
   const upsertLease = db.prepare(`
     INSERT INTO leases (role, thread_id, moved_at, primary_thread_id, primary_host) VALUES (?, ?, ?, ?, ?)
     ON CONFLICT (role) DO UPDATE SET thread_id = excluded.thread_id, moved_at = excluded.moved_at,
@@ -1069,15 +1082,46 @@ export function openStore(options: StoreOptions) {
 
   const missedSince = (lastSeen: number) => Math.max(0, Math.floor((now() - lastSeen - graceMs) / cadenceMs))
 
-  /** Missed ticks of a lease's holder: from its last tick, or from when it took the lease if it never ticked. */
-  function holderMissed(of: TickingRole, lease: Row): { missed: number; lastSeen: number } {
+  /**
+   * argus#50: record that a role's lease holder just did owner-driven work. Its tick prompts queue behind the owner's
+   * conversation, so a long turn leaves no tick for over an hour; the work itself shows it is alive. Called only
+   * after the write passed its lease check, so a stray thread's write never lands here.
+   */
+  function touchHolder(of: TickingRole, threadId: string | null) {
+    if (threadId !== null) upsertActivity.run(of, threadId, now())
+  }
+
+  /** When the lease's holder last did work, or null: only activity of the thread holding the lease now counts. */
+  function holderActivityAt(of: TickingRole, threadId: string): number | null {
+    const row = selectActivity.get(of) as Row | undefined
+    return row && String(row.thread_id) === threadId ? Number(row.at) : null
+  }
+
+  /**
+   * When a lease's holder was last seen: its last tick or work, or when it took the lease if it never ticked.
+   * Work counts as seen (argus#50), a tick from a thread that is not the holder never does.
+   */
+  function holderSeen(of: TickingRole, lease: Row): number {
     const status = selectStatus.get(of) as Row | undefined
-    const lastSeen = status && String(status.thread_id) === String(lease.thread_id) ? Number(status.last_tick_at) : Number(lease.moved_at)
+    const threadId = String(lease.thread_id)
+    const tickAt = status && String(status.thread_id) === threadId ? Number(status.last_tick_at) : Number(lease.moved_at)
+    return Math.max(tickAt, holderActivityAt(of, threadId) ?? 0)
+  }
+
+  /** Missed ticks of a lease's holder, counted from when it was last seen. */
+  function holderMissed(of: TickingRole, lease: Row): { missed: number; lastSeen: number } {
+    const lastSeen = holderSeen(of, lease)
     return { missed: missedSince(lastSeen), lastSeen }
   }
 
   /** Failover needs 2+ missed ticks (about an hour); an unanswered wake alone is only late (argus#1038). */
   const holderStalled = (of: TickingRole, lease: Row) => holderMissed(of, lease).missed >= 2
+
+  /** The status row's last tick, or the holder's later work (argus#50): what liveness counts missed ticks from. */
+  function lastSeenOf(of: TickingRole, row: Row): number {
+    const lease = selectLease.get(of) as Row | undefined
+    return lease ? Math.max(Number(row.last_tick_at), holderActivityAt(of, String(lease.thread_id)) ?? 0) : Number(row.last_tick_at)
+  }
 
   /**
    * The liveness state status_read reports: 2+ missed ticks is stalled, 1 is late, and a wake
@@ -1088,7 +1132,7 @@ export function openStore(options: StoreOptions) {
     const row = selectStatus.get(of) as Row | undefined
     if (!row) return 'never'
     const threadId = holderOf(of) ?? String(row.thread_id)
-    const missed = missedSince(Number(row.last_tick_at))
+    const missed = missedSince(lastSeenOf(of, row))
     if (missed >= 2) return 'stalled'
     return missed === 1 || wakeUnanswered(of, threadId) ? 'late' : 'alive'
   }
@@ -1325,11 +1369,15 @@ export function openStore(options: StoreOptions) {
     if (threadId === undefined || threadId === '') {
       if (options.requireCallerThread) throw new Refused(`${tool} must name your own thread as caller_thread_id: the afk lease is checked against it`)
       record('slot_write_unchecked', role, issue, null, { tool }, 'direction')
+      touchHolder('afk', holderOf('afk'))
       return unchecked(tool)
     }
     const lease = selectLease.get('afk') as Row | undefined
     const holder = optionalText(lease?.thread_id)
-    if (holder === threadId) return null
+    if (holder === threadId) {
+      touchHolder('afk', threadId)
+      return null
+    }
     const primary = optionalText(lease?.primary_thread_id)
     const drains = DRAIN_TOOLS.includes(tool) && caller.host !== undefined && slotHost === caller.host && threadId !== primary
     if (drains) return null
@@ -1354,10 +1402,14 @@ export function openStore(options: StoreOptions) {
         throw new Refused(`${tool} must name your own thread as caller_thread_id: the direction lease is checked against it`)
       }
       record('owner_turn_unchecked', role, null, null, { tool }, 'direction')
+      touchHolder('direction', holderOf('direction'))
       return 'owner_turn named no caller_thread_id, so the direction lease was not checked: pass your own thread id (a missing one will be refused in a later release)'
     }
     const holder = holderOf('direction')
-    if (holder === callerThreadId) return null
+    if (holder === callerThreadId) {
+      touchHolder('direction', callerThreadId)
+      return null
+    }
     record('lease_conflict', role, null, callerThreadId, { role, holder, tool }, 'direction')
     const who = holder === null ? 'no thread holds the direction lease' : `the direction lease is held by ${holder}`
     const only = tool === 'owner_turn' ? 'records an owner turn' : 'sets the directives'
@@ -1451,6 +1503,7 @@ export function openStore(options: StoreOptions) {
         requireState(row, 'parked', 'un-park')
         db.prepare("UPDATE slots SET state = 'ready', note = ?, updated_at = ? WHERE issue = ?").run(note ?? null, now(), issue)
         record('slot_unparked', role, issue, String(row.thread_id), { note: note ?? null })
+        touchHolder('direction', holderOf('direction'))
         return toSlot(selectSlot.get(issue) as Row)
       })
     },
@@ -1522,6 +1575,7 @@ export function openStore(options: StoreOptions) {
           note: note ?? null,
           ...(refusal === null ? {} : { reason: refusal }),
         })
+        touchHolder('direction', holderOf('direction'))
         const slot = toSlot(selectSlot.get(issue) as Row)
         return refusal === null ? { slot, resumed: true } : { slot, resumed: false, reason: refusal }
       })
@@ -2013,6 +2067,7 @@ export function openStore(options: StoreOptions) {
           },
           slots,
           liveness: { state: livenessState(of), missed_ticks: null, cadence_minutes, next_due_at: null },
+          last_activity_at: null,
           last_model_tick_at: null,
           last_tick_recorded_by: null,
           ...tickProvenance,
@@ -2021,12 +2076,16 @@ export function openStore(options: StoreOptions) {
 
       const weekly = weeklyOf(row)
       const lastTick = Number(row.last_tick_at)
-      const missed = missedSince(lastTick)
+      const lastSeen = lastSeenOf(of, row)
+      const missed = missedSince(lastSeen)
       const state = livenessState(of)
+      const lease = selectLease.get(of) as Row | undefined
+      const activityAt = lease ? holderActivityAt(of, String(lease.thread_id)) : null
       return {
         role: of,
         thread_id: String(row.thread_id),
         last_tick_at: iso(lastTick),
+        last_activity_at: activityAt === null ? null : iso(activityAt),
         last_model_tick_at: row.last_model_tick_at === null ? null : iso(Number(row.last_model_tick_at)),
         last_tick_recorded_by: String(row.last_recorded_by) as TickRecorder,
         directives_version: String(row.directives_version),
@@ -2048,7 +2107,7 @@ export function openStore(options: StoreOptions) {
           budget_exempt_repos: exemptReposOf(row),
         },
         slots,
-        liveness: { state, missed_ticks: missed, cadence_minutes, next_due_at: iso(lastTick + cadenceMs) },
+        liveness: { state, missed_ticks: missed, cadence_minutes, next_due_at: iso(lastSeen + cadenceMs) },
         ...tickProvenance,
       }
     },
@@ -2067,6 +2126,7 @@ export function openStore(options: StoreOptions) {
           now(),
         )
         recordLedger('child_started', input.thread_id, { issue: input.issue ?? null })
+        touchHolder('direction', holderOf('direction'))
         return { child: toChild(selectChild.get(input.thread_id) as Row) }
       })
     },
@@ -2084,6 +2144,7 @@ export function openStore(options: StoreOptions) {
           input.thread_id,
         )
         recordLedger('child_closed', input.thread_id, { outcome: input.outcome })
+        touchHolder('direction', holderOf('direction'))
         return { child: toChild(selectChild.get(input.thread_id) as Row) }
       })
     },

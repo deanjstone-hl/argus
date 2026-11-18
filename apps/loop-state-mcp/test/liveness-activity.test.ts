@@ -67,7 +67,7 @@ describe('liveness counts a holder that is working, not only one that ticks', ()
     clock.advance(45 * MINUTE)
     expect((await standbyCheck('direction')).body).toMatchObject({ wake: false, reason: 'primary_alive' })
 
-    await aquila.ok('child_close', { thread_id: 'child-1', outcome: 'complete' })
+    await aquila.ok('child_close', { thread_id: 'child-1', outcome: 'done' })
     clock.advance(45 * MINUTE)
     expect((await standbyCheck('direction')).body).toMatchObject({ wake: false, reason: 'primary_alive' })
   })
