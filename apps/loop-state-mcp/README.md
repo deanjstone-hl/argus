@@ -154,8 +154,16 @@ with `hooks/directives_effective.py`'s `read_front_matter` in argus-config
 `status_tick` is the last call of a full tick. It records the caller's thread id, the
 directives version it read, the `needs:owner` set, the slot cap, errors, and the window
 pressure. `status_read` returns a role's status (default `afk`) with slot counts and
-liveness: `missed_ticks = floor((now − last tick − 5 min grace) / 30 min)`, so 0 is `alive`,
-1 `late`, 2 or more `stalled`.
+liveness: `missed_ticks = floor((now − last seen − 5 min grace) / 30 min)`, so 0 is `alive`,
+1 `late`, 2 or more `stalled`. *Last seen* is the later of the last tick and the lease holder's
+last work (argus#50): an `owner_turn` or `directives_set` it made, a `child_start` / `child_close`,
+or a slot write (`slot_start`, `slot_park`, `slot_close`, `slot_free`, `slot_rebuild` for `afk`;
+`slot_unpark`, `slot_resume_ci` for `direction`). A primary deep in a long owner conversation
+queues its tick prompts behind it and may tick nothing for over an hour, but it is not dead, so
+its work counts and `/wake/check` answers no `failover` while that holds. Only the current holder
+counts: a write refused for a lease conflict, a drain by a standby, or the previous holder's old
+work never keeps the lease alive. `status_read` reports it as `last_activity_at` (`null` when
+the holder has done none), and `liveness.next_due_at` counts from it.
 
 **Pressure** is the window ladder: `normal` (<70%), `no_opus` (≥70%), `no_new_slots` (≥85%),
 `gate_only` (≥95%), or `unknown`. Pass `window_used_percent` and the level is derived; pass
@@ -473,7 +481,8 @@ The 4 h heartbeat is unchanged and remains the backstop for all five.
 to it, within 10 min. Otherwise liveness reports `late` (an unanswered wake alone never
 makes it `stalled`, and so never triggers a `failover` wake or a `lease_failover`), and the
 primary's next check re-wakes with `unanswered` instead of recording a quiet tick. With no
-quiet tick recorded, the missed ticks pile up and the thread is `stalled` at 2 (about an hour). Quiet ticks recorded by the client keep liveness alive between wakes, and the 4 h
+quiet tick recorded and no work by the holder (see *Loop status*), the missed ticks pile up and
+the thread is `stalled` at 2 (about an hour). Quiet ticks recorded by the client keep liveness alive between wakes, and the 4 h
 heartbeat bounds how long a dead thread can go unnoticed.
 
 `status_read` adds `last_tick_recorded_by` (`model` or `client`), `last_model_tick_at`,
