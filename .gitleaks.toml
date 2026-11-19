@@ -19,6 +19,16 @@ description = "A Tailscale MagicDNS hostname"
 regex = '''[a-z0-9-]+\.ts\.net\b'''
 keywords = ["ts.net"]
 
+# The links registry (links.json and its generated TS copies) is vendored from the public
+# deanjstone/frontend registry, which publishes the tailnet host its tailnet entries need
+# (argus#18). Allowed in those files only; a hostname anywhere else still fails.
+[[rules.allowlists]]
+description = "The vendored links registry names the tailnet host"
+paths = [
+  '''/links\.json$''',
+  '''/apps/[a-z-]+/src/lib/links\.ts$''',
+]
+
 [[rules]]
 id = "tailnet-ip"
 description = "A Tailscale CGNAT address (100.64.0.0/10)"
