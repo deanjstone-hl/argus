@@ -10,7 +10,7 @@ import { openStore } from './store.js'
 
 const config = loadConfig(process.env)
 mkdirSync(dirname(config.dbPath), { recursive: true })
-const store = openStore({ path: config.dbPath, cadenceMs: config.cadenceMs, requireCallerThread: config.requireCallerThread })
+const store = openStore({ path: config.dbPath, cadenceMs: config.cadenceMs, requireCallerThread: config.requireCallerThread, requireThreadHeader: config.requireThreadHeader })
 // No createServer option is passed, so this is a plain http.Server (serve's union adds Http2Server).
 const server = serve({ fetch: createApp({ store, tokens: config.tokens, promotionToken: config.promotionToken }).fetch, hostname: config.host, port: config.port }, (info) => {
   console.log(`loop-state-mcp: listening on ${config.host}:${info.port}, db ${config.dbPath}, roles ${[...new Set(config.tokens.map((token) => token.role))].join(', ')}, promotion route ${config.promotionToken ? 'on' : 'off'}`)

@@ -127,6 +127,13 @@ export interface StoreOptions {
    * accepted with a warning event instead of stalling the loop.
    */
   requireCallerThread?: boolean
+  /**
+   * Refuse a call that names its own thread but arrives with no X-T3-Thread-Id header (argus#51).
+   * Off by default: a caller whose headersHelper does not send it yet is accepted, as before.
+   */
+  requireThreadHeader?: boolean
+  /** Where the missing-header notice goes. Default console.warn. */
+  warn?: (message: string) => void
 }
 
 /** Who is writing a slot, so the server can check the afk lease. `host` is the caller's own host, for the drain. */
@@ -738,6 +745,9 @@ export function openStore(options: StoreOptions) {
   const pressureDwellMs = options.pressureDwellMs ?? DEFAULT_PRESSURE_DWELL_MS
   /** POST /wake/check: the new pressure level each (role, thread) has been seen at since when. In memory: a restart only restarts the dwell. */
   const pressureFlips = new Map<string, { level: PressureLevel; since: number }>()
+  /** argus#51: the (role, thread) pairs already logged for sending no thread header. In memory: a restart logs them once more. */
+  const headerMissingSeen = new Set<string>()
+  const warn = options.warn ?? ((message: string) => console.warn(message))
 
   const db = new DatabaseSync(options.path)
   // busy_timeout first: switching to WAL takes a lock, and a connection opening while
@@ -2147,6 +2157,38 @@ export function openStore(options: StoreOptions) {
         touchHolder('direction', holderOf('direction'))
         return { child: toChild(selectChild.get(input.thread_id) as Row) }
       })
+    },
+
+    /**
+     * argus#51: a call that names its own thread (`caller_thread_id`, or `thread_id` on a tick or
+     * a worker's slot call) is checked against X-T3-Thread-Id, the thread id the harness's
+     * headersHelper sends from the session's own environment. The argument is self-asserted and a
+     * fork inherits its parent's id; the header is not, so a fork naming its parent is refused and
+     * leaves a lease_conflict event for the holder's next gate. Returns the thread id the call acts
+     * as: the header when sent (so omitting `caller_thread_id` does not skip the lease check),
+     * else what the call named. With no header the call is accepted until `requireThreadHeader`
+     * is on, once every caller sends it; the first such call per thread is logged.
+     */
+    checkCallerThread(role: Role, tool: ToolName, named: string | undefined, header: string | undefined): string | undefined {
+      if (header === undefined) {
+        if (options.requireThreadHeader) {
+          throw new Refused(`${tool} needs the X-T3-Thread-Id header: the session's headersHelper sends it, so the call cannot name another thread. Update the helper and reconnect the MCP server.`)
+        }
+        const key = `${role}:${named ?? ''}`
+        if (named !== undefined && named !== '' && !headerMissingSeen.has(key)) {
+          headerMissingSeen.add(key)
+          warn(`loop-state-mcp: ${role} call ${tool} from ${named} sent no X-T3-Thread-Id, so its thread id is self-asserted`)
+        }
+        return named
+      }
+      if (named === undefined || named === '' || named === header) return header
+      write(() => {
+        record('lease_conflict', role, null, header, { role, tool, named, header, reason: 'thread_header_mismatch' }, 'direction')
+        throw new LeaseRefused(
+          `${tool} names thread ${named}, but this session is ${header} (X-T3-Thread-Id): refused. A forked thread must pass its own thread id, not its parent's.`,
+        )
+      })
+      return header
     },
 
     /**

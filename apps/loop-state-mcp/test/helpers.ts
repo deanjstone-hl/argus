@@ -25,6 +25,8 @@ export const TOKENS: Record<Role, string> = {
 
 export const PROMOTION_TOKEN = 'promotion-token-0123456789abc'
 
+export const THREAD_HEADER = 'X-T3-Thread-Id'
+
 export const AFK_THREAD = 'thread-afk-0001'
 export const AQUILA_THREAD = 'thread-aquila-0001'
 
@@ -71,13 +73,13 @@ export interface WorldOptions extends Partial<StoreOptions> {
 export function world({ leases = { afk: AFK_THREAD, direction: AQUILA_THREAD }, promotionToken, ...options }: WorldOptions = {}) {
   const clock = testClock()
   const path = options.path ?? tempDbPath()
-  let store = openStore({ now: clock.now, ...options, path })
+  let store = openStore({ now: clock.now, warn: () => {}, ...options, path })
   for (const [role, threadId] of Object.entries(leases)) store.leaseMove('direction', { role: role as TickingRole, to_thread_id: threadId })
   let app = createApp({ store, tokens: parseTokens(tokenSpec), promotionToken: promotionToken === undefined ? PROMOTION_TOKEN : (promotionToken ?? undefined) })
 
-  async function connect(token: string | null) {
+  async function connect(token: string | null, threadHeader?: string) {
     const transport = new StreamableHTTPClientTransport(new URL('http://loop-state.test/mcp'), {
-      requestInit: { headers: token ? { Authorization: `Bearer ${token}` } : {} },
+      requestInit: { headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(threadHeader === undefined ? {} : { [THREAD_HEADER]: threadHeader }) } },
       fetch: async (url, init) => app.request(String(url), init),
     })
     const client = new Client({ name: 'test', version: '0.0.0' })
@@ -86,8 +88,9 @@ export function world({ leases = { afk: AFK_THREAD, direction: AQUILA_THREAD }, 
     return client
   }
 
-  async function as(role: Role) {
-    const client = await connect(TOKENS[role])
+  /** `threadHeader` is the thread id the harness's headersHelper sends as X-T3-Thread-Id (argus#51); omitted, the caller sends none. */
+  async function as(role: Role, threadHeader?: string) {
+    const client = await connect(TOKENS[role], threadHeader)
     const call = async (name: string, args: Record<string, unknown> = {}) =>
       (await client.callTool({ name, arguments: args })) as ToolResult
     /** Call a tool that must succeed and return its JSON result. */
@@ -103,7 +106,7 @@ export function world({ leases = { afk: AFK_THREAD, direction: AQUILA_THREAD }, 
   /** Close and reopen the db file, as a service restart would. */
   function restart() {
     store.close()
-    store = openStore({ now: clock.now, ...options, path })
+    store = openStore({ now: clock.now, warn: () => {}, ...options, path })
     app = createApp({ store, tokens: parseTokens(tokenSpec), promotionToken: promotionToken === undefined ? PROMOTION_TOKEN : (promotionToken ?? undefined) })
   }
 

@@ -39,6 +39,9 @@ const promotedBody = z
 /** ops-hub's wake request (argus#1189). Strict: it names an issue and nothing else. */
 const wakeRequestBody = z.object({ issue: z.string() }).strict()
 
+/** The session's own T3 thread id, sent by the harness's headersHelper from T3CODE_THREAD_ID (argus#51). */
+export const THREAD_HEADER = 'X-T3-Thread-Id'
+
 export interface AppOptions {
   store: Store
   tokens: RoleToken[]
@@ -127,7 +130,7 @@ export function createApp(options: AppOptions) {
 
   // Streamable HTTP, stateless: a fresh server and transport per request.
   app.all('/mcp', async (c) => {
-    const server = createMcpServer(options.store, c.get('role'))
+    const server = createMcpServer(options.store, c.get('role'), c.req.header(THREAD_HEADER)?.trim() || undefined)
     const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true })
     await server.connect(transport)
     return transport.handleRequest(c.req.raw)

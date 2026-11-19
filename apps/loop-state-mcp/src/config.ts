@@ -12,6 +12,8 @@ export interface Config {
   /** The bearer ops-hub presents to POST /events/promoted and POST /wake/request; unset leaves both routes refusing everyone. */
   promotionToken: string | undefined
   requireCallerThread: boolean
+  /** Refuse an identity call that sends no X-T3-Thread-Id (argus#51). Off until every caller's headersHelper sends it. */
+  requireThreadHeader: boolean
 }
 
 const MIN_PROMOTION_TOKEN_LENGTH = 24
@@ -47,5 +49,6 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
     tokens,
     promotionToken,
     requireCallerThread: env['LOOP_STATE_REQUIRE_CALLER_THREAD'] === '1',
+    requireThreadHeader: env['LOOP_STATE_REQUIRE_THREAD_HEADER'] === '1',
   }
 }

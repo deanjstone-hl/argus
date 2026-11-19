@@ -105,9 +105,18 @@ const pendingApprovals = z
   )
 
 /** One server per request: the transport is stateless, and the caller's role differs per request. */
-export function createMcpServer(store: Store, role: Role): McpServer {
+export function createMcpServer(store: Store, role: Role, threadHeader?: string): McpServer {
   const server = new McpServer({ name: 'loop-state', version: '0.1.0' }, { instructions: INSTRUCTIONS })
   const offered = (tool: ToolName) => (TOOL_ROLES[tool] as readonly Role[]).includes(role)
+  /**
+   * argus#51: the thread id a call acts as. A call naming a thread other than the session's own
+   * (X-T3-Thread-Id) is refused; with the header and no named thread, the header is the caller.
+   */
+  const actingAs = (tool: ToolName, named: string | undefined) => store.checkCallerThread(role, tool, named, threadHeader)
+  const withCaller = <A extends { caller_thread_id?: string | undefined }>(tool: ToolName, args: A): A => ({
+    ...args,
+    caller_thread_id: actingAs(tool, args.caller_thread_id),
+  })
 
   if (offered('slot_start')) {
     server.registerTool(
@@ -128,7 +137,7 @@ export function createMcpServer(store: Store, role: Role): McpServer {
         },
         annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
       },
-      guarded((args) => store.slotStart(role, args.issue, args.thread_id, args.host, args.caller_thread_id, args.budget_exempt === true)),
+      guarded((args) => store.slotStart(role, args.issue, args.thread_id, args.host, actingAs('slot_start', args.caller_thread_id), args.budget_exempt === true)),
     )
   }
 
@@ -147,7 +156,7 @@ export function createMcpServer(store: Store, role: Role): McpServer {
         },
         annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
       },
-      guarded((args) => store.slotPark(role, args.issue, args.note, args)),
+      guarded((args) => store.slotPark(role, args.issue, args.note, withCaller('slot_park', args))),
     )
   }
 
@@ -181,7 +190,10 @@ export function createMcpServer(store: Store, role: Role): McpServer {
         },
         annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
       },
-      guarded((args) => ({ slot: store.slotReport(role, args) })),
+      guarded((args) => {
+        actingAs('slot_report', args.thread_id)
+        return { slot: store.slotReport(role, args) }
+      }),
     )
   }
 
@@ -200,7 +212,10 @@ export function createMcpServer(store: Store, role: Role): McpServer {
         },
         annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
       },
-      guarded((args) => ({ slot: store.slotAwaitCi(role, args) })),
+      guarded((args) => {
+        actingAs('slot_await_ci', args.thread_id)
+        return { slot: store.slotAwaitCi(role, args) }
+      }),
     )
   }
 
@@ -228,7 +243,7 @@ export function createMcpServer(store: Store, role: Role): McpServer {
         inputSchema: { issue, verified: z.string().describe('The "Verified: …" line.'), caller_thread_id: callerThreadId, host: drainHost },
         annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false },
       },
-      guarded((args) => store.slotClose(role, args.issue, args.verified, args)),
+      guarded((args) => store.slotClose(role, args.issue, args.verified, withCaller('slot_close', args))),
     )
   }
 
@@ -241,7 +256,7 @@ export function createMcpServer(store: Store, role: Role): McpServer {
         inputSchema: { issue, reason: z.string().describe('Why, one line.'), caller_thread_id: callerThreadId, host: drainHost },
         annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false },
       },
-      guarded((args) => store.slotFree(role, args.issue, args.reason, args)),
+      guarded((args) => store.slotFree(role, args.issue, args.reason, withCaller('slot_free', args))),
     )
   }
 
@@ -291,7 +306,7 @@ export function createMcpServer(store: Store, role: Role): McpServer {
         },
         annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
       },
-      guarded((args) => store.slotRebuild(role, { issues: args.issues, threads: args.threads }, args.apply ?? false, args.host, args.caller_thread_id)),
+      guarded((args) => store.slotRebuild(role, { issues: args.issues, threads: args.threads }, args.apply ?? false, args.host, actingAs('slot_rebuild', args.caller_thread_id))),
     )
   }
 
@@ -306,6 +321,7 @@ export function createMcpServer(store: Store, role: Role): McpServer {
         annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
       },
       guarded((args) => {
+        actingAs('status_tick', args.thread_id)
         const tick = store.statusTick(role, args)
         return tick.recorded ? { ...tick, ...store.statusRead(role, role === 'direction' ? 'direction' : 'afk') } : tick
       }),
@@ -322,7 +338,10 @@ export function createMcpServer(store: Store, role: Role): McpServer {
         inputSchema: tickInput,
         annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
       },
-      guarded((args) => store.tickGate(role, args)),
+      guarded((args) => {
+        actingAs('tick_gate', args.thread_id)
+        return store.tickGate(role, args)
+      }),
     )
   }
 
@@ -481,7 +500,7 @@ export function createMcpServer(store: Store, role: Role): McpServer {
         },
         annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
       },
-      guarded((args) => store.ownerTurn(role, args)),
+      guarded((args) => store.ownerTurn(role, withCaller('owner_turn', args))),
     )
   }
 
@@ -577,7 +596,10 @@ export function createMcpServer(store: Store, role: Role): McpServer {
         },
         annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
       },
-      guarded((args) => store.directivesSet(role, args)),
+      guarded((args) => {
+        actingAs('directives_set', args.caller_thread_id)
+        return store.directivesSet(role, args)
+      }),
     )
   }
 
