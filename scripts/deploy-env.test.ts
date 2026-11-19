@@ -38,6 +38,9 @@ async function install(app: string) {
   await mkdir(join(repo, "scripts/lib"), { recursive: true });
   await copyFile(join(root, "apps", app, "deploy.sh"), join(repo, "apps", app, "deploy.sh"));
   await copyFile(appEnvLib, join(repo, "scripts/lib/app-env.sh"));
+  // deploy.sh builds the Worker origin from the links registry.
+  await copyFile(join(root, "scripts/links.sh"), join(repo, "scripts/links.sh"));
+  await copyFile(join(root, "links.json"), join(repo, "links.json"));
 }
 
 async function runDeploy(app: string, extraEnv: Record<string, string> = {}) {
