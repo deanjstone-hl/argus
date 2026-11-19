@@ -64,7 +64,7 @@ app.route('/', createPlansRoutes(() => {
     const client = createClient(config.supabaseUrl, config.supabaseKey, { auth: { persistSession: false } });
     planStore = { cacheKey, store: createPlanStore(client, { ownerUserId: config.ownerUserId }) };
   }
-  return { store: planStore.store, token: config.token, baseUrl: config.baseUrl };
+  return { store: planStore.store, token: config.token, origin: config.origin };
 }));
 
 // Live notes (myargus map #121): built on first use and rebuilt only if the

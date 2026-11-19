@@ -117,7 +117,7 @@ Content-Type: application/json
 - Publishing is idempotent on `slug`. A republish updates the plan in place and returns `200`. A new
   plan returns `201`. Steps ticked off in the shell stay ticked, `predone` steps are marked complete,
   and steps past the new length are removed.
-- The response is `{ plan, created, url }`, where `url` is `<ARGUS_PLANS_BASE_URL>/<slug>`.
+- The response is `{ plan, created, url }`, where `url` is the shell's `/plans/<slug>` page, built from the links registry (`links.json`).
 - Errors: `400` for invalid input, `401` for a missing or wrong token, `500` for a Supabase failure.
 
 The route is inert until all four required variables are set in `~/.argus/agent-engine/.env`. That runtime directory is already outside the deploy copy, so [argus-config#1267](https://github.com/deanjstone/argus-config/issues/1267) leaves it where it is.
@@ -129,7 +129,7 @@ Until then every request gets `503` "plans endpoint not configured".
 | `SUPABASE_SERVICE_ROLE_KEY` | yes | Bitwarden `myargus-supabase-service-role-key` |
 | `ARGUS_PLANS_TOKEN` | yes | Bitwarden `agent-engine-plans-token` |
 | `ARGUS_PLANS_OWNER_USER_ID` | yes | The owner's `auth.users` id in the myargus project; becomes `plans.user_id` |
-| `ARGUS_PLANS_BASE_URL` | no, defaults to `https://myargus.cc/plans` | — |
+| `ARGUS_PLANS_BASE_URL` | no. Replaces only the origin of the plan URL (for a local or preview shell); a path on it is ignored and a value that is not an http(s) URL leaves the route unconfigured | — |
 
 The `plans` schema must also be in the project's exposed schemas (`db_schema`), or the Data API
 rejects every call. See `docs/supabase-config.md` in myargus.

@@ -35,7 +35,7 @@ function publishedFrom(input: PlanInput, created: boolean): PublishResult {
 function buildApp(created = true) {
   const publish = vi.fn(async (input: PlanInput) => publishedFrom(input, created));
   const store: PlanStore = { publish };
-  const app = createPlansRoutes(() => ({ store, token: TOKEN, baseUrl: 'https://myargus.cc/plans' }));
+  const app = createPlansRoutes(() => ({ store, token: TOKEN, origin: undefined }));
   return { app, publish };
 }
 
@@ -122,11 +122,20 @@ describe('POST /plans publish', () => {
 
   it('500s with the store error message when the write fails', async () => {
     const store: PlanStore = { publish: vi.fn(async () => { throw new Error('upsert failed for plan "ship-plans"'); }) };
-    const app = createPlansRoutes(() => ({ store, token: TOKEN, baseUrl: 'https://myargus.cc/plans' }));
+    const app = createPlansRoutes(() => ({ store, token: TOKEN, origin: undefined }));
     const res = await post(app, validPlan);
     expect(res.status).toBe(500);
     const body = await res.json() as { error: string };
     expect(body.error).toMatch(/ship-plans/);
+  });
+});
+
+describe('the published plan URL', () => {
+  it('follows an origin override and keeps the registry path', async () => {
+    const store: PlanStore = { publish: vi.fn(async (input: PlanInput) => publishedFrom(input, true)) };
+    const app = createPlansRoutes(() => ({ store, token: TOKEN, origin: 'http://localhost:5173' }));
+    const body = await (await post(app, validPlan)).json() as { url: string };
+    expect(body.url).toBe('http://localhost:5173/plans/ship-plans');
   });
 });
 
@@ -138,13 +147,12 @@ describe('plansConfigFromEnv', () => {
     ARGUS_PLANS_OWNER_USER_ID: '00000000-0000-4000-8000-000000000001',
   };
 
-  it('returns the config with the default base URL when all four are set', () => {
+  it('returns the config, with no origin override, when all four are set', () => {
     expect(plansConfigFromEnv(full)).toEqual({
       supabaseUrl: 'https://example.supabase.co',
       supabaseKey: 'service-role',
       token: TOKEN,
       ownerUserId: '00000000-0000-4000-8000-000000000001',
-      baseUrl: 'https://myargus.cc/plans',
     });
   });
 
@@ -152,9 +160,14 @@ describe('plansConfigFromEnv', () => {
     expect(plansConfigFromEnv({ ...full, ARGUS_PLANS_OWNER_USER_ID: 'dean' })).toBeNull();
   });
 
-  it('honours ARGUS_PLANS_BASE_URL without a trailing slash', () => {
-    expect(plansConfigFromEnv({ ...full, ARGUS_PLANS_BASE_URL: 'http://localhost:5173/plans/' })?.baseUrl)
-      .toBe('http://localhost:5173/plans');
+  it('reads ARGUS_PLANS_BASE_URL as an origin override only: a path on it is dropped', () => {
+    expect(plansConfigFromEnv({ ...full, ARGUS_PLANS_BASE_URL: 'http://localhost:5173/plans/' })?.origin)
+      .toBe('http://localhost:5173');
+  });
+
+  it('returns null, not the production URL, when ARGUS_PLANS_BASE_URL is not a URL', () => {
+    expect(plansConfigFromEnv({ ...full, ARGUS_PLANS_BASE_URL: 'localhost:5173' })).toBeNull();
+    expect(plansConfigFromEnv({ ...full, ARGUS_PLANS_BASE_URL: 'ftp://localhost' })).toBeNull();
   });
 
   it.each(['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'ARGUS_PLANS_TOKEN', 'ARGUS_PLANS_OWNER_USER_ID'] as const)(
