@@ -13,8 +13,8 @@ const root = fileURLToPath(new URL("..", import.meta.url));
 const script = join(root, "scripts", "bws-store-secret.sh");
 
 const SECRET = "sUp3r-s3cret-VALUE-9f8e7d";
-const PROJECT = "11111111-2222-3333-4444-555555555555";
-const OTHER_PROJECT = "99999999-8888-7777-6666-555555555555";
+const PROJECT = "stub-project-one";
+const OTHER_PROJECT = "stub-project-two";
 
 // A stand-in for `bws` 2.x: `secret list -o json`, `secret create KEY VALUE PROJECT [--note N]`
 // and `secret edit ID --value V [--note N]`, over $STUB_STORE. Every call is logged to $STUB_LOG
