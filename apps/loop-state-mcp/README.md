@@ -300,6 +300,29 @@ with no `caller_thread_id` is accepted for one release, with an `owner_turn_unch
 a `warning` in the result; `LOOP_STATE_REQUIRE_CALLER_THREAD=1` refuses it, for slot writes and
 `owner_turn` together, so turn it on only after both charters pass the id.
 
+**The session's own thread id** (argus#51). `caller_thread_id` and a tick's `thread_id` are
+arguments the model types, and a T3 fork inherits its parent's thread id, so a fork could call
+`owner_turn`, `tick_gate` or a slot write as the lease holder. The server therefore also reads
+the `X-T3-Thread-Id` request header. The harness sends it, not the model: T3 sets `T3CODE_THREAD_ID`
+in every Claude process's environment, and the loop-state `headersHelper`
+(`hooks/loop-state-mcp-headers.mjs` in argus-config) prints it as a header. A fork is a new T3 thread
+with its own value.
+
+- A call that names a thread other than the header's is refused, naming both, and leaves a
+  `lease_conflict` event (`detail.reason: thread_header_mismatch`) for the holder's next gate. It covers
+  `caller_thread_id` on `slot_start`, `slot_park`, `slot_close`, `slot_free`, `slot_rebuild`,
+  `owner_turn` and `directives_set`, and `thread_id` on `status_tick`, `tick_gate`, `slot_report` and
+  `slot_await_ci`.
+- With the header and no `caller_thread_id`, the header is the caller, so leaving the argument out does
+  not skip the lease check.
+- With no header, the call is accepted as before and the first one per role and thread is logged
+  (`X-T3-Thread-Id`, in the service journal), so the rollout shows who still sends none.
+  `LOOP_STATE_REQUIRE_THREAD_HEADER=1` refuses those calls; turn it on only once the helper is promoted
+  everywhere and the journal shows no legitimate caller without it.
+- Not covered: the tools that carry no caller id at all (`lease_move`, `lease_release`,
+  `lease_failover`, `lease_reclaim`, `child_*`, `away_note`, `notify_claim`, `outage_observe`). They
+  name other threads, not the caller, so there is nothing to check the header against yet.
+
 Only Aquila writes leases. An unheld lease is taken with `lease_move`. A held one moves in the
 retire-first order (rotation, #655): delete the old thread's `schedule_task`, then
 `lease_move` naming the old holder as `from_thread_id` with `old_schedule_task_deleted: true`,
