@@ -68,7 +68,7 @@ timers card and ccusage run a few child processes at a time rather than all at o
 - `src/adapters/` — one module per polled source (systemd, disk, uptime, Syncthing,
   Cloudflare, Supabase projects, AI usage, printer, scanner, GitHub runners, the LNV-LGN5 host
   report, homelab load and memory, main CI, the runner queue, Tailscale, the notice board, the
-  `*.myargus.cc` endpoints and their certificates, Worker traffic). An adapter returns the result it could work out and
+  the registry's public endpoints and their certificates, Worker traffic). An adapter returns the result it could work out and
   throws for anything it could not
 - `src/adapter.ts` — the `Adapter` interface and `CheckError`
 - `src/systemd-unit.ts` — how `systemctl show` properties become a unit's status, shared by the
@@ -332,23 +332,27 @@ The internet-facing side of the stack (argus#687), checked from homelab:
 
 | Card | `degraded` | `down` |
 |---|---|---|
-| `endpoint:<host>` | an answer other than the expected one (an API answering anonymous requests, a 404, a redirect anywhere but Cloudflare Access), or slower than 3 s | a 5xx, or no answer within 10 s |
+| `endpoint:<host>` (`endpoint:<host>/<path>` where several probes share a host) | an answer other than the expected one (an API answering anonymous requests, a 404, a redirect anywhere but Cloudflare Access), or slower than 3 s | a 5xx, or no answer within 10 s |
 | `tls:<host>` | under 21 days to expiry. Cloudflare renews about 30 days out, so a renewal is overdue | under 7 days, expired, or the handshake fails |
 | `worker-traffic:<script>` | any 5xx at 2% of requests or more; for an API Worker, 10 or more 4xx at 10% or more | 5xx at 20% or more, over at least 20 requests |
 
-The endpoints are `PUBLIC_ENDPOINTS` in `src/adapters/endpoints.ts`. Each one is a host from a
-wrangler route or custom domain, or the dashboard's Pages domain, with the anonymous answer it
-should give. An API that wants a token answers 401, and that counts as up. `mail` sits behind
-Cloudflare Access and redirects to its login. The probes need no credentials and send the user
-agent `argus-watchtower-probe`.
+The endpoints are `PUBLIC_ENDPOINTS` in `src/adapters/endpoints.ts`, and they are not kept by hand:
+each one is a `live` entry in the links registry (`links.json`, vendored at the repo root) that
+carries a `probe`, at the status the registry expects. A new host is probed once the registry holds
+it, and a planned, redirect or retired host never is. An API that wants a token answers 401, and
+that counts as up; a 302 in the registry means Cloudflare Access redirects an anonymous request to
+its login. Two entries are probed one path deeper (`DEEPER_PROBES`): the watchtower API at
+`/checks` and the email MCP at `/mcp`, both of which answer 401 themselves. The certificate checks
+cover each distinct host (`PUBLIC_HOSTS`). The probes need no credentials and send the user agent
+`argus-watchtower-probe`.
 
 Worker traffic reads Cloudflare's GraphQL Analytics API for the last hour, once a poll for
 every Worker in `CLOUDFLARE_WORKER_PROJECTS`:
 
 - **Workers analytics** gives invocations by status and the scripts' exceptions. The
   `watchtower-collector-cf-read` token can read it.
-- **HTTP analytics** gives edge 4xx/5xx on each Worker's route (`WORKER_ROUTES`), with the
-  probes left out. This needs **Zone > Analytics: Read** on `myargus.cc`
+- **HTTP analytics** gives edge 4xx/5xx on each Worker's route (`WORKER_ROUTES`, built from the registry), with the
+  probes left out. This needs **Zone > Analytics: Read** on the Argus zone
   (`CLOUDFLARE_ZONE_ID`). Until the token has it, each card says so and is judged on
   exceptions alone.
 

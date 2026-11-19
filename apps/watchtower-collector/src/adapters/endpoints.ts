@@ -1,13 +1,18 @@
 import { connect } from 'node:tls'
 import type { EndpointProbeDetail, HealthStatus, TlsCertDetail } from '@argus/watchtower-contract'
 import { CheckError, type Adapter } from '../adapter.js'
+import { REGISTRY, apiUrl, appUrl, mcpUrl, type LinkId } from '../lib/links.js'
 
-// The public surface on myargus.cc (argus#687): an anonymous HTTPS probe of
-// each endpoint, and the certificate each host presents. Both run from
-// homelab, so they see what any client on the internet sees. A failed probe
-// or handshake is the endpoint's failure, so both record a throw as down.
+// The public surface (argus#687): an anonymous HTTPS probe of each endpoint,
+// and the certificate each host presents. Both run from homelab, so they see
+// what any client on the internet sees. A failed probe or handshake is the
+// endpoint's failure, so both record a throw as down.
+//
+// The list comes from the links registry (links.json, argus#18): every live
+// entry that carries a probe. A planned, redirect or retired host is never
+// probed, and a new host is probed once the registry holds it.
 
-const HOST = 'myargus.cc'
+const HOST = REGISTRY.domain
 const INTERVAL_MS = 300_000
 const TIMEOUT_MS = 10_000
 const SLOW_AFTER_MS = 3_000
@@ -29,17 +34,61 @@ export interface PublicEndpoint {
   expectedRedirectHost?: string
 }
 
-// Each host from a wrangler route or custom domain, or the dashboard's Pages
-// domain, at a path its Worker answers itself. An API that wants a token
-// answers 401; mail is behind Cloudflare Access, which redirects to its login.
-export const PUBLIC_ENDPOINTS: PublicEndpoint[] = [
-  { url: 'https://api.myargus.cc/watchtower/checks', expected: 401 },
-  { url: 'https://memory.myargus.cc/mcp', expected: 401 },
-  { url: 'https://vault.myargus.cc/mcp', expected: 401 },
-  { url: 'https://mail.myargus.cc/', expected: 302, expectedRedirectHost: 'cloudflareaccess.com' },
-  { url: 'https://mcp.myargus.cc/email/mcp', expected: 401 },
-  { url: 'https://watchtower.myargus.cc/', expected: 200 },
-]
+// An entry whose base answers nothing useful is probed one path deeper, at a route its
+// Worker answers itself with a 401: the registry holds the base, this holds the path.
+const DEEPER_PROBES: Partial<Record<LinkId, { path: string; expected: number }>> = {
+  'watchtower-api': { path: '/checks', expected: 401 },
+  'email-mcp': { path: '/mcp', expected: 401 },
+}
+
+// A 302 in the registry is Cloudflare Access sending an anonymous request to its login.
+const ACCESS_HOST = 'cloudflareaccess.com'
+
+function baseUrl(entry: (typeof REGISTRY.entries)[number]): string | null {
+  switch (entry.bucket) {
+    case 'internal':
+    case 'external':
+      return appUrl(entry.id)
+    case 'api':
+      return apiUrl(entry.id)
+    case 'mcp':
+      return mcpUrl(entry.id)
+    default:
+      return null
+  }
+}
+
+function endpointsFromRegistry(): PublicEndpoint[] {
+  const endpoints: PublicEndpoint[] = []
+  for (const entry of REGISTRY.entries) {
+    if (entry.status !== 'live') continue
+    const deeper = DEEPER_PROBES[entry.id]
+    const expected = deeper?.expected ?? entry.probe?.status
+    const base = baseUrl(entry)
+    if (expected === undefined || base === null) continue
+    const endpoint: PublicEndpoint = { url: `${base}${deeper?.path ?? ''}`, expected }
+    if (expected === 302) endpoint.expectedRedirectHost = ACCESS_HOST
+    endpoints.push(endpoint)
+  }
+  return endpoints
+}
+
+export const PUBLIC_ENDPOINTS: PublicEndpoint[] = endpointsFromRegistry()
+
+// Each host once, in probe order: one certificate check per host, however many probes share it.
+export const PUBLIC_HOSTS: string[] = [...new Set(PUBLIC_ENDPOINTS.map((endpoint) => new URL(endpoint.url).host))]
+
+// `endpoint:<host>`, with the path added where several probes share a host (the shell and the
+// apps mounted under it, the API Workers): a host of its own keeps the key it always had.
+function endpointKeys(endpoints: PublicEndpoint[]): string[] {
+  const hosts = endpoints.map((endpoint) => new URL(endpoint.url).host)
+  return endpoints.map((endpoint) => {
+    const url = new URL(endpoint.url)
+    const shared = hosts.filter((host) => host === url.host).length > 1
+    const path = shared ? url.pathname.replace(/\/+$/, '') : ''
+    return `endpoint:${url.host}${path}`
+  })
+}
 
 export interface EndpointOptions {
   fetch?: typeof fetch
@@ -61,8 +110,9 @@ export function createEndpointAdapters(endpoints: PublicEndpoint[], options: End
   const fetchImpl = options.fetch ?? fetch
   const now = options.now ?? Date.now
 
-  return endpoints.map((endpoint) => ({
-    key: `endpoint:${new URL(endpoint.url).host}`,
+  const keys = endpointKeys(endpoints)
+  return endpoints.map((endpoint, index) => ({
+    key: keys[index] ?? `endpoint:${endpoint.url}`,
     host: HOST,
     intervalMs: INTERVAL_MS,
     failureStatus: 'down',

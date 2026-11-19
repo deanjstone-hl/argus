@@ -3,7 +3,7 @@ import { createDiskAdapter } from './adapters/disk.js'
 import { createUptimeAdapter } from './adapters/uptime.js'
 import { createSyncthingAdapter, type SyncthingTls } from './adapters/syncthing.js'
 import { createCloudflareAdapter } from './adapters/cloudflare.js'
-import { createEndpointAdapters, createTlsAdapters, PUBLIC_ENDPOINTS } from './adapters/endpoints.js'
+import { createEndpointAdapters, createTlsAdapters, PUBLIC_ENDPOINTS, PUBLIC_HOSTS } from './adapters/endpoints.js'
 import { createWorkerTrafficAdapters, createWorkerTrafficSource } from './adapters/worker-traffic.js'
 import { createGithubRunnerAdapters, createRunnerSource, parseRunnerList } from './adapters/github-runners.js'
 import { createSupabaseProjectAdapter } from './adapters/supabase-projects.js'
@@ -86,10 +86,10 @@ if (syncthingApiKey) {
 }
 
 // The public surface as the internet sees it (argus#687): an anonymous probe
-// and the certificate of each *.myargus.cc endpoint. No credentials.
+// and the certificate of each host in the links registry. No credentials.
 adapters.push(
   ...createEndpointAdapters(PUBLIC_ENDPOINTS),
-  ...createTlsAdapters(PUBLIC_ENDPOINTS.map((endpoint) => new URL(endpoint.url).host)),
+  ...createTlsAdapters(PUBLIC_HOSTS),
 )
 
 const cloudflareToken = process.env.CLOUDFLARE_API_TOKEN

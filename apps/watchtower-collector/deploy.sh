@@ -11,7 +11,7 @@
 #   "syncthing-homelab-api-key"   (personal-machine-secrets project)
 #   "watchtower-collector-cf-read" (personal-machine-secrets project) — a
 #     read-only Cloudflare user token: Account Analytics, D1, Pages and Workers
-#     Scripts read on the account, Analytics read on zone myargus.cc (argus#873).
+#     Scripts read on the account, Analytics read on the Argus zone (argus#873).
 #   "supabase-mgmt-api-pat"       (personal-machine-secrets project)
 #   "watchtower-usage-shim-token-wsl2" (personal-machine-secrets project)
 #   "watchtower-github-runners-token" (personal-machine-secrets project) — a
@@ -134,7 +134,7 @@ SYNCTHING_TLS_SERVERNAME="${SYNCTHING_TLS_SERVERNAME:-dell-server}"
 CLOUDFLARE_ACCOUNT_ID="${CLOUDFLARE_ACCOUNT_ID:-$(private_value CLOUDFLARE_ACCOUNT_ID ARGUS_CLOUDFLARE_ACCOUNT_ID)}"
 CLOUDFLARE_PAGES_PROJECTS="${CLOUDFLARE_PAGES_PROJECTS:-myargus,knowledge,stockade}"
 CLOUDFLARE_WORKER_PROJECTS="${CLOUDFLARE_WORKER_PROJECTS:-reader-api,argus-memory-mcp,argus-agent-email,argus-agent-email-mcp,argus-email,argus-vault-agent-relay,argus-watchtower-api}"
-# myargus.cc, for the Worker traffic cards' HTTP status counts (needs Zone >
+# The Argus zone, for the Worker traffic cards' HTTP status counts (needs Zone >
 # Analytics: Read on the token; without it the cards report exceptions only).
 CLOUDFLARE_ZONE_ID="${CLOUDFLARE_ZONE_ID:-$(private_value CLOUDFLARE_ZONE_ID ARGUS_CLOUDFLARE_ZONE_ID)}"
 # D1 databases as name:id, for the capacity cards.
@@ -153,7 +153,9 @@ HOST_REPORT_WSL2_VAULTS="${HOST_REPORT_WSL2_VAULTS:-CONTEXT,CORTEX}"
 NOTICE_BOARD_URL="${NOTICE_BOARD_URL:-http://127.0.0.1:3790}"
 # service_checks writes now go through the argus-watchtower-api Worker
 # (argus#252 cutover), not Supabase directly — see worker-client.ts.
-WATCHTOWER_WORKER_URL="${WATCHTOWER_WORKER_URL:-https://api.myargus.cc}"
+# The origin comes from the links registry (links.json); the environment may replace only it.
+WORKER_API_BASE="$(bash "${REPO_DIR}/../../scripts/links.sh" api watchtower-api)" || fail "links.sh could not build the watchtower API base from links.json"
+WATCHTOWER_WORKER_URL="${WATCHTOWER_WORKER_URL:-${WORKER_API_BASE%%/watchtower*}}"
 # The ops hub gets every check too (argus#1200), once WATCHTOWER_HUB_TOKEN is
 # in the env file: deploy.sh writes it from the BWS secret
 # notice-board-token-watchtower-collector (argus#52; the secret is an owner

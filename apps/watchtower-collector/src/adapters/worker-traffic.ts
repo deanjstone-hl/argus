@@ -1,5 +1,7 @@
 import type { HealthStatus, WorkerTrafficDetail } from '@argus/watchtower-contract'
 import type { Adapter } from '../adapter.js'
+import { REGISTRY, type LinkId } from '../lib/links.js'
+import type { LinkEntry } from '../lib/links-core.js'
 import { PROBE_USER_AGENT } from './endpoints.js'
 
 // Each Worker's error rates over the last hour, from Cloudflare's GraphQL
@@ -8,7 +10,7 @@ import { PROBE_USER_AGENT } from './endpoints.js'
 // - Workers analytics (account): invocations by status, and the scripts'
 //   own exceptions. Readable with the collector's existing token.
 // - HTTP analytics (zone): edge response codes on each Worker's route, which
-//   is where a 4xx shows. It needs Zone > Analytics: Read on myargus.cc; until
+//   is where a 4xx shows. It needs Zone > Analytics: Read on the Argus zone; until
 //   the token has it, each card says so and is judged on exceptions alone.
 //
 // The endpoint probes send their own user agent and are left out, or every
@@ -31,7 +33,7 @@ const THRESHOLDS: WorkerTrafficDetail['thresholds'] = {
   minClientErrors: 10,
 }
 
-export const ZONE_ANALYTICS_UNAVAILABLE = 'The Cloudflare token cannot read zone analytics (needs Zone > Analytics: Read on myargus.cc)'
+export const ZONE_ANALYTICS_UNAVAILABLE = `The Cloudflare token cannot read zone analytics (needs Zone > Analytics: Read on ${REGISTRY.domain})`
 
 interface WorkerRoute {
   host: string
@@ -40,15 +42,28 @@ interface WorkerRoute {
   api: boolean
 }
 
-// From each Worker's wrangler routes or custom domain. Null: it has no HTTP
-// route (argus-agent-email only receives Email Routing events).
+// The route of a Worker, from its links registry entry. An API or MCP Worker mounted on its
+// bucket's shared host (api., mcp.) answers only under its own path, so it carries that path;
+// a Worker with a host of its own answers the whole host.
+function routeOf(id: LinkId, api: boolean): WorkerRoute {
+  const entries: readonly LinkEntry[] = REGISTRY.entries
+  const entry = entries.find((candidate) => candidate.id === id)
+  if (!entry?.host || entry.status === 'retired') throw new Error(`links.json has no live host for ${id}`)
+  const route: WorkerRoute = { host: entry.host, api }
+  const mount = (entry.path ?? '').replace(/\/+$/, '')
+  if (mount !== '' && entry.host === `${entry.bucket}.${REGISTRY.domain}`) route.pathPrefix = `${mount}/`
+  return route
+}
+
+// Each Worker's route, by script name. Null: it has no HTTP route (argus-agent-email only
+// receives Email Routing events). A script with no entry here is reported as having no
+// known route, which is how a retired Worker still listed in CLOUDFLARE_WORKER_PROJECTS reads.
 export const WORKER_ROUTES: Record<string, WorkerRoute | null> = {
-  'argus-watchtower-api': { host: 'api.myargus.cc', pathPrefix: '/watchtower/', api: true },
-  'argus-memory-mcp': { host: 'memory.myargus.cc', api: true },
-  'argus-vault-agent-relay': { host: 'vault.myargus.cc', api: true },
-  'argus-agent-email-mcp': { host: 'mcp.myargus.cc', pathPrefix: '/email/', api: true },
-  'argus-email': { host: 'mail.myargus.cc', api: false },
-  'reader-api': { host: 'api.read.myargus.cc', api: true },
+  'argus-watchtower-api': routeOf('watchtower-api', true),
+  'argus-memory-mcp': routeOf('memory', true),
+  'argus-agent-email-mcp': routeOf('email-mcp', true),
+  'argus-email': routeOf('mail', false),
+  'reader-api': routeOf('reader-api', true),
   'argus-agent-email': null,
 }
 

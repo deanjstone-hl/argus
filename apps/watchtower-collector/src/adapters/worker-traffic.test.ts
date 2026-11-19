@@ -19,7 +19,7 @@ const ZONE_AUTHZ = fixture('cloudflare-zone-authz.json')
 const ZONE_STATUSES = fixture('cloudflare-zone-statuses.hand-built.json')
 
 const NOW = Date.parse('2026-10-16T15:41:20Z')
-const SCRIPTS = ['reader-api', 'argus-memory-mcp', 'argus-agent-email', 'argus-agent-email-mcp', 'argus-email', 'argus-vault-agent-relay', 'argus-watchtower-api']
+const SCRIPTS = ['reader-api', 'argus-memory-mcp', 'argus-agent-email', 'argus-agent-email-mcp', 'argus-email', 'argus-watchtower-api']
 
 interface Call {
   query: string
@@ -61,6 +61,20 @@ describe('WORKER_ROUTES', () => {
     for (const script of SCRIPTS) expect(script in WORKER_ROUTES, script).toBe(true)
     expect(WORKER_ROUTES['argus-watchtower-api']).toEqual({ host: 'api.myargus.cc', pathPrefix: '/watchtower/', api: true })
     expect(WORKER_ROUTES['argus-agent-email']).toBeNull()
+  })
+
+  it('takes every route from the links registry', () => {
+    expect(WORKER_ROUTES['reader-api']).toEqual({ host: 'api.myargus.cc', pathPrefix: '/reader/', api: true })
+    expect(WORKER_ROUTES['argus-agent-email-mcp']).toEqual({ host: 'mcp.myargus.cc', pathPrefix: '/email/', api: true })
+    expect(WORKER_ROUTES['argus-memory-mcp']).toEqual({ host: 'memory.myargus.cc', api: true })
+    expect(WORKER_ROUTES['argus-email']).toEqual({ host: 'mail.myargus.cc', api: false })
+  })
+
+  it('names no retired host: the old reader API host and the vault relay are gone', () => {
+    const hosts = Object.values(WORKER_ROUTES).map((route) => route?.host)
+    expect(hosts).not.toContain('api.read.myargus.cc')
+    expect(hosts).not.toContain('vault.myargus.cc')
+    expect('argus-vault-agent-relay' in WORKER_ROUTES).toBe(false)
   })
 })
 

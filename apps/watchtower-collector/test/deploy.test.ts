@@ -94,6 +94,9 @@ beforeEach(async () => {
   await mkdir(path.join(home, 'repo', 'scripts', 'lib'), { recursive: true })
   await copyFile(path.resolve(PACKAGE_DIR, '../../scripts/lib/app-env.sh'), path.join(home, 'repo', 'scripts', 'lib', 'app-env.sh'))
   await copyFile(path.join(PACKAGE_DIR, 'systemd', UNIT), repoUnit())
+  // deploy.sh builds the Worker origin from the links registry, as the repo lays it out.
+  await copyFile(path.resolve(PACKAGE_DIR, '../../scripts/links.sh'), path.join(home, 'repo', 'scripts', 'links.sh'))
+  await copyFile(path.resolve(PACKAGE_DIR, '../../links.json'), path.join(home, 'repo', 'links.json'))
   await writeFile(stubLog, '')
   await writeStub('bws', BWS_STUB)
   await writeStub('pnpm', PNPM_STUB)
@@ -152,5 +155,27 @@ describe('deploy.sh systemd unit', () => {
     expect(lines).not.toContain('systemctl --user daemon-reload')
     expect(lines.some((line) => line.includes('restart'))).toBe(false)
     expect(stdout).toContain('not installed')
+  })
+})
+
+describe('deploy.sh Worker origin', () => {
+  const envFile = () => path.join(home, '.config', 'argus', 'watchtower-collector.env')
+
+  it('writes the registry origin of the watchtower API, with no host of its own', async () => {
+    // Move the API to another host in the scratch registry: the script must follow it.
+    const registryPath = path.join(home, 'repo', 'links.json')
+    const registry = JSON.parse(await readFile(registryPath, 'utf8')) as { entries: Array<{ id: string; host?: string }> }
+    for (const entry of registry.entries) if (entry.id === 'watchtower-api') entry.host = 'api.registry-moved.test'
+    await writeFile(registryPath, JSON.stringify(registry))
+
+    await runDeploy()
+
+    expect(await readFile(envFile(), 'utf8')).toMatch(/^WATCHTOWER_WORKER_URL=https:\/\/api\.registry-moved\.test$/m)
+  })
+
+  it('lets the environment replace the origin for one deployment', async () => {
+    await runDeploy({ WATCHTOWER_WORKER_URL: 'http://127.0.0.1:8787' })
+
+    expect(await readFile(envFile(), 'utf8')).toMatch(/^WATCHTOWER_WORKER_URL=http:\/\/127\.0\.0\.1:8787$/m)
   })
 })
