@@ -225,11 +225,18 @@ export function createMcpServer(store: Store, role: Role, threadHeader?: string)
       {
         title: 'Resume an awaiting_ci slot',
         description:
-          "When an awaiting_ci slot's checks have finished (green or red), move it back: running if the effective total cap and its host's cap have room, else ready, where it waits for a free slot like an un-parked one. Pressure does not stop it. Returns resumed false and the reason for ready. Then wake the worker in its own thread; run the memory gate first. Never merge the worker's PR.",
-        inputSchema: { issue, note: z.string().optional().describe('The checks result, one line: "checks green" or "checks red: <job>".') },
+          "When an awaiting_ci slot's checks have finished (green or red), move it back: running if the effective total cap and its host's cap have room, else ready, where it waits for a free slot like an un-parked one. Pressure does not stop it. Returns resumed false and the reason for ready. Pass report_only: true for a green trunk slot that has nothing left to build, only a Resolution to post: it skips the total, effective and host caps and always goes to running (refused unless note starts with \"checks green\"; a red resume stays capped). Then wake the worker in its own thread; run the memory gate first. Never merge the worker's PR.",
+        inputSchema: {
+          issue,
+          note: z.string().optional().describe('The checks result, one line: "checks green" or "checks red: <job>".'),
+          report_only: z
+            .boolean()
+            .optional()
+            .describe('true: skip the slot caps for a green resume whose worker only reports. Needs note to start with "checks green".'),
+        },
         annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
       },
-      guarded((args) => store.slotResumeCi(role, args.issue, args.note)),
+      guarded((args) => store.slotResumeCi(role, args.issue, args.note, args.report_only === true)),
     )
   }
 

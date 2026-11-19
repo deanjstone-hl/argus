@@ -574,7 +574,8 @@ export const MIGRATIONS = [
 ]
 
 /** What an awaiting_ci slot waits on: a PR URL, or the SHA of a push to a trunk repo's main. */
-const CI_REF_PATTERN = /^(https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/pull\/[1-9]\d*|[0-9a-f]{7,40})$/
+const GREEN_NOTE_PATTERN = /^\s*checks green\b/i
+const CI_REF_PATTERN =/^(https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/pull\/[1-9]\d*|[0-9a-f]{7,40})$/
 const REPO_PATTERN = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/
 const ISSUE_PATTERN = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+#[1-9]\d*$/
 
@@ -1569,20 +1570,30 @@ export function openStore(options: StoreOptions) {
      * argus-config#1169: Aquila's move when an awaiting slot's checks finish, green or red. The slot
      * counts against the caps again: running if they have room, else ready, where it waits for a
      * free slot like an un-parked one. Pressure does not stop it, the worker is already mid-task.
+     *
+     * argus/37: with `reportOnly` a green slot has nothing left to build, only a Resolution to
+     * post and a report to make, so it skips the total, effective and host caps and always goes
+     * to running. Only a note that says "checks green" may ask for it; a red resume does real
+     * work and stays capped.
      */
-    slotResumeCi(role: Role, issue: string, note?: string): { slot: Slot; resumed: boolean; reason?: string } {
+    slotResumeCi(role: Role, issue: string, note?: string, reportOnly = false): { slot: Slot; resumed: boolean; reason?: string } {
       permit(role, 'slot_resume_ci')
+      if (reportOnly && !GREEN_NOTE_PATTERN.test(note ?? '')) {
+        throw new Refused('report_only skips the slot caps, so it needs note to say "checks green"; a red resume stays capped')
+      }
       return write(() => {
         const row = slotOrRefuse(issue)
         requireState(row, 'awaiting_ci', 'resume')
         const status = selectStatus.get('afk') as Row | undefined
-        const refusal = status
-          ? capRefusal(status, pressureOf(status), String(row.host) as Host, issue, Number(row.budget_exempt) === 1)
-          : null
+        const refusal =
+          status && !reportOnly
+            ? capRefusal(status, pressureOf(status), String(row.host) as Host, issue, Number(row.budget_exempt) === 1)
+            : null
         const state = refusal === null ? 'running' : 'ready'
         db.prepare('UPDATE slots SET state = ?, ci_ref = NULL, note = ?, updated_at = ? WHERE issue = ?').run(state, note ?? null, now(), issue)
         record(refusal === null ? 'slot_resumed' : 'slot_resume_deferred', role, issue, String(row.thread_id), {
           note: note ?? null,
+          ...(reportOnly ? { report_only: true } : {}),
           ...(refusal === null ? {} : { reason: refusal }),
         })
         touchHolder('direction', holderOf('direction'))

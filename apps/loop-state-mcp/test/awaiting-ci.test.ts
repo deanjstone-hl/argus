@@ -218,6 +218,58 @@ describe('slot_resume_ci', () => {
   })
 })
 
+/**
+ * argus/37: a green trunk slot has nothing left to build, only a Resolution to post, so Aquila
+ * resumes it with report_only and the caps (total, effective and host) do not hold it back. A
+ * checks-red resume does real work and stays capped.
+ */
+describe('slot_resume_ci with report_only', () => {
+  const SHA = '0a69f4f0d1c2b3a4958677665544332211009988'
+
+  // A awaits CI on a trunk push while B fills the one total slot and the one wsl2 slot.
+  async function fullCaps() {
+    const world = await started([A, B])
+    await world.afk.ok('status_tick', tick({ total_cap: 1, host_caps: { wsl2: 1 } }))
+    await world.worker.ok('slot_await_ci', { issue: A, thread_id: 'worker-1', ref: SHA })
+    return world
+  }
+
+  it('moves a green slot to running although the total cap and the host cap are full', async () => {
+    const { aquila, afk } = await fullCaps()
+
+    const result = await aquila.ok('slot_resume_ci', { issue: A, note: 'checks green', report_only: true })
+
+    expect(result).toMatchObject({ resumed: true, slot: { issue: A, state: 'running', ci_ref: null, note: 'checks green' } })
+    expect(result.reason).toBeUndefined()
+    expect((await afk.ok('status_read')).slots).toMatchObject({ used: 2, free: 0, ready: 0, awaiting_ci: 0 })
+  })
+
+  it('leaves a red resume capped: it goes to ready, and report_only is refused for it', async () => {
+    const { aquila } = await fullCaps()
+
+    const refused = await aquila.call('slot_resume_ci', { issue: A, note: 'checks red: test', report_only: true })
+    expect(refused.isError).toBe(true)
+    expect(text(refused)).toMatch(/report_only.*checks green/)
+    expect(await slotOf(aquila, A)).toMatchObject({ state: 'awaiting_ci', ci_ref: SHA })
+
+    const capped = await aquila.ok('slot_resume_ci', { issue: A, note: 'checks red: test' })
+    expect(capped).toMatchObject({ resumed: false, slot: { state: 'ready' } })
+    expect(capped.reason).toMatch(/effective slot cap 1 is reached/)
+  })
+
+  it('refuses report_only with no note, or a note that does not say checks green', async () => {
+    const { aquila } = await fullCaps()
+    expect((await aquila.call('slot_resume_ci', { issue: A, report_only: true })).isError).toBe(true)
+    expect((await aquila.call('slot_resume_ci', { issue: A, note: 'probably fine', report_only: true })).isError).toBe(true)
+    expect(await slotOf(aquila, A)).toMatchObject({ state: 'awaiting_ci' })
+  })
+
+  it('still caps a green resume without report_only', async () => {
+    const { aquila } = await fullCaps()
+    expect(await aquila.ok('slot_resume_ci', { issue: A, note: 'checks green' })).toMatchObject({ resumed: false, slot: { state: 'ready' } })
+  })
+})
+
 describe('slot_rebuild with an awaiting slot', () => {
   it('keeps awaiting_ci for a live worker on an assigned issue, and does not nudge it as idle', async () => {
     const { worker, aquila } = await started([A])
