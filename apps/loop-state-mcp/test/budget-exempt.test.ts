@@ -9,7 +9,7 @@ import { ladderWorld } from './ladder-world.js'
  * slot per repo and still obeys no_new_slots and gate_only.
  * Burn 10.5 puts the ladder at no_opus (cap cut to 1), 13 at no_new_slots.
  */
-const trial = 'deanjstone/design-system'
+const trial = 'deanjstone/frontend'
 const issue = (repo: string, n: number) => `${repo}#${n}`
 const other = 'deanjstone/argus'
 
@@ -53,7 +53,7 @@ describe('budget_exempt_repos', () => {
     await afk.ok('slot_start', { issue: issue(trial, 1), thread_id: 'w1' })
     const refused = await afk.call('slot_start', { issue: issue(trial, 2), thread_id: 'w2' })
     expect(refused.isError).toBe(true)
-    expect(refused.content[0]?.text).toMatch(/deanjstone\/design-system already runs a slot/)
+    expect(refused.content[0]?.text).toMatch(/deanjstone\/frontend already runs a slot/)
   })
 
   it('lets an exempt repo start again once its slot is closed', async () => {
@@ -149,7 +149,7 @@ describe('budget_exempt_repos', () => {
     expect((await afk.call('slot_start', { issue: issue(trial, 2), thread_id: 'w2' })).isError).toBeFalsy()
   })
 
-  it.each([['trial'], ['deanjstone/design-system#1'], [''], ['a/b/c']])('refuses %j as a repo', async (bad) => {
+  it.each([['trial'], ['deanjstone/frontend#1'], [''], ['a/b/c']])('refuses %j as a repo', async (bad) => {
     const { afk, tick } = await ladderWorld()
     const result = await afk.call('status_tick', tick(0, { budget_exempt_repos: [bad] }))
     expect(result.isError).toBe(true)

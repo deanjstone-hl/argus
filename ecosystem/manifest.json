@@ -22,7 +22,7 @@
     {"name":"email","description":"Shared agent inbox on one Cloudflare Worker: web UI, threading, Web Push and an MCP server (mail.myargus.cc)","category":"project","tags":["deanjstone/email"],"connects":["Email inbox","argus-config"]},
     {"name":"memory-mcp","description":"Persistent memory MCP server: Supabase-backed, stdio plus Cloudflare Worker (memory.myargus.cc)","category":"project","tags":["deanjstone/memory-mcp"],"connects":["CONTEXT vault","memorise"]},
     {"name":"myargus","description":"pnpm and Turborepo monorepo for all myargus.cc web apps","category":"project","tags":["deanjstone/myargus"],"connects":["Shell","Stockade","Knowledge","Read","Briefings","design-system"]},
-    {"name":"design-system","description":"Shared shadcn/ui component registry and design tokens","category":"project","tags":["deanjstone/design-system"],"connects":["myargus","atto1","argus"]},
+    {"name":"design-system","description":"Shared shadcn/ui component registry and design tokens","category":"project","tags":["deanjstone/frontend"],"connects":["myargus","atto1","argus"]},
     {"name":"slate-reader","description":"Reader PWA for EPUB, PDF, web articles and Markdown notes, built for an iPad 2","category":"project","tags":["deanjstone/slate-reader"]},
     {"name":"code-relay","description":"Provider-agnostic PWA remote console for AI coding agents","category":"project","status":"archived","tags":["deanjstone/code-relay"]},
     {"name":"sys-admin","description":"SysAdmin workspace for WSL2, Windows and homelab","category":"project","tags":["dev-stack"],"connects":["argus-config","homelab"]},

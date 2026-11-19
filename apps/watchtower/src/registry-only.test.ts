@@ -1,4 +1,4 @@
-// #671: the dashboard is built only from deanjstone/design-system registry components.
+// #671: the dashboard is built only from deanjstone/frontend registry components.
 // Every UI primitive must be a registry item installed by the shadcn CLI, and app code
 // composes those primitives and the theme's tokens rather than hand-rolling its own.
 import { readdirSync, readFileSync } from 'node:fs'
