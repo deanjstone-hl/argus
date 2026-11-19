@@ -140,6 +140,12 @@ root workspace and each changed nested package. The ecosystem manifest's skills 
 it; see `ecosystem/README.md`) is its own workflow, `ecosystem-skills.yml`, which no pull request starts. A change to `scripts/ci.sh`, `ci.yml` or
 `.github/actions/` runs everything. To add a check, edit the script, not the workflow.
 
+### Links
+
+URLs come from the vendored links registry (`links.json`, `*/src/lib/links.ts`), never from a
+literal; `bash scripts/link-check.sh` enforces it in CI and `bash scripts/vendor-links.sh vX.Y.Z`
+re-vendors it from `deanjstone/frontend`. See the README's "Links come from the registry".
+
 ## Governance
 
 **Package manager:** pnpm (workspace — `pnpm-workspace.yaml`). Never use npm or yarn.

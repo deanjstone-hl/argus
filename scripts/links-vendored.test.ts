@@ -53,4 +53,11 @@ describe('vendored links registry', () => {
       expect(head, dir).toContain('link-check:vendored')
     }
   })
+
+  it('the link-check workflow blocks, on a hosted runner, with no CI_RUNS_ON', () => {
+    const workflow = read('.github/workflows/link-check.yml')
+    expect(workflow).toContain('LINK_CHECK_MODE: block')
+    expect(workflow).toContain('runs-on: ubuntu-latest')
+    expect(workflow).not.toContain('CI_RUNS_ON')
+  })
 })

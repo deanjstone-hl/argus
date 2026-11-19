@@ -27,7 +27,7 @@ jobs:
     name: Link check
     runs-on: ubuntu-latest
     env:
-      LINK_CHECK_MODE: report
+      LINK_CHECK_MODE: block
     steps:
       - uses: actions/checkout@v4
 

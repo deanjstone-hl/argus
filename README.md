@@ -61,6 +61,24 @@ Run `pnpm check` before every push (a PR branch, or `main` once the repo is trun
 result in the PR's test plan or the ticket's Resolution. Every push to `main` runs CI in full: no
 commit subject or committer skips it.
 
+## Links come from the registry
+
+Every myargus and tailnet URL in this repo is built from `links.json`, the registry vendored from
+[`deanjstone/frontend`](https://github.com/deanjstone/frontend) (ADR-0004). Code uses the vendored
+builders (`appUrl`, `routeUrl`, `apiUrl`, `mcpUrl`, `switcherApps`, `COOKIE_DOMAIN`) from
+`apps/watchtower/src/lib/links.ts`, `apps/watchtower-collector/src/lib/links.ts` and
+`apps/agent-engine/src/lib/links.ts`; scripts use `bash scripts/links.sh api watchtower-api`. A
+backend's environment may override an origin, never a path, and nothing carries a host fallback.
+
+```bash
+bash scripts/link-check.sh        # bans host literals, checks wrangler/Vite/manifest config and registry drift
+bash scripts/vendor-links.sh vX.Y.Z   # re-vendor the registry from a frontend tag, then commit the result
+```
+
+`link-check` blocks in CI (`.github/workflows/link-check.yml`). `.link-check-ignore` lists the
+files it does not scan; the ecosystem manifest's app `href`s are checked against the registry by
+`scripts/ecosystem/links.ts` instead. Never edit a vendored file: change the registry in `frontend`.
+
 ## Branches, PRs and releases
 
 - Work on a branch in a worktree under `~/.t3/worktrees/argus/`; `~/repos/argus` is the deploy

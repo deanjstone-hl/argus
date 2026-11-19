@@ -13,7 +13,7 @@
 # The Vite package (apps/watchtower) keeps the `@/lib/links-core` import. The Node
 # services are built with tsc and run `node dist/...`, which cannot resolve that alias,
 # so their copies import `./links-core.js`. scripts/links-vendored.test.ts pins both.
-# The workflow's runs-on is rewritten to `ubuntu-latest` (public-repo rule).
+# The workflow's runs-on is rewritten to `ubuntu-latest` (public-repo rule) and its mode to `block`.
 # Re-run after a registry change, then commit the result. Never edit a vendored file.
 set -euo pipefail
 
@@ -39,7 +39,10 @@ fetch links/link-check.yml .github/workflows/link-check.yml
 chmod +x "$root/scripts/link-check.sh" "$root/scripts/links.sh"
 
 # This repo is public: a public repo's CI runs on ubuntu-latest and reads no CI_RUNS_ON.
-sed -i "s#runs-on: \${{ fromJSON(vars.CI_RUNS_ON || '\"ubuntu-latest\"') }}#runs-on: ubuntu-latest#" "$root/.github/workflows/link-check.yml"
+# It also holds at 0 findings, so the check blocks (decision 10), not reports.
+workflow="$root/.github/workflows/link-check.yml"
+sed -i "s#runs-on: \${{ fromJSON(vars.CI_RUNS_ON || '\"ubuntu-latest\"') }}#runs-on: ubuntu-latest#" "$workflow"
+sed -i 's#LINK_CHECK_MODE: report#LINK_CHECK_MODE: block#' "$workflow"
 
 vite_dir=apps/watchtower/src/lib
 fetch lib/links.ts "$vite_dir/links.ts"
