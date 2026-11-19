@@ -1,0 +1,7 @@
+# Globs link-check does not scan for host literals (one git pathspec glob per line).
+#
+# The ecosystem manifest names hosts in prose and tags; its app hrefs are checked against
+# links.json by scripts/ecosystem/links.ts (argus#18).
+ecosystem/manifest.json
+# Generated architecture page: a static diagram of the data flow, not code that builds a link.
+docs/architecture/*.html

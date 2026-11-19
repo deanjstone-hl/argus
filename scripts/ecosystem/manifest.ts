@@ -1,6 +1,6 @@
 /**
  * The ecosystem manifest: the apps, projects and skills of the Argus system and the edges
- * between them, which myargus.cc's System Map page draws (deanjstone/myargus#310). The source
+ * between them, which the shell's System Map page draws (deanjstone/myargus#310). The source
  * is `ecosystem/manifest.json` at the repo root, published as the `ecosystem.json` asset of
  * the argus release tagged `ecosystem`; the hub fetches it, keeps the last valid copy and
  * serves it at `GET /api/ecosystem`. The shape is a contract with the shell's reader in

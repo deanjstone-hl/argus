@@ -1,7 +1,7 @@
 name: Ecosystem Release
 
 # Publishes ecosystem/manifest.json as the `ecosystem.json` asset of the release tagged
-# `ecosystem`, which the ops hub fetches for myargus.cc's System Map
+# `ecosystem`, which the ops hub fetches for the shell's System Map
 # (deanjstone/myargus#310). The tag is fixed: the hub looks the asset up by it.
 #
 # It runs on the owner's promotion, a push to `deploy`, not on a merge to `main`
