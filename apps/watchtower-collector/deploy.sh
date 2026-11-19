@@ -37,6 +37,9 @@
 # are in BWS under ARGUS_TAILSCALE_IP_HOMELAB, ARGUS_TAILSCALE_IP_WSL2, ARGUS_CLOUDFLARE_ACCOUNT_ID,
 # ARGUS_CLOUDFLARE_ZONE_ID and ARGUS_D1_WATCHTOWER_DATABASE_ID (argus#1207).
 #
+# Where the unit is installed, it also refreshes ~/.config/systemd/user/watchtower-collector.service
+# from systemd/ when the content differs, and reloads systemd before the restart (argus#53).
+#
 # Needs BWS_ACCESS_TOKEN set — see ~/.argus/watchtower/.bws-token.
 # Run: bash deploy.sh
 set -euo pipefail
@@ -206,9 +209,37 @@ chmod 600 "$ENV_FILE"
 ok "${ENV_FILE} written (chmod 600)"
 [[ -f "$LEGACY_ENV_FILE" ]] && app_env_warn_legacy watchtower-collector "$LEGACY_ENV_FILE"
 
+# Refreshes the installed unit from systemd/ (argus#53). cmp, not mtime: a cp always bumps the
+# mtime. A unit that is a symlink into the checkout already is the repo's file, so it is never
+# copied over (a cp would write through the link); systemd only needs the reload. Same shape as
+# homelab's copy_user_unit (homelab#490), kept local so argus does not depend on that repo.
+# Sets UNIT_CHANGED=1 when the installed copy was replaced.
+UNIT_CHANGED=0
+refresh_unit() {
+  local src="${REPO_DIR}/systemd/$1" dest_dir="${HOME}/.config/systemd/user"
+  [[ -f "$src" ]] || fail "$src is missing"
+  if [[ -L "${dest_dir}/$1" ]]; then
+    ok "$1 is linked into the checkout — not copied"
+  elif [[ -f "${dest_dir}/$1" ]] && cmp -s "$src" "${dest_dir}/$1"; then
+    ok "$1 unchanged"
+  else
+    mkdir -p "$dest_dir"
+    cp "$src" "${dest_dir}/$1"
+    UNIT_CHANGED=1
+    ok "$1 copied to ${dest_dir}"
+  fi
+}
+
 step "Building and restarting (if this host runs the service)"
 UNIT="watchtower-collector.service"
 if systemctl --user list-unit-files "$UNIT" &>/dev/null && systemctl --user list-unit-files "$UNIT" | grep -q "$UNIT"; then
+  refresh_unit "$UNIT"
+  # A changed copy, or a linked unit whose file changed under systemd, needs a reload before
+  # the restart can use it.
+  if (( UNIT_CHANGED )) || [[ "$(systemctl --user show -p NeedDaemonReload --value "$UNIT" 2>/dev/null || true)" == yes ]]; then
+    systemctl --user daemon-reload
+    ok "systemd reloaded"
+  fi
   pnpm install --frozen-lockfile
   pnpm run build
   systemctl --user restart "$UNIT"

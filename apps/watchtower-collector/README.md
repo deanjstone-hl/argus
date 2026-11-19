@@ -47,9 +47,14 @@ writing the env file.
 Its env file is `~/.config/argus/watchtower-collector.env` (mode 600), outside the deploy copy so an agent can fix it ([argus-config#1267](https://github.com/deanjstone/argus-config/issues/1267)). The old `apps/watchtower-collector/.env` still loads and is deprecated; the one-time move is argus-config's `scripts/owner-steps/1267.sh`. `deploy.sh` warns while the old file is still there; the unit loads the old file first and the new one after it, so the new one wins.
 
 The unit file is in [`systemd/`](systemd/); it runs from this directory in the checkout, so a
-deploy is a `git pull` plus the above. `deploy.sh` does not install or change the unit: after a
-change to `systemd/watchtower-collector.service`, copy it to `~/.config/systemd/user/` (unless that
-is a symlink into the checkout), then `systemctl --user daemon-reload` and restart.
+deploy is a `git pull` plus the above. On a host where the unit is installed, `deploy.sh` also
+refreshes it from `systemd/` ([argus#53](https://github.com/deanjstone/argus/issues/53)): it
+compares content (`cmp -s`, since a `cp` always bumps the mtime), copies the file to
+`~/.config/systemd/user/` only when it differs, and runs `systemctl --user daemon-reload` before
+the restart, so a unit change reaches the host with the next deploy. A unit that is a symlink into
+the checkout is never copied over; it is only reloaded when systemd reports `NeedDaemonReload`.
+A host where the unit is not installed is left alone (the first install is a one-time owner step:
+`install -m 644 systemd/watchtower-collector.service ~/.config/systemd/user/`).
 
 The unit sets `MemoryHigh=512M` and `ManagedOOMPreference=avoid` (argus#845). The cgroup counts
 every `systemctl` and `ccusage` child the collector spawns, so its figure is well above the Node
