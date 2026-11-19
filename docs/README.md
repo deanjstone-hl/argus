@@ -20,6 +20,7 @@ are exempt).
 | [`decisions/`](decisions/) | ADRs. Index: [`DECISIONS.md`](DECISIONS.md). Speculative proposals live here too, as `status: proposed`. |
 | [`architecture/`](architecture/) | How the system is put together, and why — orchestrator strategy, the memory system, the Watchtower data flow. |
 | [`diagrams/`](diagrams/) | Self-contained HTML/SVG diagrams: the repo architecture, each app's main flow, and build and deploy. Index: [`diagrams/README.md`](diagrams/README.md). |
+| [`runbooks/`](runbooks/) | Step-by-step procedures for an owner or an agent to run: [`bws-store-secret.md`](runbooks/bws-store-secret.md) stores a secret from a hidden prompt. |
 | [`reference/`](reference/) | Look-it-up material for this repo: ADR format, brrr, one-off evaluations. |
 | [`system-specs/`](system-specs/) | `common/` for shared cross-repo conventions, `features/` and `modules/` as they gain content. |
 | [`task-specs/`](task-specs/) | Design-doc overflow: `<slug>/design.md` for the minority of tasks whose write-up is too long for an issue body. The owning issue links to the file. |

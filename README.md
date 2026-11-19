@@ -79,6 +79,19 @@ bash scripts/vendor-links.sh vX.Y.Z   # re-vendor the registry from a frontend t
 files it does not scan; the ecosystem manifest's app `href`s are checked against the registry by
 `scripts/ecosystem/links.ts` instead. Never edit a vendored file: change the registry in `frontend`.
 
+## Storing a secret
+
+A value goes into Bitwarden Secrets Manager through a hidden prompt, never a chat, a `!` command or a
+typed command line. Env variables name the key and project, so nothing is hardcoded:
+
+```bash
+BWS_SECRET_KEY=<key> BWS_SIBLING_KEY=<existing-key-in-the-same-project> bash scripts/bws-store-secret.sh
+bash scripts/bws-store-secret.sh --dry-run   # same variables; says create or replace, changes nothing
+```
+
+`BWS_PROJECT_ID` replaces `BWS_SIBLING_KEY`; `SECRET_NOTE`, `SECRET_EXPIRES`, `SECRET_PREFIX` and
+`BWS_TOKEN_FILE` are optional. Runbook: [`docs/runbooks/bws-store-secret.md`](docs/runbooks/bws-store-secret.md).
+
 ## Branches, PRs and releases
 
 - Work on a branch in a worktree under `~/.t3/worktrees/argus/`; `~/repos/argus` is the deploy
