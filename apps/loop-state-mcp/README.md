@@ -71,7 +71,10 @@ the checks; when they finish, green or red, it calls `slot_resume_ci`: the slot 
 if the effective total cap and its host's cap have room (pressure does not stop it, the worker is
 already mid-task), else to `ready` with `resumed: false` and the reason, where it waits for a free slot
 like an un-parked one. Aquila then wakes the worker in its own thread, behind the memory gate, and the
-worker merges its own PR on green or fixes it on red. Nothing else moves an awaiting slot: `slot_report`,
+worker merges its own PR on green or fixes it on red. A green trunk slot has nothing left to build, only a
+Resolution to post, so Aquila resumes it with `report_only: true` (argus/37): it skips the total, effective
+and host caps and always goes to `running`, so finished work never waits behind a fresh worker. The flag is
+refused unless `note` starts with `checks green`; a red resume stays capped. Nothing else moves an awaiting slot: `slot_report`,
 `slot_park`, `slot_close` and `slot_start` refuse it, `slot_free` clears it, and a `slot_rebuild` keeps it
 awaiting while its worker thread lives (and does not list it in `idle_workers`).
 
