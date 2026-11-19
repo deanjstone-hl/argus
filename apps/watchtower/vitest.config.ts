@@ -1,4 +1,5 @@
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { cloudflareTest, readD1Migrations } from '@cloudflare/vitest-pool-workers'
 import { defineConfig } from 'vitest/config'
 
@@ -17,6 +18,8 @@ export default defineConfig({
   test: {
     projects: [
       {
+        // The vendored links registry imports its builders through the `@/` alias, as the app does.
+        resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
         test: {
           name: 'node',
           include: ['src/**/*.test.ts'],

@@ -9,7 +9,7 @@ import { createRemoteJWKSet, jwtVerify, type JWTVerifyGetKey } from 'jose'
 // extended by src/worker/env.d.ts for the secrets below.
 
 // Cloudflare Workers Routes don't strip the matched path prefix — a request
-// to api.myargus.cc/watchtower/checks arrives at this Worker with the full
+// to the API host's /watchtower/checks arrives at this Worker with the full
 // /watchtower/checks path, not /checks. basePath() mounts every route below
 // under that same prefix so the two stay in sync (same reason
 // the retired email-mcp Worker used .basePath("/email")).

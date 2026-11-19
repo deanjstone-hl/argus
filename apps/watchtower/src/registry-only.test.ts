@@ -22,8 +22,16 @@ function filesUnder(dir: string): string[] {
 
 const itemName = (file: string) => basename(file, extname(file))
 const read = (file: string) => readFileSync(file, 'utf8')
+// The vendored links registry holds issue references and notes, not app code (#18).
+const VENDORED_LINKS = ['/lib/links.ts', '/lib/links-core.ts']
+
 const appFiles = filesUnder(SRC).filter(
-  (file) => /\.tsx?$/.test(file) && !file.includes('/components/ui/') && !file.endsWith('.test.ts') && !file.includes('/worker/'),
+  (file) =>
+    /\.tsx?$/.test(file) &&
+    !file.includes('/components/ui/') &&
+    !file.endsWith('.test.ts') &&
+    !file.includes('/worker/') &&
+    !VENDORED_LINKS.some((vendored) => file.endsWith(vendored)),
 )
 
 describe('registry-only UI', () => {

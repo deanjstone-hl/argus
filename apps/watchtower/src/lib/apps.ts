@@ -1,14 +1,5 @@
-export interface AppEntry {
-  id: string
-  name: string
-  href: string
-  description: string
-}
+import { switcherApps } from '@/lib/links'
 
-// The Argus web apps the app switcher lists, the current one included.
-export const APPS: AppEntry[] = [
-  { id: 'watchtower', name: 'Watchtower', href: 'https://watchtower.myargus.cc', description: 'Infra health, live from the collector' },
-  { id: 'ops', name: 'Ops hub', href: 'https://ops.myargus.cc', description: 'Issues, PRs, waves and the notice board' },
-  { id: 'mail', name: 'Mail', href: 'https://mail.myargus.cc', description: 'The shared agent inbox' },
-  { id: 'myargus', name: 'myargus', href: 'https://myargus.cc', description: 'Portal, plans and the system map' },
-]
+// The Argus web apps the app switcher lists, the current one included. The registry
+// (links.json) owns the list, so a new or retired app changes it in one place.
+export const APPS = switcherApps('watchtower')

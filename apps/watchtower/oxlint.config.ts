@@ -1,7 +1,9 @@
 import { defineConfig } from "oxlint";
 
 export default defineConfig({
-  ignorePatterns: ["**/node_modules/**", "**/dist/**", ".wrangler/**", "worker-configuration.d.ts"],
+  // links.ts and links-core.ts are vendored from the frontend registry (scripts/vendor-links.sh);
+  // a lint fix here would be overwritten by the next vendoring.
+  ignorePatterns: ["**/node_modules/**", "**/dist/**", ".wrangler/**", "worker-configuration.d.ts", "src/lib/links.ts", "src/lib/links-core.ts"],
   jsPlugins: [{ name: "anti-slop", specifier: "../../tools/oxlint/anti-slop/index.ts" }],
   plugins: ["typescript", "react"],
   rules: {

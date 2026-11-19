@@ -2,8 +2,12 @@ import type { WorkerTrafficDetail } from '@argus/watchtower-contract'
 import { afterPrefix, num, record, row, rows, text } from '../fields'
 import type { CardFormatter, DetailRow } from '../types'
 import { formatAbsoluteTime, pluralise } from '../units'
+import { COOKIE_DOMAIN } from '@/lib/links'
 
-// The public surface on myargus.cc: the anonymous probe of each endpoint
+// A host without the shared domain's suffix: the zone is the group's own name.
+const withoutDomain = (host: string) => (host.endsWith(COOKIE_DOMAIN) ? host.slice(0, -COOKIE_DOMAIN.length) : host)
+
+// The public surface of the Argus domain: the anonymous probe of each endpoint
 // (`endpoint:<host>`), the certificate it presents (`tls:<host>`), and each
 // Worker's error rates over the last hour (`worker-traffic:<script>`).
 
@@ -83,7 +87,7 @@ export const tlsFormatter: CardFormatter = {
     return {
       // Beside the same host's endpoint card, so named for what it shows;
       // the zone is the group's own name, and the full host would not fit.
-      title: `${afterPrefix(check.service_key, TLS).replace(/\.myargus\.cc$/, '')} certificate`,
+      title: `${withoutDomain(afterPrefix(check.service_key, TLS))} certificate`,
       summary: daysLeft === null ? null : [daysLeft < 0 ? `expired ${expiryText(daysLeft)}` : `expires ${expiryText(daysLeft)}`, issuer].filter(Boolean).join(' · '),
       reason,
       rows: rows(
