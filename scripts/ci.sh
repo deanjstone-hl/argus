@@ -21,6 +21,14 @@ set -euo pipefail
 repo_root="$(git rev-parse --show-toplevel)"
 cd "$repo_root"
 
+# One full check at a time per host (argus-config#1506): two overlapping gates made
+# systemd-oomd kill agent scopes. Every mode takes the host-wide lock: the re-exec waits for
+# it (HEAVY_LOCK_TIMEOUT, default 3600 s, then exit 75), then runs this script with
+# HEAVY_LOCK_HELD=1 so it does not wait again. scripts/heavy-lock.sh is vendored from argus-config.
+if [[ "${HEAVY_LOCK_HELD:-}" != 1 ]]; then
+  exec bash "$repo_root/scripts/heavy-lock.sh" bash "$repo_root/scripts/ci.sh" "$@"
+fi
+
 # Run from a git hook, git exports GIT_DIR, GIT_INDEX_FILE and friends. Every
 # git command the test suites run in their own scratch repos would inherit them
 # and act on this repository instead — the reconciler tests of the former

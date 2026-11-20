@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 const ciScript = fileURLToPath(new URL("./ci.sh", import.meta.url));
+const heavyLockScript = fileURLToPath(new URL("./heavy-lock.sh", import.meta.url));
 
 // Stands in for pnpm: logs each call, and answers `list` with the repo root alone,
 // which ci.sh reads as "no workspace member changed".
@@ -44,6 +45,9 @@ function pnpmCalls(changedFile: string, extraEnv: Record<string, string> = {}): 
   git(work, "config", "user.name", "ci");
   copyFileSync(ciScript, join(work, "scripts", "ci.sh"));
   chmodSync(join(work, "scripts", "ci.sh"), 0o755);
+  // ci.sh re-runs itself under the host lock (argus-config#1506): copy the script and keep the
+  // lock file local, so this test never waits on, or takes, the real host lock.
+  copyFileSync(heavyLockScript, join(work, "scripts", "heavy-lock.sh"));
   writeFileSync(join(work, "README.md"), "base\n");
   git(work, "add", "-A");
   git(work, "commit", "--quiet", "-m", "base");
@@ -64,6 +68,8 @@ function pnpmCalls(changedFile: string, extraEnv: Record<string, string> = {}): 
       CI_TEST_LOG: log,
       GIT_CONFIG_GLOBAL: "/dev/null",
       GIT_CONFIG_SYSTEM: "/dev/null",
+      HEAVY_LOCK_FILE: join(root, "heavy.lock"),
+      HEAVY_LOCK_PSI_FILE: join(root, "no-pressure-file"),
       ...extraEnv,
     },
   });

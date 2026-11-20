@@ -82,5 +82,6 @@ regexes = [
 paths = [
   '''pnpm-lock\.yaml$''',
   '''scripts/ci/release-scripts\.lock$''',
+  '''scripts/heavy-lock\.lock$''',
   '''\.gitleaks\.toml$''',
 ]
