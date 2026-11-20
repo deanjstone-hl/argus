@@ -65,7 +65,9 @@ Running slots count against the cap; parked, ready and awaiting_ci ones do not. 
 the AFK loop reads the report on its next tick, verifies it, and closes or parks the slot.
 
 **Awaiting CI** (argus-config#1169). A worker whose PR is open and whose checks have started calls
-`slot_await_ci` (`issue`, `thread_id`, `ref`: the PR URL, or the SHA pushed to a trunk repo's `main`)
+`slot_await_ci` (`issue`, `thread_id`, `ref`: the PR URL, the SHA pushed to the issue's own trunk repo's `main`, or
+`owner/repo@<40-hex sha>` for a push to another repo; one ref per slot, stored and shown as given in
+`ci_ref`, and nothing in loop-state parses it)
 and ends its turn instead of holding a slot while it waits. The slot counts toward no cap (`slots.used`,
 the effective total cap and the host caps all leave it out), so the next issue can start. Aquila reads
 the checks; when they finish, green or red, it calls `slot_resume_ci`: the slot goes back to `running`
