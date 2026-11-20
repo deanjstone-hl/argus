@@ -109,6 +109,34 @@ export function createMcpServer(store: Store, role: Role, threadHeader?: string)
   const server = new McpServer({ name: 'loop-state', version: '0.1.0' }, { instructions: INSTRUCTIONS })
   const offered = (tool: ToolName) => (TOOL_ROLES[tool] as readonly Role[]).includes(role)
   /**
+   * argus#54: a registered owner thread (owner_thread_set) makes no loop-state write but owner_turn. Every
+   * write tool but that one checks the session's own thread id, and any thread the call names, against it.
+   */
+  const registerTool = server.registerTool.bind(server) as unknown as (
+    name: string,
+    config: { annotations?: { readOnlyHint?: boolean } },
+    handler: (...params: unknown[]) => unknown,
+  ) => unknown
+  server.registerTool = ((name: string, config: { annotations?: { readOnlyHint?: boolean } }, handler: (...params: unknown[]) => unknown) =>
+    registerTool(
+      name,
+      config,
+      config.annotations?.readOnlyHint === false && name !== 'owner_turn'
+        ? async (...params: unknown[]) => {
+            // A tool with an input schema gets (args, extra); one without gets (extra): `extra` has no thread fields.
+            const args = (params[0] ?? {}) as Record<string, unknown>
+            const named = (field: string) => (typeof args[field] === 'string' ? (args[field] as string) : undefined)
+            try {
+              store.refuseOwnerThread(role, name, [threadHeader, named('thread_id'), named('caller_thread_id')])
+            } catch (error) {
+              if (error instanceof Refused) return failure(error.message)
+              throw error
+            }
+            return handler(...params)
+          }
+        : handler,
+    )) as typeof server.registerTool
+  /**
    * argus#51: the thread id a call acts as. A call naming a thread other than the session's own
    * (X-T3-Thread-Id) is refused; with the header and no named thread, the header is the caller.
    */
@@ -508,6 +536,27 @@ export function createMcpServer(store: Store, role: Role, threadHeader?: string)
         annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
       },
       guarded((args) => store.ownerTurn(role, withCaller('owner_turn', args))),
+    )
+  }
+
+  if (offered('owner_thread_set')) {
+    server.registerTool(
+      'owner_thread_set',
+      {
+        title: 'Register the owner chat',
+        description:
+          "Register the owner chat of a host (argus#54), for the split tick: the tick thread holds the direction lease and this thread is the owner's, so the owner chat can call owner_turn for presence while it holds nothing. Refused unless your thread holds the direction lease and the owner is present (owner_turn within the last 30 minutes, not stepped away). One thread per host: a new call replaces the host's. lease_move, lease_release, lease_failover and lease_reclaim leave it alone; lease_read shows it as owner_threads. A registered owner thread is refused on every other write, naming the lease holder.",
+        inputSchema: {
+          host: hostField.describe("The host whose owner chat this is: wsl2 or homelab."),
+          thread_id: threadId.describe("The owner chat's T3 thread id."),
+          caller_thread_id: z.string().describe('Your own T3 thread id. Required: the direction lease is checked against it.'),
+        },
+        annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
+      },
+      guarded((args) => {
+        actingAs('owner_thread_set', args.caller_thread_id)
+        return store.ownerThreadSet(role, args)
+      }),
     )
   }
 

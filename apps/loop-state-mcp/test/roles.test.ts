@@ -44,6 +44,7 @@ describe('caller role', () => {
       'ledger_read',
       'notify_claim',
       'outage_observe',
+      'owner_thread_set',
       'owner_turn',
       'slot_list',
       'slot_rebuild',

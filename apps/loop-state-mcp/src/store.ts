@@ -25,7 +25,7 @@ export const HEARTBEAT_MS = 4 * 60 * 60_000
  * still reports them.
  */
 const isWakeNoise = (reason: string) =>
-  reason === 'owner_turn' || reason === 'away_noted' || reason === 'notified' || reason === 'promoted' || reason.startsWith('child_')
+  reason === 'owner_turn' || reason === 'owner_thread_set' || reason === 'away_noted' || reason === 'notified' || reason === 'promoted' || reason.startsWith('child_')
 
 /**
  * argus#1167: a pressure level that differs from the last recorded tick wakes POST /wake/check only once
@@ -66,6 +66,7 @@ export const TOOL_ROLES = {
   child_start: ['direction'],
   child_close: ['direction'],
   owner_turn: ['direction'],
+  owner_thread_set: ['direction'],
   away_note: ['direction'],
   notify_claim: ['direction'],
   outage_observe: ['direction'],
@@ -571,6 +572,16 @@ export const MIGRATIONS = [
     at        INTEGER NOT NULL
   );
   `,
+  // argus#54: the owner chat registered per host for the split tick thread. It lives beside the leases, not in
+  // them, so lease_move, lease_release, lease_failover and lease_reclaim (which rewrite or delete a lease row)
+  // leave it alone.
+  `
+  CREATE TABLE owner_threads (
+    host      TEXT PRIMARY KEY CHECK (host IN ('wsl2', 'homelab')),
+    thread_id TEXT NOT NULL,
+    set_at    INTEGER NOT NULL
+  );
+  `,
 ]
 
 /** What an awaiting_ci slot waits on: a PR URL, or the SHA of a push to a trunk repo's main. */
@@ -812,6 +823,12 @@ export function openStore(options: StoreOptions) {
     ON CONFLICT (role) DO UPDATE SET thread_id = excluded.thread_id, moved_at = excluded.moved_at,
                                      primary_thread_id = excluded.primary_thread_id, primary_host = excluded.primary_host`)
   const deleteLease = db.prepare('DELETE FROM leases WHERE role = ?')
+  const selectOwnerThreads = db.prepare('SELECT host, thread_id FROM owner_threads')
+  const selectOwnerThreadByHost = db.prepare('SELECT thread_id FROM owner_threads WHERE host = ?')
+  const selectOwnerThreadById = db.prepare('SELECT 1 FROM owner_threads WHERE thread_id = ? LIMIT 1')
+  const upsertOwnerThread = db.prepare(`
+    INSERT INTO owner_threads (host, thread_id, set_at) VALUES (?, ?, ?)
+    ON CONFLICT (host) DO UPDATE SET thread_id = excluded.thread_id, set_at = excluded.set_at`)
   const selectLastEvent = db.prepare('SELECT COALESCE(MAX(id), 0) AS id FROM events')
   const countSlots = db.prepare('SELECT state, COUNT(*) AS n FROM slots GROUP BY state')
 
@@ -1399,17 +1416,22 @@ export function openStore(options: StoreOptions) {
     )
   }
 
+  /** argus#54: whether a thread is the registered owner chat of either host. */
+  const isOwnerThread = (threadId: string) => selectOwnerThreadById.get(threadId) !== undefined
+
   /**
    * argus#1042: an owner turn counts only from the thread holding the direction lease, so a
    * stray thread launched in the orchestrator's workspace (it inherits the direction token)
    * cannot record presence or take the "since you left" lines. Same shape as requireAfkLease,
    * without the standby drain: a non-holder is refused and leaves a lease_conflict event.
+   * argus#54: for owner_turn alone, a thread registered by owner_thread_set (the owner chat of
+   * a split tick) counts too; it is no activity of the holder, so it does not touch it.
    * Runs first in the caller's transaction. Returns a warning when the check was skipped.
    */
-  function requireDirectionLease(role: Role, callerThreadId: string | undefined, tool: 'owner_turn' | 'directives_set' = 'owner_turn'): string | null {
+  function requireDirectionLease(role: Role, callerThreadId: string | undefined, tool: 'owner_turn' | 'directives_set' | 'owner_thread_set' = 'owner_turn'): string | null {
     if (callerThreadId === undefined || callerThreadId === '') {
       // A new tool has no charter to wait for: only owner_turn, which shipped without the id, gets the grace.
-      if (tool === 'directives_set' || options.requireCallerThread) {
+      if (tool !== 'owner_turn' || options.requireCallerThread) {
         throw new Refused(`${tool} must name your own thread as caller_thread_id: the direction lease is checked against it`)
       }
       record('owner_turn_unchecked', role, null, null, { tool }, 'direction')
@@ -1421,9 +1443,10 @@ export function openStore(options: StoreOptions) {
       touchHolder('direction', callerThreadId)
       return null
     }
+    if (tool === 'owner_turn' && isOwnerThread(callerThreadId)) return null
     record('lease_conflict', role, null, callerThreadId, { role, holder, tool }, 'direction')
     const who = holder === null ? 'no thread holds the direction lease' : `the direction lease is held by ${holder}`
-    const only = tool === 'owner_turn' ? 'records an owner turn' : 'sets the directives'
+    const only = tool === 'owner_turn' ? 'records an owner turn' : tool === 'owner_thread_set' ? 'registers the owner thread' : 'sets the directives'
     throw new LeaseRefused(`${who}, not ${callerThreadId}: ${tool} is refused. Only the orchestrator thread ${only}.`)
   }
 
@@ -1913,13 +1936,18 @@ export function openStore(options: StoreOptions) {
       })
     },
 
-    leaseRead(role: Role): { leases: Record<TickingRole, Lease | null> } {
+    leaseRead(role: Role): { leases: Record<TickingRole, Lease | null>; owner_threads?: Record<Host, string | null> } {
       permit(role, 'lease_read')
       const read = (of: TickingRole): Lease | null => {
         const row = selectLease.get(of) as Row | undefined
         return row ? leaseOf(row) : null
       }
-      return { leases: { afk: read('afk'), direction: read('direction') } }
+      const ownerThreads: Record<Host, string | null> = { wsl2: null, homelab: null }
+      const registered = selectOwnerThreads.all() as Row[]
+      for (const row of registered) ownerThreads[String(row.host) as Host] = String(row.thread_id)
+      // Shown only once one is registered (argus#54), so the result is what it was before for a db that has none.
+      const leases = { afk: read('afk'), direction: read('direction') }
+      return registered.length === 0 ? { leases } : { leases, owner_threads: ownerThreads }
     },
 
     /**
@@ -2223,6 +2251,50 @@ export function openStore(options: StoreOptions) {
         db.prepare('UPDATE ledger_away_notes SET presented_at = ? WHERE presented_at IS NULL').run(at)
         recordLedger('owner_turn', null, { stepping_away: input.stepping_away === true })
         return warning === null ? { owner: ownerPresence(), since_you_left: notes } : { owner: ownerPresence(), since_you_left: notes, warning }
+      })
+    },
+
+    /**
+     * argus#54: register the owner chat of a host, so the tick thread can hold the direction lease while the
+     * owner chat still counts for presence (owner_turn). Only the direction holder, in a turn the owner is
+     * driving. It is kept apart from the lease row: lease_move, lease_release, lease_failover and lease_reclaim
+     * leave it alone.
+     */
+    ownerThreadSet(role: Role, input: { host: string; thread_id: string; caller_thread_id?: string }): { owner_threads: Record<Host, string | null> } {
+      permit(role, 'owner_thread_set')
+      requireHost(input.host)
+      requireText(input.thread_id, 'thread_id')
+      return write(() => {
+        requireDirectionLease(role, input.caller_thread_id, 'owner_thread_set')
+        const presence = ownerPresence()
+        if (!presence.present) {
+          const last = presence.stepped_away ? 'the owner stepped away' : presence.last_turn_at ? `the last owner turn was ${presence.last_turn_at}` : 'no owner turn is recorded'
+          throw new Refused(`the owner is not present (${last}): the owner thread is registered only in a turn the owner is driving. Call owner_turn on the owner's turn, then register it.`)
+        }
+        const previous = optionalText((selectOwnerThreadByHost.get(input.host) as Row | undefined)?.thread_id)
+        upsertOwnerThread.run(input.host, input.thread_id, now())
+        recordLedger('owner_thread_set', input.caller_thread_id as string, { host: input.host, thread_id: input.thread_id, previous })
+        return { owner_threads: this.leaseRead(role).owner_threads as Record<Host, string | null> }
+      })
+    },
+
+    /**
+     * argus#54: refuse a write whose caller is a registered owner thread (and not the holder). The owner chat
+     * calls owner_turn and nothing else; every other loop-state write is the tick thread's. Names the holder and
+     * leaves a lease_conflict event for the holder's next gate, as a stray thread's refusal does. `threadIds` are
+     * the session's X-T3-Thread-Id and any thread the call names. A call from no registered owner thread is not
+     * touched, so with no `owner_thread_set` ever called this changes nothing.
+     */
+    refuseOwnerThread(role: Role, tool: string, threadIds: (string | undefined)[]): void {
+      const named = threadIds.filter((id): id is string => id !== undefined && id !== '' && isOwnerThread(id))
+      if (named.length === 0) return
+      write(() => {
+        const holder = holderOf('direction')
+        const caller = named.find((id) => id !== holder)
+        if (caller === undefined) return
+        record('lease_conflict', role, null, caller, { role, holder, tool, reason: 'owner_thread_write' }, 'direction')
+        const who = holder === null ? 'no thread holds the direction lease' : `the direction lease is held by ${holder}`
+        throw new LeaseRefused(`${who}, not ${caller}: ${tool} is refused. ${caller} is the registered owner chat; it calls owner_turn and makes no other loop-state write.`)
       })
     },
 

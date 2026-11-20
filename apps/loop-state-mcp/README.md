@@ -33,6 +33,7 @@ token. A caller sees only the tools its role may call, and the store refuses the
 | `directives_read` | ✓ | ✓ | |
 | `directives_set` | | ✓ | |
 | `lease_move`, `lease_release` | | ✓ | |
+| `owner_thread_set` | | ✓ (the `direction` lease holder, owner present) | |
 | `child_start`, `child_close`, `owner_turn`, `away_note`, `notify_claim`, `outage_observe`, `ledger_read` | | ✓ | |
 
 ## Slots
@@ -303,6 +304,29 @@ with no `caller_thread_id` is accepted for one release, with an `owner_turn_unch
 a `warning` in the result; `LOOP_STATE_REQUIRE_CALLER_THREAD=1` refuses it, for slot writes and
 `owner_turn` together, so turn it on only after both charters pass the id.
 
+**The owner chat of a split tick** (argus#54, [argus-config/1426](https://github.com/deanjstone-hl/argus-config/issues/1426)).
+When a tick thread holds the `direction` lease, the owner's own chat is not the holder, so `owner_turn` would
+refuse it. `owner_thread_set { host, thread_id, caller_thread_id }` registers that chat as the host's
+`owner_thread_id` (`wsl2` or `homelab`, one thread each; a new call replaces the host's). Only the `direction`
+holder may call it, and only while the owner is present (`owner_turn` within 30 minutes, not stepped away); a
+non-holder, including the registered owner thread itself, is refused with the holder named, and the call must name
+`caller_thread_id`.
+
+- `owner_turn` accepts the holder or either host's registered owner thread. A turn from the owner thread sets
+  presence and hands over the "since you left" lines; it is not activity of the holder, so a stalled tick thread
+  still reads stalled.
+- Every other write from the owner thread is refused, naming the holder, with a `lease_conflict` event
+  (`detail.reason: owner_thread_write`) for the holder's next gate: `tick_gate`, `status_tick`, `slot_*`,
+  `lease_*`, `directives_set`, `child_*`, `away_note`, `notify_claim` and `outage_observe`. The server tells the
+  owner thread by the `X-T3-Thread-Id` header and by any `thread_id` or `caller_thread_id` the call names, so a
+  session with no header is caught only by a name. Reads stay open.
+- The registration lives in its own table (a new schema version adds the `owner_threads` table), not on the lease row, so
+  `lease_move`, `lease_release`, `lease_failover` and `lease_reclaim` leave it alone. `lease_read` shows it as
+  `owner_threads: { wsl2, homelab }` once one is set; until then the key is absent and nothing else changes: with
+  no registration every call behaves as before.
+- Live steps for the owner: none for the server beyond promotion (the migration runs when the service starts).
+  Registering the chat is a call made at cutover ([argus-config/1539](https://github.com/deanjstone-hl/argus-config/issues/1539)).
+
 **The session's own thread id** (argus#51). `caller_thread_id` and a tick's `thread_id` are
 arguments the model types, and a T3 fork inherits its parent's thread id, so a fork could call
 `owner_turn`, `tick_gate` or a slot write as the lease holder. The server therefore also reads
@@ -324,7 +348,8 @@ with its own value.
   everywhere and the journal shows no legitimate caller without it.
 - Not covered: the tools that carry no caller id at all (`lease_move`, `lease_release`,
   `lease_failover`, `lease_reclaim`, `child_*`, `away_note`, `notify_claim`, `outage_observe`). They
-  name other threads, not the caller, so there is nothing to check the header against yet.
+  name other threads, not the caller, so there is nothing to check the header against yet. The one thing the header does check on
+  them is a registered owner thread (see "The owner chat of a split tick" above, argus#54): that session is refused on all of them.
 
 Only Aquila writes leases. An unheld lease is taken with `lease_move`. A held one moves in the
 retire-first order (rotation, #655): delete the old thread's `schedule_task`, then
@@ -553,7 +578,8 @@ Only the `direction` role can read or write it, and its writes never wake the AF
 - **Children:** `child_start` records a thread Aquila launched or delegated; `child_close`
   records its verified outcome (`done`, `failed`, `abandoned`). `ledger_read` lists the open
   ones (`include_closed` for all).
-- **Owner presence:** `owner_turn` at the start of every owner turn sets `last_owner_turn`.
+- **Owner presence:** `owner_turn` at the start of every owner turn sets `last_owner_turn`. It counts from
+  the `direction` holder or a registered owner thread (`owner_thread_set`, argus#54).
   The owner is present for 30 minutes after it, unless the turn passed `stepping_away`, which
   switches to away at once.
 - **Since you left:** `away_note` appends a line while the owner is away. The next
