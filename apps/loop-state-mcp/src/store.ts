@@ -137,6 +137,17 @@ export interface StoreOptions {
   warn?: (message: string) => void
 }
 
+/** The prefix of the `errors` entry in which the afk holder hands a homelab slot to the standby's drain (argus#57). */
+const DRAIN_LEFT_MARKER = 'drain-left:'
+
+/** Whether `text` names `issue` (both lower case) as a whole token, so `owner/repo#1` is not found in `owner/repo#10`. */
+const namesIssue = (text: string, issue: string): boolean => {
+  for (let at = text.indexOf(issue); at !== -1; at = text.indexOf(issue, at + 1)) {
+    if (!/\d/.test(text[at + issue.length] ?? '')) return true
+  }
+  return false
+}
+
 /** Who is writing a slot, so the server can check the afk lease. `host` is the caller's own host, for the drain. */
 export interface SlotCaller {
   caller_thread_id?: string
@@ -1157,17 +1168,22 @@ export function openStore(options: StoreOptions) {
   /** Failover needs 2+ missed ticks (about an hour); an unanswered wake alone is only late (argus#1038). */
   const holderStalled = (of: TickingRole, lease: Row) => holderMissed(of, lease).missed >= 2
   /**
-   * A running homelab slot the lease holder's last tick says it could not reach: an error naming homelab or the slot's
-   * issue (the charter has the holder note a refused write or an unreachable link in `errors` and leave the slot to the
-   * standby's drain). False with no running homelab slot, or when the holder's tick reports nothing of the kind.
+   * A running homelab slot the lease holder's last tick says it could not drain: an `errors` entry that starts with
+   * `drain-left:` (any case) and names the slot's issue, e.g. `drain-left: deanjstone/argus#9 homelab not reachable`
+   * (the charter's hand-off to the standby's drain). Nothing looser counts: a routine line that merely mentions
+   * homelab or a homelab URL must not wake the standby for an empty turn (argus#57). False with no running homelab
+   * slot, or when the tick is not the holder's.
    */
   const holderLeftHomelabSlots = (of: TickingRole, lease: Row): boolean => {
     const issues = (selectRunningHostIssues.all('homelab') as Row[]).map((row) => String(row.issue).toLowerCase())
     if (issues.length === 0) return false
     const status = selectStatus.get(of) as Row | undefined
     if (!status || String(status.thread_id) !== String(lease.thread_id)) return false
-    const errors = (JSON.parse(String(status.errors)) as string[]).map((error) => error.toLowerCase())
-    return errors.some((error) => error.includes('homelab') || issues.some((issue) => error.includes(issue)))
+    const handOffs = (JSON.parse(String(status.errors)) as string[])
+      .map((error) => error.trim().toLowerCase())
+      .filter((error) => error.startsWith(DRAIN_LEFT_MARKER))
+      .map((error) => error.slice(DRAIN_LEFT_MARKER.length))
+    return handOffs.some((handOff) => issues.some((issue) => namesIssue(handOff, issue)))
   }
 
   /** The status row's last tick, or the holder's later work (argus#50): what liveness counts missed ticks from. */
