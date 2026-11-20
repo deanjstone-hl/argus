@@ -591,9 +591,14 @@ export const MIGRATIONS = [
   `,
 ]
 
-/** What an awaiting_ci slot waits on: a PR URL, or the SHA of a push to a trunk repo's main. */
 const GREEN_NOTE_PATTERN = /^\s*checks green\b/i
-const CI_REF_PATTERN =/^(https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/pull\/[1-9]\d*|[0-9a-f]{7,40})$/
+/**
+ * What an awaiting_ci slot waits on: a PR URL, the SHA of a push to the issue's own trunk repo's main,
+ * or owner/repo@<40-hex SHA> for a push to another repo (argus#55: a multi-repo worker names the repo,
+ * since a bare SHA means nothing outside the issue's repo). ci_ref is stored and shown as given.
+ */
+const CI_REF_PATTERN =
+  /^(https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/pull\/[1-9]\d*|[0-9a-f]{7,40}|[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+@[0-9a-f]{40})$/
 const REPO_PATTERN = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/
 const ISSUE_PATTERN = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+#[1-9]\d*$/
 
@@ -1575,7 +1580,9 @@ export function openStore(options: StoreOptions) {
      */
     slotAwaitCi(role: Role, input: { issue: string; thread_id: string; ref: string; note?: string }): Slot {
       permit(role, 'slot_await_ci')
-      if (!CI_REF_PATTERN.test(input.ref)) throw new Refused('ref must be the PR URL (https://github.com/owner/repo/pull/N) or the pushed commit SHA')
+      if (!CI_REF_PATTERN.test(input.ref)) throw new Refused(
+        'ref must be the PR URL (https://github.com/owner/repo/pull/N), the pushed commit SHA, or owner/repo@<40-hex sha> for a push in another repo',
+      )
       return write(() => {
         const row = slotOrRefuse(input.issue)
         requireState(row, 'running', 'await CI on')

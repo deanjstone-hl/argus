@@ -54,6 +54,28 @@ describe('slot_await_ci', () => {
     expect((await worker.ok('slot_await_ci', { issue: A, thread_id: 'worker-1', ref: sha })).slot.ci_ref).toBe(sha)
   })
 
+  it('accepts owner/repo@<40-hex sha>, the ref a multi-repo worker passes for a push in another repo (argus#55)', async () => {
+    const { worker } = await started([A])
+    const ref = 'deanjstone/argus@00a9746e3043de8ca3689dd7e1e56ddeddefba3e'
+    const result = await worker.ok('slot_await_ci', { issue: A, thread_id: 'worker-1', ref })
+    expect(result.slot).toMatchObject({ state: 'awaiting_ci', ci_ref: ref })
+    expect(await slotOf(worker, A)).toMatchObject({ state: 'awaiting_ci', ci_ref: ref })
+  })
+
+  it.each([
+    ['a short SHA after owner/repo@', 'deanjstone/argus@00a9746'],
+    ['a SHA longer than 40 hex', 'deanjstone/argus@00a9746e3043de8ca3689dd7e1e56ddeddefba3e0'],
+    ['an uppercase SHA', 'deanjstone/argus@00A9746E3043DE8CA3689DD7E1E56DDEDDEFBA3E'],
+    ['no repo part', 'deanjstone@00a9746e3043de8ca3689dd7e1e56ddeddefba3e'],
+    ['a stray suffix', 'deanjstone/argus@00a9746e3043de8ca3689dd7e1e56ddeddefba3e extra'],
+  ])('refuses %s', async (_label, ref) => {
+    const { worker } = await started([A])
+    const refused = await awaitCi(worker, A, 'worker-1', { ref })
+    expect(refused.isError).toBe(true)
+    expect(text(refused)).toMatch(/owner\/repo@/)
+    expect((await slotOf(worker, A))?.state).toBe('running')
+  })
+
   it('refuses a ref that names no PR URL or SHA', async () => {
     const { worker } = await started([A])
     const refused = await awaitCi(worker, A, 'worker-1', { ref: 'soon' })

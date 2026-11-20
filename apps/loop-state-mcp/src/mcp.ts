@@ -231,11 +231,11 @@ export function createMcpServer(store: Store, role: Role, threadHeader?: string)
       {
         title: 'Release your slot while CI runs',
         description:
-          "Once your PR is open and its checks have started (or your trunk push is made), call this and end your turn instead of waiting. Your slot becomes awaiting_ci: it counts toward no cap, so the next issue can start, and Aquila watches the checks. When they finish Aquila wakes you in this thread: on green merge your own PR and report; on red fix it here. Refused when awaiting_ci_cap slots (default 3) already wait: keep your slot and wait for the checks as before. ref is the PR URL, or the SHA you pushed to a trunk repo's main.",
+          "Once your PR is open and its checks have started (or your trunk push is made), call this and end your turn instead of waiting. Your slot becomes awaiting_ci: it counts toward no cap, so the next issue can start, and Aquila watches the checks. When they finish Aquila wakes you in this thread: on green merge your own PR and report; on red fix it here. Refused when awaiting_ci_cap slots (default 3) already wait: keep your slot and wait for the checks as before. ref is the PR URL, the SHA you pushed to the issue's own trunk repo's main, or owner/repo@<40-hex sha> for a push to another repo (one ref per slot: name the last push).",
         inputSchema: {
           issue,
           thread_id: threadId.describe('Your own thread id; it must be the thread holding the slot.'),
-          ref: z.string().describe('The PR URL (https://github.com/owner/repo/pull/N), or the pushed commit SHA.'),
+          ref: z.string().describe('The PR URL (https://github.com/owner/repo/pull/N), the pushed commit SHA, or owner/repo@<40-hex sha> for a push in another repo.'),
           note: z.string().optional().describe('One line: what is waiting, e.g. "checks started on the PR".'),
         },
         annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
