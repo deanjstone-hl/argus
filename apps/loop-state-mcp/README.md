@@ -444,12 +444,19 @@ one named issue.
   that does not hold the direction lease stays `not_holder`. The reason is checked ahead of the other direction reasons,
   so it is named alone.
 - **Rate limit,** kept in the events table so a restart does not reset it:
-  - an issue whose request is still pending (Aquila has not ticked since) answers `200 { "recorded": false, "reason": "pending" }`
+  - an issue whose request is still pending (Aquila has not ticked since) answers `200 { "recorded": false, "reason": "pending", "budget_rung": …, "budget_rung_held": … }`
     and records nothing, so a double press is one wake;
   - the same issue again within 2 min of a recorded request (`WAKE_REQUEST_COOLDOWN_MS`), or any issues together beyond 6 per
-    hour (`WAKE_REQUEST_HOURLY_CAP`), answers `429 { "error": "rate_limited", "retry_after_seconds": n }` with a `Retry-After`
+    hour (`WAKE_REQUEST_HOURLY_CAP`), answers `429 { "error": "rate_limited", "retry_after_seconds": n, "budget_rung": …, "budget_rung_held": … }` with a `Retry-After`
     header, and records nothing.
-  - A recorded request answers `200 { "recorded": true }`.
+  - A recorded request answers `200 { "recorded": true, "budget_rung": …, "budget_rung_held": … }`.
+- **The budget rung** ([#47](https://github.com/deanjstone/argus/issues/47)): every 200 and 429 body also carries
+  `budget_rung` (`normal`, `no_opus`, `no_new_slots` or `gate_only`) and `budget_rung_held` (hysteresis keeps the rung above
+  what the ratio alone gives), read from the AFK loop's last recorded tick: the row the slot gate enforces. The hub's bearer
+  reads nothing else from loop-state, so this is how its Update dialog says the filed issue will wait: a rung above `normal`
+  lowers the effective total cap to 1, and `no_new_slots` and `gate_only` start no ordinary slot. `budget_rung` is `null` (with
+  `budget_rung_held: false`) until a tick has recorded a weekly figure: the ladder is unseen, which is not `normal`. A 429
+  carries them beside `retry_after_seconds`. Reading them writes nothing, and needs no new secret or route.
 - **A wake never bypasses a gate.** It only makes the next poll answer `wake: true`. The model tick it starts still runs
   every gate: the slot cap, the budget rungs, the host load gates. This route starts no slot and moves no lease.
 

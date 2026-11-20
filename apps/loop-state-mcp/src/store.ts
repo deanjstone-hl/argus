@@ -201,11 +201,18 @@ export interface PromotedInput {
   source: 'approve' | 'webhook'
 }
 
-/** The answer to a wake request (argus#1189): recorded, folded into one still pending, or refused by the rate limit. */
-export type WakeRequestResult =
-  | { recorded: true }
-  | { recorded: false; reason: 'pending' }
-  | { rate_limited: true; retry_after_seconds: number }
+/**
+ * The budget ladder as a wake request answers it (argus#47): the rung the slot gate enforces, and whether
+ * hysteresis holds it. `budget_rung` is null while no tick has recorded a weekly figure: the ladder is unseen.
+ */
+export interface WakeBudget {
+  budget_rung: BudgetRung | null
+  budget_rung_held: boolean
+}
+
+/** The answer to a wake request (argus#1189): recorded, folded into one still pending, or refused by the rate limit. Each carries the budget rung. */
+export type WakeRequestResult = WakeBudget &
+  ({ recorded: true } | { recorded: false; reason: 'pending' } | { rate_limited: true; retry_after_seconds: number })
 
 export interface TickInput {
   thread_id: string
@@ -1809,19 +1816,28 @@ export function openStore(options: StoreOptions) {
      * `wake_requested` event on the direction gate, which POST /wake/check answers on its next poll and the
      * model tick that follows acknowledges. It writes no slot, lease or directive: a wake only starts a
      * tick, and the tick's own gates (slot cap, budget rungs, load) decide whether anything starts.
+     * Every answer names the budget rung (argus#47), which the hub's bearer cannot read elsewhere.
      * Rate-limited from the events themselves, so a restart does not reset it.
      */
     recordWakeRequest(issue: string): WakeRequestResult {
       requireIssue(issue)
       return write((): WakeRequestResult => {
-        if (selectWakeRequestPending.get(issue) !== undefined) return { recorded: false, reason: 'pending' }
-        const retryAfter = (untilMs: number): WakeRequestResult => ({ rate_limited: true, retry_after_seconds: Math.max(1, Math.ceil((untilMs - now()) / 1000)) })
+        // The AFK loop's last tick, the row requireRoomForSlot enforces: a read, so the route still writes nothing but the event.
+        const afkStatus = selectStatus.get('afk') as Row | undefined
+        const weekly = afkStatus ? weeklyOf(afkStatus) : null
+        const budget: WakeBudget = { budget_rung: weekly?.rung ?? null, budget_rung_held: weekly?.held ?? false }
+        if (selectWakeRequestPending.get(issue) !== undefined) return { recorded: false, reason: 'pending', ...budget }
+        const retryAfter = (untilMs: number): WakeRequestResult => ({
+          rate_limited: true,
+          retry_after_seconds: Math.max(1, Math.ceil((untilMs - now()) / 1000)),
+          ...budget,
+        })
         const last = Number((selectWakeRequestLast.get(issue) as Row).at ?? 0)
         if (last > 0 && now() - last < WAKE_REQUEST_COOLDOWN_MS) return retryAfter(last + WAKE_REQUEST_COOLDOWN_MS)
         const recent = (selectWakeRequestsSince.all(now() - WAKE_REQUEST_WINDOW_MS) as Row[]).map((row) => Number(row.at))
         if (recent.length >= WAKE_REQUEST_HOURLY_CAP) return retryAfter(recent[recent.length - WAKE_REQUEST_HOURLY_CAP]! + WAKE_REQUEST_WINDOW_MS)
         record('wake_requested', 'direction', issue, null, {}, 'direction')
-        return { recorded: true }
+        return { recorded: true, ...budget }
       })
     },
 

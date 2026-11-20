@@ -114,7 +114,8 @@ export function createApp(options: AppOptions) {
     try {
       const result = options.store.recordWakeRequest(body.data.issue)
       if (!('rate_limited' in result)) return c.json(result)
-      return c.json({ error: 'rate_limited', retry_after_seconds: result.retry_after_seconds }, 429, { 'Retry-After': String(result.retry_after_seconds) })
+      const { rate_limited: _limited, ...limited } = result
+      return c.json({ error: 'rate_limited', ...limited }, 429, { 'Retry-After': String(result.retry_after_seconds) })
     } catch (error) {
       if (error instanceof Refused) return c.json({ error: error.message }, 400)
       throw error

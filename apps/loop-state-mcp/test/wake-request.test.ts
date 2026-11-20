@@ -47,7 +47,7 @@ describe('POST /wake/request: auth and body', () => {
     for (const role of ['afk', 'direction', 'worker'] as const) {
       expect((await post('/wake/request', request(), TOKENS[role])).status).toBe(401)
     }
-    expect(await post('/wake/request', request(), PROMOTION_TOKEN)).toEqual({ status: 200, body: { recorded: true } })
+    expect(await post('/wake/request', request(), PROMOTION_TOKEN)).toMatchObject({ status: 200, body: { recorded: true } })
   })
 
   it('fails closed while no hub token is configured', async () => {
@@ -164,7 +164,7 @@ describe('POST /wake/request: rate limit', () => {
   it('coalesces a press while the same issue is still pending: acknowledged, no second event', async () => {
     const { post, aquila } = await ticked()
     await post('/wake/request', request(), PROMOTION_TOKEN)
-    expect(await post('/wake/request', request(), PROMOTION_TOKEN)).toEqual({
+    expect(await post('/wake/request', request(), PROMOTION_TOKEN)).toMatchObject({
       status: 200,
       body: { recorded: false, reason: 'pending' },
     })
@@ -182,7 +182,7 @@ describe('POST /wake/request: rate limit', () => {
     expect(refused.body).toMatchObject({ error: 'rate_limited' })
     expect(refused.body.retry_after_seconds).toBe((WAKE_REQUEST_COOLDOWN_MS - MINUTE) / 1000)
     clock.advance(WAKE_REQUEST_COOLDOWN_MS - MINUTE)
-    expect((await post('/wake/request', request(), PROMOTION_TOKEN)).body).toEqual({ recorded: true })
+    expect((await post('/wake/request', request(), PROMOTION_TOKEN)).body).toMatchObject({ recorded: true })
   })
 
   it('a refused press records nothing and wakes nothing', async () => {
@@ -197,7 +197,7 @@ describe('POST /wake/request: rate limit', () => {
   it('caps all issues together per hour, whichever issue the presses name', async () => {
     const { post, aquila, clock } = await ticked()
     for (let n = 1; n <= WAKE_REQUEST_HOURLY_CAP; n += 1) {
-      expect((await post('/wake/request', { issue: `deanjstone/argus#${n}` }, PROMOTION_TOKEN)).body).toEqual({ recorded: true })
+      expect((await post('/wake/request', { issue: `deanjstone/argus#${n}` }, PROMOTION_TOKEN)).body).toMatchObject({ recorded: true })
       await aquila.ok('status_tick', modelTick(AQUILA_THREAD))
       clock.advance(WAKE_REQUEST_COOLDOWN_MS)
     }
@@ -206,7 +206,7 @@ describe('POST /wake/request: rate limit', () => {
     expect(refused.body.retry_after_seconds).toBeGreaterThan(0)
     expect(refused.body.retry_after_seconds).toBeLessThanOrEqual(HOUR / 1000)
     clock.advance(HOUR)
-    expect((await post('/wake/request', { issue: 'deanjstone/argus#999' }, PROMOTION_TOKEN)).body).toEqual({ recorded: true })
+    expect((await post('/wake/request', { issue: 'deanjstone/argus#999' }, PROMOTION_TOKEN)).body).toMatchObject({ recorded: true })
   })
 
   it('keeps the limit across a restart', async () => {
