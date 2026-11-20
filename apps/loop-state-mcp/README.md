@@ -421,7 +421,8 @@ never wakes either gate.
 | `homelab` standby | the holder is alive or late, no running `host: homelab` slot | false, nothing recorded | `primary_alive` |
 | `homelab` standby | the holder is stalled | true | `failover` |
 | `homelab` standby | it holds the lease | true at most once per cadence | `standby_cadence` / `standby_waiting` |
-| `homelab` standby (afk) | the primary holds the lease and a `running` `host: homelab` slot is open (parked and ready slots do not count) | true at most once per cadence | `drain` |
+| `homelab` standby (afk) | the primary holds the lease, a `running` `host: homelab` slot is open (parked and ready slots do not count), and the holder's last tick has an `errors` entry naming `homelab` or that slot's issue (it could not drain the slot itself) | true at most once per cadence | `drain` |
+| `homelab` standby (afk) | the holder is alive and its last tick reports no such error: it drains homelab slots itself, so a wake would be an empty turn ([#57](https://github.com/deanjstone/argus/issues/57)) | false | `primary_alive` |
 | anyone | nobody holds the lease | false | `no_lease` |
 
 ## Wake requests: `POST /wake/request`

@@ -1109,7 +1109,7 @@ export function openStore(options: StoreOptions) {
   const countTicks = db.prepare('SELECT recorded_by, COUNT(*) AS n FROM ticks WHERE role = ? AND at >= ? GROUP BY recorded_by')
   const setApprovals = db.prepare("UPDATE slots SET pending_approvals = ? WHERE issue = ? AND state = 'running'")
   const selectApprovals = db.prepare("SELECT issue, pending_approvals FROM slots WHERE state = 'running' AND pending_approvals > 0 ORDER BY issue")
-  const countRunningHostSlots = db.prepare("SELECT COUNT(*) AS n FROM slots WHERE host = ? AND state = 'running'")
+  const selectRunningHostIssues = db.prepare("SELECT issue FROM slots WHERE host = ? AND state = 'running'")
 
   /** A model tick call (tick_gate or status_tick) answers any wake sent to that thread, lease or not. */
   const acknowledgeWake = (role: TickingRole, threadId: string) => clearWake.run(role, threadId)
@@ -1156,6 +1156,19 @@ export function openStore(options: StoreOptions) {
 
   /** Failover needs 2+ missed ticks (about an hour); an unanswered wake alone is only late (argus#1038). */
   const holderStalled = (of: TickingRole, lease: Row) => holderMissed(of, lease).missed >= 2
+  /**
+   * A running homelab slot the lease holder's last tick says it could not reach: an error naming homelab or the slot's
+   * issue (the charter has the holder note a refused write or an unreachable link in `errors` and leave the slot to the
+   * standby's drain). False with no running homelab slot, or when the holder's tick reports nothing of the kind.
+   */
+  const holderLeftHomelabSlots = (of: TickingRole, lease: Row): boolean => {
+    const issues = (selectRunningHostIssues.all('homelab') as Row[]).map((row) => String(row.issue).toLowerCase())
+    if (issues.length === 0) return false
+    const status = selectStatus.get(of) as Row | undefined
+    if (!status || String(status.thread_id) !== String(lease.thread_id)) return false
+    const errors = (JSON.parse(String(status.errors)) as string[]).map((error) => error.toLowerCase())
+    return errors.some((error) => error.includes('homelab') || issues.some((issue) => error.includes(issue)))
+  }
 
   /** The status row's last tick, or the holder's later work (argus#50): what liveness counts missed ticks from. */
   function lastSeenOf(of: TickingRole, row: Row): number {
@@ -1893,8 +1906,9 @@ export function openStore(options: StoreOptions) {
           if (holder === input.thread_id) return sinceLastWake() >= cadenceMs ? wake('standby_cadence') : quiet('standby_waiting')
           if (holderStalled(of, lease)) return wake('failover')
           // Only a running worker has a report to settle; a parked slot waits on the owner, a ready one on the lease holder.
-          const ownSlots = Number((countRunningHostSlots.get('homelab') as Row).n)
-          if (of === 'afk' && ownSlots > 0 && sinceLastWake() >= cadenceMs) return wake('drain')
+          // And only when the holder could not drain it itself: a live WSL2 holder drains homelab slots directly (charter,
+          // Cross-env control), so waking the standby for them is an empty model turn (argus#57).
+          if (of === 'afk' && sinceLastWake() >= cadenceMs && holderLeftHomelabSlots(of, lease)) return wake('drain')
           return quiet('primary_alive')
         }
 

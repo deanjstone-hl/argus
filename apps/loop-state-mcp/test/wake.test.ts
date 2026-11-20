@@ -230,13 +230,24 @@ describe('POST /wake/check: a standby on homelab', () => {
     expect((await wake(standby)).body).toEqual({ wake: true, reason: 'standby_cadence', recorded: false })
   })
 
-  it('after a handback with its own homelab slots still open: wake at most once per 30 min to drain them', async () => {
+  it('after a handback with its own homelab slots still open: no drain while the WSL2 holder is alive, it drains them itself (argus#57)', async () => {
     const { wake, afk, clock } = await ticked()
     clock.advance(70 * MINUTE)
     await afk.ok('lease_failover', { role: 'afk', to_thread_id: AFK_STANDBY, from_thread_id: AFK_THREAD })
     await afk.ok('slot_start', { issue: 'deanjstone/argus#9', thread_id: 'homelab-worker', host: 'homelab' })
     await afk.ok('lease_reclaim', { role: 'afk', to_thread_id: AFK_THREAD, from_thread_id: AFK_STANDBY })
     await afk.ok('status_tick', modelTick(AFK_THREAD, { slot_cap: 1, window_used_percent: 20 }))
+
+    const standby = check('afk', AFK_STANDBY, { host: 'homelab' })
+    expect((await wake(standby)).body).toEqual({ wake: false, reason: 'primary_alive', recorded: false })
+    clock.advance(40 * MINUTE)
+    expect((await wake(standby)).body).toEqual({ wake: false, reason: 'primary_alive', recorded: false })
+  })
+
+  it('the holder\'s last tick reports it cannot reach homelab: wake at most once per 30 min to drain the open slots', async () => {
+    const { wake, afk, clock } = await ticked()
+    await afk.ok('slot_start', { issue: 'deanjstone/argus#9', thread_id: 'homelab-worker', host: 'homelab' })
+    await afk.ok('status_tick', modelTick(AFK_THREAD, { slot_cap: 1, window_used_percent: 20, errors: ['homelab not reachable: t3 link expired'] }))
 
     const standby = check('afk', AFK_STANDBY, { host: 'homelab' })
     expect((await wake(standby)).body).toEqual({ wake: true, reason: 'drain', recorded: false })
@@ -249,6 +260,20 @@ describe('POST /wake/check: a standby on homelab', () => {
     await afk.ok('slot_free', { issue: 'deanjstone/argus#9', reason: 'drained' })
     clock.advance(30 * MINUTE)
     expect((await wake(standby)).body).toEqual({ wake: false, reason: 'primary_alive', recorded: false })
+  })
+
+  it('the holder\'s tick names the homelab slot it could not write: drain, though the error does not say homelab', async () => {
+    const { wake, afk } = await ticked()
+    await afk.ok('slot_start', { issue: 'deanjstone/argus#9', thread_id: 'homelab-worker', host: 'homelab' })
+    await afk.ok('status_tick', modelTick(AFK_THREAD, { slot_cap: 1, window_used_percent: 20, errors: ['slot_park deanjstone/argus#9 refused'] }))
+    expect((await wake(check('afk', AFK_STANDBY, { host: 'homelab' }))).body).toEqual({ wake: true, reason: 'drain', recorded: false })
+  })
+
+  it('an unrelated error on the holder\'s tick does not wake the standby', async () => {
+    const { wake, afk } = await ticked()
+    await afk.ok('slot_start', { issue: 'deanjstone/argus#9', thread_id: 'homelab-worker', host: 'homelab' })
+    await afk.ok('status_tick', modelTick(AFK_THREAD, { slot_cap: 1, window_used_percent: 20, errors: ['gh rate limit low'] }))
+    expect((await wake(check('afk', AFK_STANDBY, { host: 'homelab' }))).body).toEqual({ wake: false, reason: 'primary_alive', recorded: false })
   })
 })
 
@@ -276,10 +301,11 @@ describe('POST /wake/check: the drain counts only running homelab slots', () => 
     expect((await wake(check('afk', AFK_STANDBY, { host: 'homelab' }))).body).toEqual({ wake: false, reason: 'primary_alive', recorded: false })
   })
 
-  it('one running homelab slot among parked ones still drains', async () => {
+  it('one running homelab slot among parked ones still drains, when the holder cannot reach homelab', async () => {
     const { wake, afk } = await parkedHomelabWorld()
     await afk.ok('slot_park', { issue: 'deanjstone/budget#240', note: 'needs:owner' })
     await afk.ok('slot_start', { issue: 'deanjstone/context#329', thread_id: 'homelab-worker-2', host: 'homelab' })
+    await afk.ok('status_tick', modelTick(AFK_THREAD, { slot_cap: 2, window_used_percent: 20, errors: ['homelab not reachable'] }))
     expect((await wake(check('afk', AFK_STANDBY, { host: 'homelab' }))).body).toEqual({ wake: true, reason: 'drain', recorded: false })
   })
 })
@@ -288,7 +314,7 @@ describe('POST /wake/check: taking a lease answers a wake', () => {
   it('a standby woken to drain, then failing over, is not stalled by that older wake', async () => {
     const { wake, afk, aquila, clock } = await ticked()
     await afk.ok('slot_start', { issue: 'deanjstone/argus#9', thread_id: 'homelab-worker', host: 'homelab' })
-    await afk.ok('status_tick', modelTick(AFK_THREAD, { slot_cap: 1, window_used_percent: 20 }))
+    await afk.ok('status_tick', modelTick(AFK_THREAD, { slot_cap: 1, window_used_percent: 20, errors: ['homelab not reachable'] }))
     expect((await wake(check('afk', AFK_STANDBY, { host: 'homelab' }))).body.reason).toBe('drain') // never answered
 
     clock.advance(70 * MINUTE)
