@@ -176,33 +176,34 @@ the holder has done none), and `liveness.next_due_at` counts from it.
 `pressure` alone when no percentage is available. A level that contradicts the percentage is
 refused.
 
-**Remaining-budget ladder** ([#871](https://github.com/deanjstone/argus/issues/871), replacing
-the weekly pace ladder of [#861](https://github.com/deanjstone/argus/issues/861)). Pass
-`weekly_used_percent` and `weekly_resets_at` (ISO UTC, given together) and the server adds a
-second ladder, from how fast the week is being spent against what is left of it:
+**Weekly budget ladder** ([argus#62](https://github.com/deanjstone/argus/issues/62), owner
+22 Nov 2026: weekly pace again, replacing the burn ÷ allowance ladder of argus#871, which let one
+busy day gate the rest of the week). Pass `weekly_used_percent` and `weekly_resets_at` (ISO UTC,
+given together) and the server adds a second ladder, from how far the week's use runs ahead of
+the time gone:
 
+- `weekly_pace = used ÷ elapsed share of the week` (1.0 is even pace: 100% used exactly at the
+  reset). It is null in the first hour of the week, and it sets no rung until a day of the week
+  has gone: a few early points swing it far past every edge. Only the spent allowance gates
+  before then.
 - `allowance_per_day = (100 − used − reserve) ÷ days left`, `reserve` being `reserve_percent`
-  from the directives (default 10): the loop plans as if the week ends at 100 − reserve % used.
-- `burn_per_day` is the rise in `weekly_used_percent` over the trailing 24h, taken from the
-  figures ticks have given (kept in `weekly_readings`, a week and a day deep): the rise since
-  the latest reading at least 24h old, per day of the span between them. While there is no
-  reading that old there is no burn, no ratio and no rung: a few hours of whole-percent
-  readings extrapolated to a day swung the ratio from 1.28 to 1.73 on one point
-  ([#1091](https://github.com/deanjstone/argus/issues/1091)). The allowance spent still gates
-  `gate_only`, as that needs no burn. So the ladder starts a day into the week, or a day after
-  the first weekly figure a tick gives.
-- `budget_ratio = burn ÷ allowance`; 1.0 is on track to reach the reserve line at week end.
+  from the directives (default 10). Once it is 0 (`100 − reserve` or more used) the rung is
+  `gate_only` whatever the pace.
+- `burn_per_day` (the rise over the trailing 24h, from `weekly_readings`; null until a reading
+  is at least 24h old, [#1091](https://github.com/deanjstone/argus/issues/1091)) and
+  `budget_ratio = burn ÷ allowance` are reported beside the rung as information. They no longer
+  set it.
 
 | Condition | Rung | Total cap |
 |---|---|---|
-| ratio ≤ 1.0 | `normal` (the window ladder alone) | the directives cap |
-| ratio > 1.0 | `no_opus` | lowered to 1 |
-| ratio > 1.2 | `no_new_slots` | 1, and no starts |
-| ratio > 1.5, or the allowance spent (`100 - reserve_percent` or more used) | `gate_only` | no starts |
+| pace ≤ 1.1 | `normal` (the window ladder alone) | the directives cap |
+| pace > 1.1 | `no_opus` (Sonnet or Haiku workers only) | the directives cap |
+| pace > 1.25 | `no_new_slots` | 0: no starts |
+| pace > 1.5, or the allowance spent | `gate_only` | 0: no starts |
 
-A rung engages above its edge and releases only below the edge − 0.05, so a ratio hovering at
-an edge does not flip the level each tick. `budget_rung_held` is true while hysteresis is
-holding a rung the ratio alone would not give. A new week starts with no rung held. The
+A rung engages above its edge and releases only below the edge − 0.05, so a pace hovering at
+an edge does not flip the level each tick (on 25 Oct it hovered at 1.09–1.12). `budget_rung_held`
+is true while hysteresis is holding a rung the pace alone would not give. A new week starts with no rung held. The
 effective `pressure.level` is the stricter of the budget rung and the window ladder, and a
 change in it is a `pressure` change for the gate. A `normal` rung adds no limit, so an unread
 window stays `unknown`. `tick_gate` and `POST /wake/check` carry the last weekly figure and
@@ -215,7 +216,7 @@ The directives' `overrides` accept `{key: ignore_weekly_budget, value: true, unt
 (`true` only; `until` is exclusive, as for the other overrides). While one is live the server
 skips the budget ladder whatever a tick sends: weekly figures are validated and the readings
 still kept, but no rung is resolved, the effective level is the window ladder alone, and the
-total cap is not cut. It also holds for a rung an earlier tick stored, so it takes effect at
+total cap is the directives cap. It also holds for a rung an earlier tick stored, so it takes effect at
 once, with no new tick, and when the entry expires or a later version drops it the next tick
 that sends the figures applies the ladder again. `budget_rung` reads null while it is live.
 
@@ -225,7 +226,7 @@ for a caller that has not moved to `total_cap`; if both are given `total_cap` wi
 passes no `host_caps` records none, so a caller that does not send them is held to the total
 alone, as before. `slot_start` is refused when the AFK loop's last recorded tick left the
 effective level at `no_new_slots` or `gate_only`, when the running slots already fill the
-effective total cap (the directives total, lowered to 1 once the rung passes `normal`), or when
+effective total cap (the directives total; 0 from `no_new_slots` up), or when
 the starting `host` already runs its own cap. Before any tick is recorded there is nothing to
 enforce. Running workers carry on. `POST /wake/check` wakes for a free slot only while some
 host still has room.
@@ -234,11 +235,11 @@ host still has room.
 `owner/repo` (the directives' trunk-trial repos). A running slot in a listed repo sits outside
 the slot caps (argus#1033): no `slot_start` counts it toward the total cap, the effective cap or a
 host cap, so non-exempt starts count only non-exempt running slots. A `slot_start` in a listed
-repo skips those caps and the budget ladder's cut of the total cap to 1; it is refused if the
+repo skips those caps; it is refused if the
 repo already runs a slot (one running slot per exempt repo), and it still checks `no_new_slots`
 and `gate_only`. `tick_gate` carries the last list forward when a call omits it; a `status_tick`
 that omits it records none. `POST /wake/check` reads the stored list, counts only non-exempt
-running slots, and, while any repo is listed, counts room for a free slot against the uncut
+running slots, and, while any repo is listed, counts room for a free slot against the directives
 total, because the poll does not know which repo the takeable work is in. `status_read` still
 counts every running slot in `slots.used`. `status_read`
 `pressure.budget_exempt_repos` returns the list; `effective_slot_cap` is unchanged. Schema
@@ -247,7 +248,7 @@ version 9 adds the `budget_exempt_repos` column to `loop_status`.
 **Budget-exempt issues** ([argus#60](https://github.com/deanjstone/argus/issues/60)). The directives'
 `budget_exempt_issues` is an optional list of `owner/repo#N`, each an issue the owner named.
 `slot_start` reads it from the current directives, so the caller passes no flag. A listed issue
-passes `no_new_slots` and `gate_only`, skips the budget ladder's cut and every cap, and while it
+passes `no_new_slots` and `gate_only`, skips every cap, and while it
 runs it is not counted toward the total, effective or host caps. One listed issue runs at a
 time: a second listed start is refused until the first closes. It does not use the
 `efficiency:orchestrator` slot above, so each keeps its own one at a time. Nothing else is
@@ -258,7 +259,7 @@ it ends the exemption. `status_read` `pressure.budget_exempt_issues` returns the
 **Budget-exempt slots** (argus#1171). An issue labelled `efficiency:orchestrator` (it cuts the
 orchestrator's token or tick cost) starts with `slot_start` `budget_exempt: true`; the caller
 passes it, the server does not read labels. Such a start is allowed at `no_new_slots` and still
-refused at `gate_only`; it skips the budget ladder's cut and every cap, and while it runs it is
+refused at `gate_only`; it skips every cap, and while it runs it is
 not counted toward the total, effective or host caps (the same as a slot in an exempt repo). One
 budget-exempt slot runs at a time: a second start is refused until the first closes. The slot row
 records `budget_exempt`; `slot_list` (and every slot a write returns) shows it, and `status_read`
@@ -271,9 +272,8 @@ because `takeable` does not say which issues carry the label and a guess would w
 
 `status_read` `pressure` returns `weekly_used_percent`, `weekly_resets_at`, `burn_per_day`,
 `allowance_per_day`, `budget_ratio`, `budget_rung`, `budget_rung_held`, `reserve_percent` and
-`effective_slot_cap`; `slots.hosts` returns `used` and `cap` per host. `weekly_pace`
-(used ÷ elapsed share of the week) is still computed and reported for one release so a reader
-of the #861 fields keeps working; it no longer drives anything.
+`effective_slot_cap`, with `weekly_pace`, which sets the rung; `slots.hosts` returns `used` and
+`cap` per host.
 
 Schema version 7 added `window_level`, `weekly_used_percent`, `weekly_resets_at` and
 `weekly_pace` to `loop_status`. Schema version 8 adds the `weekly_readings` table and

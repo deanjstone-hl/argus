@@ -13,7 +13,7 @@ const issue = (n: number) => `deanjstone/argus#${n}`
 describe('slot_start budget_exempt', () => {
   it('starts at no_new_slots, and a start without it is still refused there', async () => {
     const { afk, tick } = await ladderWorld()
-    await afk.ok('status_tick', tick(13, { total_cap: 3 }))
+    await afk.ok('status_tick', tick(1.3, { total_cap: 3 }))
     expect((await afk.call('slot_start', { issue: issue(1), thread_id: 'w1' })).content[0]?.text).toMatch(/no_new_slots/)
     const started = await afk.ok('slot_start', { issue: issue(2), thread_id: 'w2', budget_exempt: true })
     expect(started.slot).toMatchObject({ issue: issue(2), state: 'running', budget_exempt: true })
@@ -21,7 +21,7 @@ describe('slot_start budget_exempt', () => {
 
   it('is refused at gate_only', async () => {
     const { afk, tick } = await ladderWorld()
-    await afk.ok('status_tick', tick(16, { total_cap: 3 }))
+    await afk.ok('status_tick', tick(1.6, { total_cap: 3 }))
     const refused = await afk.call('slot_start', { issue: issue(1), thread_id: 'w1', budget_exempt: true })
     expect(refused.isError).toBe(true)
     expect(refused.content[0]?.text).toMatch(/gate_only/)
@@ -29,7 +29,7 @@ describe('slot_start budget_exempt', () => {
 
   it('refuses a second exempt start while one runs, and allows it once the first closes', async () => {
     const { afk, tick } = await ladderWorld()
-    await afk.ok('status_tick', tick(13, { total_cap: 3 }))
+    await afk.ok('status_tick', tick(1.3, { total_cap: 3 }))
     await afk.ok('slot_start', { issue: issue(1), thread_id: 'w1', budget_exempt: true })
     const refused = await afk.call('slot_start', { issue: issue(2), thread_id: 'w2', budget_exempt: true })
     expect(refused.isError).toBe(true)
@@ -40,7 +40,7 @@ describe('slot_start budget_exempt', () => {
 
   it('does not count toward the total, effective or host caps, and is not held to them', async () => {
     const { afk, tick } = await ladderWorld()
-    await afk.ok('status_tick', tick(10.5, { total_cap: 1, host_caps: { wsl2: 1, homelab: 1 } }))
+    await afk.ok('status_tick', tick(1.15, { total_cap: 1, host_caps: { wsl2: 1, homelab: 1 } }))
     await afk.ok('slot_start', { issue: issue(1), thread_id: 'w1' })
     // The cap of 1 is full, yet the exempt start goes through.
     await afk.ok('slot_start', { issue: issue(2), thread_id: 'w2', budget_exempt: true })
@@ -68,7 +68,7 @@ describe('budget_exempt: POST /wake/check', () => {
 
   it('wakes at no_new_slots for a takeable exempt issue, and stays quiet without one', async () => {
     const { afk, tick, post, clock } = await ladderWorld()
-    await afk.ok('status_tick', tick(13, { total_cap: 3 }))
+    await afk.ok('status_tick', tick(1.3, { total_cap: 3 }))
     clock.advance(5 * MINUTE)
     expect((await post('/wake/check', body, TOKENS.afk)).body).toMatchObject({ wake: false })
     expect((await post('/wake/check', { ...body, takeable_exempt: 1 }, TOKENS.afk)).body).toMatchObject({ wake: true, reason: 'free_slot' })
@@ -76,20 +76,20 @@ describe('budget_exempt: POST /wake/check', () => {
 
   it('stays quiet at gate_only and while an exempt slot already runs', async () => {
     const { afk, tick, post, clock } = await ladderWorld()
-    await afk.ok('status_tick', tick(16, { total_cap: 3 }))
+    await afk.ok('status_tick', tick(1.6, { total_cap: 3 }))
     clock.advance(5 * MINUTE)
     expect((await post('/wake/check', { ...body, takeable_exempt: 1 }, TOKENS.afk)).body).toMatchObject({ wake: false })
 
-    await afk.ok('status_tick', tick(13, { total_cap: 3 }))
+    await afk.ok('status_tick', tick(1.3, { total_cap: 3 }))
     await afk.ok('slot_start', { issue: issue(1), thread_id: 'w1', budget_exempt: true })
-    await afk.ok('status_tick', tick(13, { total_cap: 3 }))
+    await afk.ok('status_tick', tick(1.3, { total_cap: 3 }))
     clock.advance(5 * MINUTE)
     expect((await post('/wake/check', { ...body, takeable_exempt: 1 }, TOKENS.afk)).body).toMatchObject({ wake: false })
   })
 
   it.each([[-1], [1.5], ['1']])('refuses takeable_exempt %j', async (bad) => {
     const { afk, tick, post, clock } = await ladderWorld()
-    await afk.ok('status_tick', tick(13, { total_cap: 3 }))
+    await afk.ok('status_tick', tick(1.3, { total_cap: 3 }))
     clock.advance(5 * MINUTE)
     expect((await post('/wake/check', { ...body, takeable_exempt: bad }, TOKENS.afk)).status).toBeGreaterThanOrEqual(400)
   })

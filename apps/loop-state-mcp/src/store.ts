@@ -89,7 +89,8 @@ export type ReportOutcome = (typeof REPORT_OUTCOMES)[number]
 
 /**
  * The window ladder (#659): ≥70% no new Opus workers, ≥85% no new slots, ≥95% gate-only ticks.
- * The remaining-budget ladder (#871, replacing #861's weekly pace) uses the same levels; the effective level is the stricter of the two.
+ * The weekly budget ladder (argus#62: weekly pace again, replacing #871's burn ÷ allowance) uses the same levels;
+ * the effective level is the stricter of the two.
  */
 export const PRESSURE_LEVELS = ['unknown', 'normal', 'no_opus', 'no_new_slots', 'gate_only'] as const
 export type PressureLevel = (typeof PRESSURE_LEVELS)[number]
@@ -234,7 +235,7 @@ export interface TickInput {
   total_cap?: number
   /** Per-host caps from the directives; a host left out has none. */
   host_caps?: HostCaps
-  /** Repos (`owner/repo`) whose slots skip the budget ladder's cut of the total cap to 1 (argus#1012). Nothing else is waived. */
+  /** Repos (`owner/repo`) whose slots sit outside the slot caps (argus#1012, #1033). Nothing else is waived. */
   budget_exempt_repos?: string[]
   errors?: string[]
   window_used_percent?: number
@@ -634,13 +635,19 @@ const READING_KEEP_MS = WEEK_MS + DAY_MS
 /** The share of the week held back (#871): the loop plans as if the week ends at 100 - reserve % used. */
 const DEFAULT_RESERVE_PERCENT = 10
 
-/** The budget ladder's edges (#871): the burn ÷ allowance ratio above each steps the level up. A rung releases below its edge - HYSTERESIS. */
+/**
+ * The budget ladder's edges (argus#62, owner 22 Nov 2026): weekly pace (used ÷ elapsed share of the week) above each
+ * steps the level up. A rung releases below its edge - HYSTERESIS. Before argus#62 the trigger was #871's
+ * trailing-24h burn ÷ allowance, which let one busy day gate the rest of the week.
+ */
 const BUDGET_EDGES = [
-  { rung: 'no_opus', over: 1.0 },
-  { rung: 'no_new_slots', over: 1.2 },
+  { rung: 'no_opus', over: 1.1 },
+  { rung: 'no_new_slots', over: 1.25 },
   { rung: 'gate_only', over: 1.5 },
 ] as const
 const HYSTERESIS = 0.05
+/** How much of the week must be gone before pace sets a rung (argus#62); before it only the spent allowance gates. */
+const PACE_READABLE_AFTER_MS = DAY_MS
 
 /** What the ladder's rung is: `normal` or a pressure level that limits starts. */
 export type BudgetRung = 'normal' | (typeof BUDGET_EDGES)[number]['rung']
@@ -651,16 +658,16 @@ const isBudgetRung = (value: unknown): value is BudgetRung => value === 'normal'
 export interface Weekly {
   used: number
   resetsAt: number
-  /** Used ÷ elapsed share of the week; null in the first hour of the week. Kept for one release (#861): it no longer drives the level. */
+  /** Used ÷ elapsed share of the week; null in the first hour of the week. It drives the rung (argus#62). */
   pace: number | null
-  /** Trailing-24h rise in % used, per day. Null while no reading is at least 24h old. */
+  /** Trailing-24h rise in % used, per day. Null while no reading is at least 24h old. Information only since argus#62. */
   burnPerDay: number | null
   /** What the rest of the week allows per day, keeping the reserve back; 0 when none is left. Null once the week is over. */
   allowancePerDay: number | null
-  /** burn ÷ allowance; null when either is unknown or the allowance is spent. */
+  /** burn ÷ allowance; null when either is unknown or the allowance is spent. Information only since argus#62. */
   ratio: number | null
   rung: BudgetRung
-  /** The rung is held by hysteresis: the ratio alone would give a lower one. */
+  /** The rung is held by hysteresis: the pace alone would give a lower one. */
   held: boolean
   reservePercent: number
 }
@@ -679,14 +686,14 @@ export function weeklyPace(used: number, resetsAt: number, at: number): number |
   return used / ((elapsedMs / WEEK_MS) * 100)
 }
 
-/** The rung a ratio gives, given the rung held before it. Engages above an edge, releases below the edge - HYSTERESIS. */
-export function budgetRungFor(ratio: number | null, prior: BudgetRung): { rung: BudgetRung; held: boolean } {
-  if (ratio === null) return { rung: 'normal', held: false }
+/** The rung a weekly pace gives, given the rung held before it. Engages above an edge, releases below the edge - HYSTERESIS. */
+export function budgetRungFor(pace: number | null, prior: BudgetRung): { rung: BudgetRung; held: boolean } {
+  if (pace === null) return { rung: 'normal', held: false }
   let rung: BudgetRung = 'normal'
   let alone: BudgetRung = 'normal'
   for (const edge of BUDGET_EDGES) {
-    if (ratio > edge.over) alone = edge.rung
-    if (ratio > edge.over || (rungIndex(prior) >= rungIndex(edge.rung) && ratio >= edge.over - HYSTERESIS)) rung = edge.rung
+    if (pace > edge.over) alone = edge.rung
+    if (pace > edge.over || (rungIndex(prior) >= rungIndex(edge.rung) && pace >= edge.over - HYSTERESIS)) rung = edge.rung
   }
   return { rung, held: rung !== alone }
 }
@@ -697,10 +704,13 @@ function stricter(windowLevel: PressureLevel, weeklyLevel: PressureLevel): Press
   return PRESSURE_LEVELS.indexOf(weeklyLevel) > PRESSURE_LEVELS.indexOf(windowLevel) ? weeklyLevel : windowLevel
 }
 
-/** The directives total cap, lowered to 1 once the budget ladder is past `normal`. */
+/**
+ * The directives total cap under the budget ladder (argus#62): unchanged at `normal` and `no_opus` (Sonnet or Haiku
+ * workers only), 0 from `no_new_slots` up, where the level already refuses new starts.
+ */
 export function effectiveSlotCap(slotCap: number | null, weekly: Weekly | null): number | null {
-  if (weekly === null || weekly.rung === 'normal') return slotCap
-  return slotCap === null ? 1 : Math.min(slotCap, 1)
+  if (weekly === null || weekly.rung === 'normal' || weekly.rung === 'no_opus') return slotCap
+  return 0
 }
 
 /** Per-host caps from the directives. A host left out has no cap of its own. */
@@ -880,13 +890,13 @@ export function openStore(options: StoreOptions) {
   const selectBaseline = db.prepare('SELECT at, used FROM weekly_readings WHERE at >= ? AND at <= ? ORDER BY at DESC LIMIT 1')
 
   /**
-   * The burn (% of the week used per day) and what the week allows. The burn is the rise since
-   * the latest reading at least 24h old, per day of the span between them. With no such reading
-   * there is no burn, so no ratio and no rung: extrapolating a few hours of whole-percent
-   * readings to a day swung the ratio by 0.4 on a single point (argus#1091). The allowance spent
-   * (100 - reserve used) still gates, as it needs no burn.
+   * The rung, from the weekly pace (argus#62), and the burn and allowance shown beside it. The burn
+   * (% of the week used per day) is the rise since the latest reading at least 24h old, per day of
+   * the span between them; with no such reading there is no burn and no ratio (argus#1091). Burn,
+   * allowance and ratio are information only. The allowance spent (100 - reserve used) still
+   * gates whatever the pace.
    */
-  function budgetOf(used: number, resetsAt: number, at: number, reservePercent: number, prior: BudgetRung): Omit<Weekly, 'used' | 'resetsAt' | 'pace' | 'reservePercent'> {
+  function budgetOf(used: number, resetsAt: number, at: number, reservePercent: number, pace: number | null, prior: BudgetRung): Omit<Weekly, 'used' | 'resetsAt' | 'pace' | 'reservePercent'> {
     const daysLeft = (resetsAt - at) / DAY_MS
     const weekStart = resetsAt - WEEK_MS
     const allowancePerDay = daysLeft > 0 ? Math.max(0, (100 - used - reservePercent) / daysLeft) : null
@@ -896,17 +906,18 @@ export function openStore(options: StoreOptions) {
       if (baseline) burnPerDay = Math.max(0, used - Number(baseline.used)) / ((at - Number(baseline.at)) / DAY_MS)
     }
     const ratio = burnPerDay === null || allowancePerDay === null || allowancePerDay <= 0 ? null : burnPerDay / allowancePerDay
-    const { rung, held } = budgetRungFor(ratio, prior)
+    const { rung, held } = budgetRungFor(pace, prior)
     const spent = allowancePerDay === 0
     return { burnPerDay, allowancePerDay, ratio, rung: spent ? 'gate_only' : rung, held: spent ? false : held }
   }
 
-  const deriveWeekly = (weekly: { used: number; resetsAt: number }, reservePercent: number, prior: BudgetRung): Weekly => ({
-    ...weekly,
-    pace: weeklyPace(weekly.used, weekly.resetsAt, now()),
-    reservePercent,
-    ...budgetOf(weekly.used, weekly.resetsAt, now(), reservePercent, prior),
-  })
+  const deriveWeekly = (weekly: { used: number; resetsAt: number }, reservePercent: number, prior: BudgetRung): Weekly => {
+    const at = now()
+    const pace = weeklyPace(weekly.used, weekly.resetsAt, at)
+    // argus#62: a few points in the first day swing pace far past every edge, so pace drives no rung until a day is gone.
+    const rungPace = at - (weekly.resetsAt - WEEK_MS) >= PACE_READABLE_AFTER_MS ? pace : null
+    return { ...weekly, pace, reservePercent, ...budgetOf(weekly.used, weekly.resetsAt, at, reservePercent, rungPace, prior) }
+  }
 
   /**
    * argus#60 (argus-config#1573): the owner's time-boxed `ignore_weekly_budget` override. While it is live the

@@ -4,19 +4,19 @@ import { AFK_THREAD, MINUTE, TOKENS } from './helpers.js'
 import { ladderWorld } from './ladder-world.js'
 
 /**
- * Trunk-trial repos skip the budget ladder's cut of the slot cap to 1 (argus#1012), and a running
- * slot in one sits outside the total, effective and host caps (argus#1033). It keeps one running
- * slot per repo and still obeys no_new_slots and gate_only.
- * Burn 10.5 puts the ladder at no_opus (cap cut to 1), 13 at no_new_slots.
+ * Trunk-trial repos sit outside the slot caps (argus#1012): a running slot in one is not counted
+ * toward the total, effective and host caps (argus#1033). It keeps one running slot per repo and
+ * still obeys no_new_slots and gate_only. Since argus#62 no_opus no longer cuts the cap to 1.
+ * Pace 1.15 puts the ladder at no_opus, 1.3 at no_new_slots, 1.6 at gate_only.
  */
 const trial = 'deanjstone/frontend'
 const issue = (repo: string, n: number) => `${repo}#${n}`
 const other = 'deanjstone/argus'
 
 describe('budget_exempt_repos', () => {
-  it('lets an exempt repo start past the cut cap of 1 at no_opus', async () => {
+  it('lets an exempt repo start at no_opus beside a running slot', async () => {
     const { afk, tick } = await ladderWorld()
-    await afk.ok('status_tick', tick(10.5, { total_cap: 3, budget_exempt_repos: [trial] }))
+    await afk.ok('status_tick', tick(1.15, { total_cap: 3, budget_exempt_repos: [trial] }))
     await afk.ok('slot_start', { issue: issue(other, 1), thread_id: 'w1' })
     expect((await afk.call('slot_start', { issue: issue(trial, 2), thread_id: 'w2' })).isError).toBeFalsy()
   })
@@ -29,9 +29,9 @@ describe('budget_exempt_repos', () => {
     expect((await afk.call('slot_start', { issue: issue(trial, 3), thread_id: 'w3' })).isError).toBeFalsy()
   })
 
-  it('does not count a running exempt slot against a non-exempt start at no_opus with cap 1', async () => {
+  it('does not count a running exempt slot against a non-exempt start with a total cap of 1', async () => {
     const { afk, tick } = await ladderWorld()
-    await afk.ok('status_tick', tick(10.5, { total_cap: 1, budget_exempt_repos: [trial] }))
+    await afk.ok('status_tick', tick(1.15, { total_cap: 1, budget_exempt_repos: [trial] }))
     await afk.ok('slot_start', { issue: issue(trial, 164), thread_id: 'w1' })
     expect((await afk.call('slot_start', { issue: issue(other, 335), thread_id: 'w2' })).isError).toBeFalsy()
   })
@@ -66,7 +66,7 @@ describe('budget_exempt_repos', () => {
 
   it('still refuses an exempt repo at no_new_slots', async () => {
     const { afk, tick } = await ladderWorld()
-    await afk.ok('status_tick', tick(13, { total_cap: 3, budget_exempt_repos: [trial] }))
+    await afk.ok('status_tick', tick(1.3, { total_cap: 3, budget_exempt_repos: [trial] }))
     const refused = await afk.call('slot_start', { issue: issue(trial, 1), thread_id: 'w1' })
     expect(refused.isError).toBe(true)
     expect(refused.content[0]?.text).toMatch(/no_new_slots/)
@@ -74,7 +74,7 @@ describe('budget_exempt_repos', () => {
 
   it('still refuses an exempt repo at gate_only', async () => {
     const { afk, tick } = await ladderWorld()
-    await afk.ok('status_tick', tick(16, { total_cap: 3, budget_exempt_repos: [trial] }))
+    await afk.ok('status_tick', tick(1.6, { total_cap: 3, budget_exempt_repos: [trial] }))
     const refused = await afk.call('slot_start', { issue: issue(trial, 1), thread_id: 'w1' })
     expect(refused.isError).toBe(true)
     expect(refused.content[0]?.text).toMatch(/gate_only/)
@@ -97,27 +97,27 @@ describe('budget_exempt_repos', () => {
     expect((await afk.call('slot_start', { issue: issue(trial, 2), thread_id: 'w2', host: 'wsl2' })).isError).toBeFalsy()
   })
 
-  it('refuses a repo that is not listed at the cut cap when a non-exempt slot is running', async () => {
+  it('refuses a repo that is not listed once a non-exempt slot fills the cap', async () => {
     const { afk, tick } = await ladderWorld()
-    await afk.ok('status_tick', tick(10.5, { total_cap: 3, budget_exempt_repos: [trial] }))
+    await afk.ok('status_tick', tick(1.15, { total_cap: 1, budget_exempt_repos: [trial] }))
     await afk.ok('slot_start', { issue: issue(other, 1), thread_id: 'w1' })
     const refused = await afk.call('slot_start', { issue: issue(other, 2), thread_id: 'w2' })
     expect(refused.isError).toBe(true)
     expect(refused.content[0]?.text).toMatch(/effective slot cap 1 is reached \(1 running\)/)
   })
 
-  it('refuses everything at the cut cap when no repo is listed', async () => {
+  it('refuses everything at a full cap when no repo is listed', async () => {
     const { afk, tick } = await ladderWorld()
-    await afk.ok('status_tick', tick(10.5, { total_cap: 3 }))
+    await afk.ok('status_tick', tick(1.15, { total_cap: 1 }))
     await afk.ok('slot_start', { issue: issue(other, 1), thread_id: 'w1' })
     expect((await afk.call('slot_start', { issue: issue(trial, 2), thread_id: 'w2' })).isError).toBe(true)
   })
 
   it('does not change the effective cap status_read reports', async () => {
     const { afk, tick } = await ladderWorld()
-    await afk.ok('status_tick', tick(10.5, { total_cap: 3, budget_exempt_repos: [trial] }))
+    await afk.ok('status_tick', tick(1.15, { total_cap: 3, budget_exempt_repos: [trial] }))
     const read = await afk.ok('status_read')
-    expect(read.pressure.effective_slot_cap).toBe(1)
+    expect(read.pressure.effective_slot_cap).toBe(3)
     expect(read.pressure.budget_exempt_repos).toEqual([trial])
   })
 
@@ -130,20 +130,20 @@ describe('budget_exempt_repos', () => {
 
   it('tick_gate carries the list forward when a call omits it; status_tick records none', async () => {
     const { afk, tick, clock } = await ladderWorld()
-    await afk.ok('status_tick', tick(10.5, { total_cap: 3, budget_exempt_repos: [trial] }))
+    await afk.ok('status_tick', tick(1.15, { total_cap: 3, budget_exempt_repos: [trial] }))
     clock.advance(5 * MINUTE)
-    const gate = await afk.ok('tick_gate', tick(10.5))
+    const gate = await afk.ok('tick_gate', tick(1.15))
     expect(gate.recorded).toBe(true)
     expect((await afk.ok('status_read')).pressure.budget_exempt_repos).toEqual([trial])
-    await afk.ok('status_tick', tick(10.5, { total_cap: 3 }))
+    await afk.ok('status_tick', tick(1.15, { total_cap: 3 }))
     expect((await afk.ok('status_read')).pressure.budget_exempt_repos).toEqual([])
   })
 
   it('tick_gate records a list it is given', async () => {
     const { afk, tick, clock } = await ladderWorld()
-    await afk.ok('status_tick', tick(10.5, { total_cap: 3 }))
+    await afk.ok('status_tick', tick(1.15, { total_cap: 3 }))
     clock.advance(5 * MINUTE)
-    await afk.ok('tick_gate', tick(10.5, { budget_exempt_repos: [trial] }))
+    await afk.ok('tick_gate', tick(1.15, { budget_exempt_repos: [trial] }))
     expect((await afk.ok('status_read')).pressure.budget_exempt_repos).toEqual([trial])
     await afk.ok('slot_start', { issue: issue(other, 1), thread_id: 'w1' })
     expect((await afk.call('slot_start', { issue: issue(trial, 2), thread_id: 'w2' })).isError).toBeFalsy()
@@ -166,33 +166,33 @@ describe('budget_exempt_repos', () => {
 describe('budget_exempt_repos: POST /wake/check', () => {
   const body = { role: 'afk', host: 'wsl2', thread_id: AFK_THREAD, directives_version: 'v1', needs_owner: [] as string[], window_used_percent: 20, takeable: 3 }
 
-  it('wakes for a free slot at the cut cap only while a repo is exempt', async () => {
+  it('wakes for a free slot at a full cap only while the running repo is exempt', async () => {
     const { afk, tick, post, clock } = await ladderWorld()
-    await afk.ok('status_tick', tick(10.5, { total_cap: 3, budget_exempt_repos: [trial] }))
+    await afk.ok('status_tick', tick(1.15, { total_cap: 1, budget_exempt_repos: [trial] }))
     await afk.ok('slot_start', { issue: issue(trial, 1), thread_id: 'w1' })
-    await afk.ok('status_tick', tick(10.5, { total_cap: 3, budget_exempt_repos: [trial] }))
+    await afk.ok('status_tick', tick(1.15, { total_cap: 1, budget_exempt_repos: [trial] }))
     clock.advance(5 * MINUTE)
     expect((await post('/wake/check', body, TOKENS.afk)).body).toMatchObject({ wake: true, reason: 'free_slot' })
 
-    await afk.ok('status_tick', tick(10.5, { total_cap: 3 }))
+    await afk.ok('status_tick', tick(1.15, { total_cap: 1 }))
     clock.advance(5 * MINUTE)
     expect((await post('/wake/check', body, TOKENS.afk)).body).toMatchObject({ wake: false })
   })
 
   it('does not wake once the non-exempt slots fill the directives total', async () => {
     const { afk, tick, post, clock } = await ladderWorld()
-    await afk.ok('status_tick', tick(10.5, { total_cap: 1, budget_exempt_repos: [trial] }))
+    await afk.ok('status_tick', tick(1.15, { total_cap: 1, budget_exempt_repos: [trial] }))
     await afk.ok('slot_start', { issue: issue(other, 1), thread_id: 'w1' })
-    await afk.ok('status_tick', tick(10.5, { total_cap: 1, budget_exempt_repos: [trial] }))
+    await afk.ok('status_tick', tick(1.15, { total_cap: 1, budget_exempt_repos: [trial] }))
     clock.advance(5 * MINUTE)
     expect((await post('/wake/check', body, TOKENS.afk)).body).toMatchObject({ wake: false })
   })
 
   it('still wakes while only an exempt slot is running and the total is full of it', async () => {
     const { afk, tick, post, clock } = await ladderWorld()
-    await afk.ok('status_tick', tick(10.5, { total_cap: 1, budget_exempt_repos: [trial] }))
+    await afk.ok('status_tick', tick(1.15, { total_cap: 1, budget_exempt_repos: [trial] }))
     await afk.ok('slot_start', { issue: issue(trial, 1), thread_id: 'w1' })
-    await afk.ok('status_tick', tick(10.5, { total_cap: 1, budget_exempt_repos: [trial] }))
+    await afk.ok('status_tick', tick(1.15, { total_cap: 1, budget_exempt_repos: [trial] }))
     clock.advance(5 * MINUTE)
     expect((await post('/wake/check', body, TOKENS.afk)).body).toMatchObject({ wake: true, reason: 'free_slot' })
   })

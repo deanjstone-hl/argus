@@ -69,7 +69,7 @@ const tickInput = {
   budget_exempt_repos: z
     .array(z.string())
     .optional()
-    .describe('Repos (owner/repo) in the directives\' budget_exempt_repos: a running slot in one sits outside the total cap, the effective cap and the host caps: it is not counted when any slot starts, and its own start skips those caps and the budget ladder\'s cut of the total cap to 1. A listed repo keeps one running slot (a second start in it is refused), and no_new_slots and gate_only still refuse its starts. tick_gate carries the last list forward when it is omitted; a status_tick that omits it records none.'),
+    .describe('Repos (owner/repo) in the directives\' budget_exempt_repos: a running slot in one sits outside the total cap, the effective cap and the host caps: it is not counted when any slot starts, and its own start skips those caps. A listed repo keeps one running slot (a second start in it is refused), and no_new_slots and gate_only still refuse its starts. tick_gate carries the last list forward when it is omitted; a status_tick that omits it records none.'),
   reserve_percent: z
     .number()
     .min(0)
@@ -152,7 +152,7 @@ export function createMcpServer(store: Store, role: Role, threadHeader?: string)
       {
         title: 'Start a slot',
         description:
-          'Put a worker thread on an issue. Refused if the issue already holds a running slot, or is parked; a ready (un-parked) issue resumes here with its new thread. Also refused when the last recorded AFK tick put the effective pressure at no_new_slots or gate_only, or the running slots already fill the effective slot cap (the directives total cap, lowered to 1 once the budget ladder passes normal), or the starting host already runs its own cap. Running slots in a repo in budget_exempt_repos are not counted toward any of those caps, and a start in such a repo skips them; it is refused only if that repo already runs a slot. Pass budget_exempt: true for an issue labelled efficiency:orchestrator (argus#1171): the start is allowed at no_new_slots but still refused at gate_only, skips the ladder\'s cut and every cap, is not counted toward them while it runs, and only one budget-exempt slot runs at a time. Use Sonnet or Haiku for it. An issue in the directives\' budget_exempt_issues (argus#60) needs no flag: the server passes it at no_new_slots and gate_only, outside every cap and the ladder\'s cut, one such issue running at a time; slot_list shows budget_exempt on each slot.',
+          'Put a worker thread on an issue. Refused if the issue already holds a running slot, or is parked; a ready (un-parked) issue resumes here with its new thread. Also refused when the last recorded AFK tick put the effective pressure at no_new_slots or gate_only, or the running slots already fill the effective slot cap (the directives total cap; 0 once the budget ladder reaches no_new_slots), or the starting host already runs its own cap. Running slots in a repo in budget_exempt_repos are not counted toward any of those caps, and a start in such a repo skips them; it is refused only if that repo already runs a slot. Pass budget_exempt: true for an issue labelled efficiency:orchestrator (argus#1171): the start is allowed at no_new_slots but still refused at gate_only, skips every cap, is not counted toward them while it runs, and only one budget-exempt slot runs at a time. Use Sonnet or Haiku for it. An issue in the directives\' budget_exempt_issues (argus#60) needs no flag: the server passes it at no_new_slots and gate_only, outside every cap, one such issue running at a time; slot_list shows budget_exempt on each slot.',
         inputSchema: {
           issue,
           thread_id: threadId.describe('The worker thread taking the issue.'),
@@ -385,7 +385,7 @@ export function createMcpServer(store: Store, role: Role, threadHeader?: string)
     {
       title: 'Read loop status',
       description:
-        "A role's loop status from its last tick: thread, directives version, slots used and free, errors, pressure (the effective level, the weekly figures, burn and allowance per day, the budget ratio and rung with whether hysteresis holds it, and the effective slot cap), per-host slots used and cap, and liveness (last tick against the cadence; 2 missed ticks is stalled).",
+        "A role's loop status from its last tick: thread, directives version, slots used and free, errors, pressure (the effective level, the weekly figures, burn and allowance per day, the weekly pace that sets the budget rung, the rung with whether hysteresis holds it, the burn ratio as information, and the effective slot cap), per-host slots used and cap, and liveness (last tick against the cadence; 2 missed ticks is stalled).",
       inputSchema: { role: z.enum(['afk', 'direction']).optional().describe('Whose status. Defaults to afk.') },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
     },

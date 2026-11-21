@@ -55,13 +55,13 @@ describe('the ignore_weekly_budget override in the validator', () => {
 })
 
 describe('the ladder while ignore_weekly_budget is live', () => {
-  it('the same week that cuts the cap to 1 without it leaves the total cap alone with it', async () => {
+  it('the same week that stops starts without it leaves the total cap alone with it', async () => {
     const w = await ladderWorld()
     const aquila = await ownerPresent(w)
     await setDirectives(aquila, [entry(true)]).then((r) => expect(r.isError).toBeFalsy())
 
-    // A tick that still sends the weekly figures (ratio 1.1: no_new_slots on its own).
-    await w.afk.ok('status_tick', w.tick(11, { slot_cap: 2 }))
+    // A tick that still sends the weekly figures (pace 1.3: no_new_slots on its own).
+    await w.afk.ok('status_tick', w.tick(1.3, { slot_cap: 2 }))
     const { pressure } = await w.afk.ok('status_read')
     expect(pressure).toMatchObject({
       level: 'normal',
@@ -73,15 +73,15 @@ describe('the ladder while ignore_weekly_budget is live', () => {
     expect((await w.afk.call('slot_start', { issue: B, thread_id: 'w2' })).isError).toBeFalsy()
   })
 
-  it('does not stop a start at gate_only-grade burn, but the window ladder still does', async () => {
+  it('does not stop a start at gate_only-grade pace, but the window ladder still does', async () => {
     const w = await ladderWorld()
     const aquila = await ownerPresent(w)
     await setDirectives(aquila, [entry(true)])
 
-    await w.afk.ok('status_tick', w.tick(16, { slot_cap: 2 }))
+    await w.afk.ok('status_tick', w.tick(1.6, { slot_cap: 2 }))
     expect((await w.afk.call('slot_start', { issue: A, thread_id: 'w1' })).isError).toBeFalsy()
 
-    await w.afk.ok('status_tick', w.tick(16, { slot_cap: 2, window_used_percent: 96 }))
+    await w.afk.ok('status_tick', w.tick(1.6, { slot_cap: 2, window_used_percent: 96 }))
     const refused = await w.afk.call('slot_start', { issue: B, thread_id: 'w2' })
     expect(refused.isError).toBe(true)
     expect(text(refused)).toMatch(/pressure is gate_only/)
@@ -89,7 +89,7 @@ describe('the ladder while ignore_weekly_budget is live', () => {
 
   it('takes hold at once on the rung the last tick recorded, with no new tick', async () => {
     const w = await ladderWorld()
-    await w.afk.ok('status_tick', w.tick(16, { slot_cap: 2 }))
+    await w.afk.ok('status_tick', w.tick(1.6, { slot_cap: 2 }))
     expect((await w.afk.call('slot_start', { issue: A, thread_id: 'w1' })).isError).toBe(true)
 
     const aquila = await ownerPresent(w)
@@ -100,7 +100,7 @@ describe('the ladder while ignore_weekly_budget is live', () => {
 
   it('shows no weekly rung on a wake request', async () => {
     const w = await ladderWorld()
-    await w.afk.ok('status_tick', w.tick(16, { slot_cap: 2 }))
+    await w.afk.ok('status_tick', w.tick(1.6, { slot_cap: 2 }))
     const aquila = await ownerPresent(w)
     await setDirectives(aquila, [entry(true)])
     const wake = await w.post('/wake/request', { issue: A }, PROMOTION_TOKEN)
@@ -111,10 +111,10 @@ describe('the ladder while ignore_weekly_budget is live', () => {
     const w = await ladderWorld()
     const aquila = await ownerPresent(w)
     await setDirectives(aquila, [entry(true, new Date(w.clock.now() + 30 * MINUTE).toISOString())])
-    await w.afk.ok('status_tick', w.tick(16, { slot_cap: 2 }))
+    await w.afk.ok('status_tick', w.tick(1.6, { slot_cap: 2 }))
 
     w.clock.advance(31 * MINUTE)
-    await w.afk.ok('status_tick', w.tick(16, { slot_cap: 2 }))
+    await w.afk.ok('status_tick', w.tick(1.6, { slot_cap: 2 }))
     expect((await w.afk.ok('status_read')).pressure).toMatchObject({ level: 'gate_only', budget_rung: 'gate_only' })
     const refused = await w.afk.call('slot_start', { issue: A, thread_id: 'w1' })
     expect(refused.isError).toBe(true)
@@ -125,7 +125,7 @@ describe('the ladder while ignore_weekly_budget is live', () => {
     const w = await ladderWorld()
     const aquila = await ownerPresent(w)
     await setDirectives(aquila, [entry(true, new Date(w.clock.now() - MINUTE).toISOString())])
-    await w.afk.ok('status_tick', w.tick(16, { slot_cap: 2 }))
+    await w.afk.ok('status_tick', w.tick(1.6, { slot_cap: 2 }))
     expect((await w.afk.ok('status_read')).pressure).toMatchObject({ budget_rung: 'gate_only' })
   })
 
@@ -133,7 +133,7 @@ describe('the ladder while ignore_weekly_budget is live', () => {
     const w = await ladderWorld()
     const aquila = await ownerPresent(w)
     await setDirectives(aquila, [{ key: 'max_slots', value: 1, until: UNTIL, reason: 'quota' }])
-    await w.afk.ok('status_tick', w.tick(16, { slot_cap: 2 }))
+    await w.afk.ok('status_tick', w.tick(1.6, { slot_cap: 2 }))
     expect((await w.afk.ok('status_read')).pressure).toMatchObject({ budget_rung: 'gate_only' })
   })
 
@@ -141,11 +141,11 @@ describe('the ladder while ignore_weekly_budget is live', () => {
     const w = await ladderWorld()
     const aquila = await ownerPresent(w)
     await setDirectives(aquila, [entry(true)])
-    await w.afk.ok('status_tick', w.tick(16, { slot_cap: 2 }))
+    await w.afk.ok('status_tick', w.tick(1.6, { slot_cap: 2 }))
     expect((await w.afk.ok('status_read')).pressure).toMatchObject({ level: 'normal' })
 
     await setDirectives(aquila, [], 1).then((r) => expect(r.isError).toBeFalsy())
-    await w.afk.ok('status_tick', w.tick(16, { slot_cap: 2 }))
+    await w.afk.ok('status_tick', w.tick(1.6, { slot_cap: 2 }))
     expect((await w.afk.ok('status_read')).pressure).toMatchObject({ level: 'gate_only', budget_rung: 'gate_only' })
   })
 })

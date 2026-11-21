@@ -53,7 +53,7 @@ describe('slot_start for a budget_exempt_issues issue', () => {
   it('starts at gate_only, with no client flag', async () => {
     const w = await ladderWorld()
     await listed(w)
-    await w.afk.ok('status_tick', w.tick(16, { total_cap: 3 }))
+    await w.afk.ok('status_tick', w.tick(1.6, { total_cap: 3 }))
     const started = await w.afk.ok('slot_start', { issue: LISTED, thread_id: 'w1' })
     expect(started.slot).toMatchObject({ issue: LISTED, state: 'running' })
   })
@@ -61,16 +61,16 @@ describe('slot_start for a budget_exempt_issues issue', () => {
   it('also starts at no_new_slots', async () => {
     const w = await ladderWorld()
     await listed(w)
-    await w.afk.ok('status_tick', w.tick(13, { total_cap: 3 }))
+    await w.afk.ok('status_tick', w.tick(1.3, { total_cap: 3 }))
     expect((await w.afk.call('slot_start', { issue: LISTED, thread_id: 'w1' })).isError).toBeFalsy()
   })
 
   it('refuses an unlisted issue at gate_only and no_new_slots', async () => {
     const w = await ladderWorld()
     await listed(w)
-    await w.afk.ok('status_tick', w.tick(16, { total_cap: 3 }))
+    await w.afk.ok('status_tick', w.tick(1.6, { total_cap: 3 }))
     expect(text(await w.afk.call('slot_start', { issue: issue(1), thread_id: 'w1' }))).toMatch(/pressure is gate_only/)
-    await w.afk.ok('status_tick', w.tick(13, { total_cap: 3 }))
+    await w.afk.ok('status_tick', w.tick(1.3, { total_cap: 3 }))
     expect(text(await w.afk.call('slot_start', { issue: issue(1), thread_id: 'w1' }))).toMatch(/pressure is no_new_slots/)
     expect((await w.afk.ok('slot_list')).slots).toHaveLength(0)
   })
@@ -78,7 +78,7 @@ describe('slot_start for a budget_exempt_issues issue', () => {
   it('refuses a second listed issue while one runs, and allows it once the first closes', async () => {
     const w = await ladderWorld()
     await listed(w)
-    await w.afk.ok('status_tick', w.tick(16, { total_cap: 3 }))
+    await w.afk.ok('status_tick', w.tick(1.6, { total_cap: 3 }))
     await w.afk.ok('slot_start', { issue: LISTED, thread_id: 'w1' })
     const refused = await w.afk.call('slot_start', { issue: OTHER_LISTED, thread_id: 'w2' })
     expect(refused.isError).toBe(true)
@@ -99,10 +99,10 @@ describe('slot_start for a budget_exempt_issues issue', () => {
     expect(text(refused)).toMatch(/effective slot cap 1 is reached \(1 running\)/)
   })
 
-  it('is not held to the ladder\'s cut of the total cap to 1', async () => {
+  it('is not held to a full total cap of 1', async () => {
     const w = await ladderWorld()
     await listed(w)
-    await w.afk.ok('status_tick', w.tick(10.5, { total_cap: 1 }))
+    await w.afk.ok('status_tick', w.tick(1.15, { total_cap: 1 }))
     await w.afk.ok('slot_start', { issue: issue(1), thread_id: 'w1' })
     expect((await w.afk.call('slot_start', { issue: LISTED, thread_id: 'w2' })).isError).toBeFalsy()
   })
@@ -110,7 +110,7 @@ describe('slot_start for a budget_exempt_issues issue', () => {
   it('leaves the efficiency:orchestrator exempt slot its own one-at-a-time', async () => {
     const w = await ladderWorld()
     await listed(w)
-    await w.afk.ok('status_tick', w.tick(13, { total_cap: 3 }))
+    await w.afk.ok('status_tick', w.tick(1.3, { total_cap: 3 }))
     await w.afk.ok('slot_start', { issue: LISTED, thread_id: 'w1' })
     expect((await w.afk.call('slot_start', { issue: issue(2), thread_id: 'w2', budget_exempt: true })).isError).toBeFalsy()
   })
@@ -119,7 +119,7 @@ describe('slot_start for a budget_exempt_issues issue', () => {
     const w = await ladderWorld()
     const aquila = await listed(w)
     await setDirectives(aquila, { budget_exempt_issues: [] }, 1)
-    await w.afk.ok('status_tick', w.tick(16, { total_cap: 3 }))
+    await w.afk.ok('status_tick', w.tick(1.6, { total_cap: 3 }))
     expect(text(await w.afk.call('slot_start', { issue: LISTED, thread_id: 'w1' }))).toMatch(/pressure is gate_only/)
   })
 })

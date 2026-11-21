@@ -7,7 +7,7 @@ import { AFK_THREAD, MIGRATION_TEST_TIMEOUT_MS, MINUTE, TOKENS, tempDbPath, worl
 import { DAY, base, ladderWorld } from './ladder-world.js'
 
 /**
- * The weekly figures around the remaining-budget ladder (argus#871): how they combine with the
+ * The weekly figures around the budget ladder (argus#62, pace; before it argus#871): how they combine with the
  * window ladder, carry through the quiet-tick gate and the wake check, gate slot starts, and
  * validate. The ladder's own edges and hysteresis are in ladder.test.ts.
  */
@@ -16,17 +16,17 @@ const calm = { ...base, window_used_percent: 20 }
 describe('the budget ladder beside the window ladder', () => {
   it('takes the weekly level when the window is unknown, and stays unknown when the week is fine', async () => {
     const { afk, tick } = await ladderWorld()
-    const { window_used_percent: _window, ...weeklyOnly } = tick(10.5)
+    const { window_used_percent: _window, ...weeklyOnly } = tick(1.15)
     await afk.ok('status_tick', weeklyOnly)
     expect((await afk.ok('status_read')).pressure.level).toBe('no_opus')
-    const { window_used_percent: _calm, ...fine } = tick(5)
+    const { window_used_percent: _calm, ...fine } = tick(0.5)
     await afk.ok('status_tick', fine)
     expect((await afk.ok('status_read')).pressure.level).toBe('unknown')
   })
 
   it('a window pressure level given alone is the window side of the comparison', async () => {
     const { afk, tick } = await ladderWorld()
-    const { window_used_percent: _window, ...weeklyOnly } = tick(10.5)
+    const { window_used_percent: _window, ...weeklyOnly } = tick(1.15)
     await afk.ok('status_tick', { ...weeklyOnly, pressure: 'no_new_slots' })
     expect((await afk.ok('status_read')).pressure.level).toBe('no_new_slots')
   })
@@ -60,30 +60,31 @@ describe('the budget ladder beside the window ladder', () => {
 })
 
 describe('slot starts under the budget ladder', () => {
-  it('refuses a start past the effective cap, and allows one under it', async () => {
+  it('keeps the directives cap at no_opus: refuses a start past it, and allows one under it', async () => {
     const { afk, tick } = await ladderWorld()
-    await afk.ok('status_tick', tick(10.5, { slot_cap: 2 }))
+    await afk.ok('status_tick', tick(1.15, { slot_cap: 2 }))
     await afk.ok('slot_start', { issue: 'deanjstone/argus#1', thread_id: 'w1' })
-    const refused = await afk.call('slot_start', { issue: 'deanjstone/argus#2', thread_id: 'w2' })
+    await afk.ok('slot_start', { issue: 'deanjstone/argus#2', thread_id: 'w2' })
+    const refused = await afk.call('slot_start', { issue: 'deanjstone/argus#3', thread_id: 'w3' })
     expect(refused.isError).toBe(true)
-    expect(refused.content[0]?.text).toMatch(/effective slot cap 1/)
-    expect((await afk.ok('slot_list')).slots).toHaveLength(1)
+    expect(refused.content[0]?.text).toMatch(/effective slot cap 2/)
+    expect((await afk.ok('slot_list')).slots).toHaveLength(2)
   })
 
   it('allows the second slot once the week is back under budget', async () => {
     const { afk, tick } = await ladderWorld()
-    await afk.ok('status_tick', tick(5, { slot_cap: 2 }))
+    await afk.ok('status_tick', tick(0.5, { slot_cap: 2 }))
     await afk.ok('slot_start', { issue: 'deanjstone/argus#1', thread_id: 'w1' })
     expect((await afk.call('slot_start', { issue: 'deanjstone/argus#2', thread_id: 'w2' })).isError).toBeFalsy()
   })
 
   it.each([
-    ['budget no_new_slots', { burn: 12.5 }],
-    ['budget gate_only', { burn: 16 }],
-    ['window no_new_slots', { burn: 5, window: 86 }],
-  ])('refuses any start at %s, even with no slot running', async (_name, { burn, window }: { burn: number; window?: number }) => {
+    ['budget no_new_slots', { pace: 1.3 }],
+    ['budget gate_only', { pace: 1.6 }],
+    ['window no_new_slots', { pace: 0.5, window: 86 }],
+  ])('refuses any start at %s, even with no slot running', async (_name, { pace, window }: { pace: number; window?: number }) => {
     const { afk, tick } = await ladderWorld()
-    await afk.ok('status_tick', tick(burn, { slot_cap: 2, ...(window === undefined ? {} : { window_used_percent: window }) }))
+    await afk.ok('status_tick', tick(pace, { slot_cap: 2, ...(window === undefined ? {} : { window_used_percent: window }) }))
     const refused = await afk.call('slot_start', { issue: 'deanjstone/argus#1', thread_id: 'w1' })
     expect(refused.isError).toBe(true)
     expect(refused.content[0]?.text).toMatch(/no_new_slots|gate_only/)
@@ -99,34 +100,34 @@ describe('slot starts under the budget ladder', () => {
 describe('the budget ladder and the quiet-tick gate', () => {
   it('a change in the rung is a pressure change, and a move inside a band is not', async () => {
     const { afk, tick } = await ladderWorld()
-    await afk.ok('status_tick', tick(5))
-    expect(await afk.ok('tick_gate', tick(7))).toMatchObject({ changed: false, recorded: true })
-    expect(await afk.ok('tick_gate', tick(10.5))).toMatchObject({ changed: true, reasons: ['pressure'], recorded: false })
+    await afk.ok('status_tick', tick(0.5))
+    expect(await afk.ok('tick_gate', tick(0.7))).toMatchObject({ changed: false, recorded: true })
+    expect(await afk.ok('tick_gate', tick(1.15))).toMatchObject({ changed: true, reasons: ['pressure'], recorded: false })
   })
 
   it('a quiet tick that omits the weekly fields carries them forward and sees no change', async () => {
     const { afk, tick } = await ladderWorld()
-    await afk.ok('status_tick', tick(10.5, { slot_cap: 2 }))
+    await afk.ok('status_tick', tick(1.15, { slot_cap: 2 }))
     expect(await afk.ok('tick_gate', { ...base, window_used_percent: 41 })).toMatchObject({ changed: false, recorded: true })
     expect((await afk.ok('status_read')).pressure).toMatchObject({
       level: 'no_opus',
       window_used_percent: 41,
-      weekly_used_percent: 40.5,
-      effective_slot_cap: 1,
+      weekly_used_percent: 57.5,
+      effective_slot_cap: 2,
     })
   })
 
   it('a quiet tick with weekly fields but no window figure keeps the window side from the last tick', async () => {
     const { afk, tick } = await ladderWorld()
-    await afk.ok('status_tick', tick(5, { window_used_percent: 90 }))
-    const { window_used_percent: _window, ...weeklyOnly } = tick(5.5)
+    await afk.ok('status_tick', tick(0.5, { window_used_percent: 90 }))
+    const { window_used_percent: _window, ...weeklyOnly } = tick(0.55)
     expect(await afk.ok('tick_gate', weeklyOnly)).toMatchObject({ changed: false, recorded: true })
     expect((await afk.ok('status_read')).pressure).toMatchObject({ level: 'no_new_slots', window_used_percent: 90 })
   })
 
   it('a week that eases as time passes is seen by the next carry-forward, with no new weekly figure', async () => {
     const { afk, tick, clock } = await ladderWorld()
-    await afk.ok('status_tick', tick(10.5))
+    await afk.ok('status_tick', tick(1.15))
     expect((await afk.ok('status_read')).pressure.level).toBe('no_opus')
     clock.advance(DAY)
     expect(await afk.ok('tick_gate', { ...base })).toMatchObject({ changed: true, reasons: ['pressure'] })
@@ -182,7 +183,7 @@ describe('POST /wake/check with the weekly fields', () => {
     takeable: 3,
     ...extra,
   })
-  /** The weekly fields of a tick at `burn`, as the wake check takes them. */
+  /** The weekly fields of a tick at `pace`, as the wake check takes them. */
   const weeklyFields = (tick: Record<string, unknown>) => ({
     weekly_used_percent: tick.weekly_used_percent,
     weekly_resets_at: tick.weekly_resets_at,
@@ -191,16 +192,16 @@ describe('POST /wake/check with the weekly fields', () => {
 
   it('accepts weekly_used_percent, weekly_resets_at and reserve_percent', async () => {
     const { afk, tick, post } = await ladderWorld()
-    await afk.ok('status_tick', tick(5, { slot_cap: 2 }))
-    const result = await post('/wake/check', check(weeklyFields(tick(5))), TOKENS.afk)
+    await afk.ok('status_tick', tick(0.5, { slot_cap: 2 }))
+    const result = await post('/wake/check', check(weeklyFields(tick(0.5))), TOKENS.afk)
     expect(result.status).toBe(200)
     expect(result.body).toMatchObject({ wake: true, reason: 'free_slot' })
   })
 
   it('wakes on a rung change once it has held for the pressure dwell (argus#1167)', async () => {
     const { afk, tick, post, clock } = await ladderWorld()
-    await afk.ok('status_tick', tick(5, { slot_cap: 2 }))
-    const poll = () => post('/wake/check', check({ ...weeklyFields(tick(10.5)), takeable: 0 }), TOKENS.afk)
+    await afk.ok('status_tick', tick(0.5, { slot_cap: 2 }))
+    const poll = () => post('/wake/check', check({ ...weeklyFields(tick(1.15)), takeable: 0 }), TOKENS.afk)
     expect((await poll()).body).toMatchObject({ wake: false, reason: 'quiet' })
     clock.advance(20 * MINUTE)
     expect((await poll()).body).toMatchObject({ wake: true, reason: 'changed:pressure' })
@@ -208,23 +209,23 @@ describe('POST /wake/check with the weekly fields', () => {
 
   it('a rung change that opens a free slot wakes for the slot at once (argus#1167)', async () => {
     const { afk, tick, post } = await ladderWorld()
-    await afk.ok('status_tick', tick(5, { slot_cap: 2 }))
-    expect((await post('/wake/check', check(weeklyFields(tick(10.5))), TOKENS.afk)).body).toMatchObject({ wake: true, reason: 'free_slot' })
+    await afk.ok('status_tick', tick(0.5, { slot_cap: 2 }))
+    expect((await post('/wake/check', check(weeklyFields(tick(1.15))), TOKENS.afk)).body).toMatchObject({ wake: true, reason: 'free_slot' })
   })
 
   it('does not wake for a free slot at budget no_new_slots', async () => {
     const { afk, tick, post, clock } = await ladderWorld()
-    await afk.ok('status_tick', tick(12.5, { slot_cap: 2 }))
+    await afk.ok('status_tick', tick(1.3, { slot_cap: 2 }))
     clock.advance(MINUTE)
-    expect((await post('/wake/check', check(weeklyFields(tick(12.5))), TOKENS.afk)).body).toEqual({ wake: false, reason: 'quiet', recorded: true })
+    expect((await post('/wake/check', check(weeklyFields(tick(1.3))), TOKENS.afk)).body).toEqual({ wake: false, reason: 'quiet', recorded: true })
   })
 
-  it('does not wake for a second slot past the rung cap of 1', async () => {
+  it('does not wake for a second slot past the directives cap at no_opus', async () => {
     const { afk, tick, post, clock } = await ladderWorld()
     await afk.ok('slot_start', { issue: 'deanjstone/argus#1', thread_id: 'w1' })
-    await afk.ok('status_tick', tick(10.5, { slot_cap: 2 }))
+    await afk.ok('status_tick', tick(1.15, { slot_cap: 1 }))
     clock.advance(MINUTE)
-    expect((await post('/wake/check', check(weeklyFields(tick(10.5))), TOKENS.afk)).body).toEqual({ wake: false, reason: 'quiet', recorded: true })
+    expect((await post('/wake/check', check(weeklyFields(tick(1.15))), TOKENS.afk)).body).toEqual({ wake: false, reason: 'quiet', recorded: true })
   })
 
   it('refuses a half-given weekly pair with a 400', async () => {

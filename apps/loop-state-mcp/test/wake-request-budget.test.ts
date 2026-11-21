@@ -14,8 +14,8 @@ const request = (issue = ISSUE) => ({ issue })
 
 describe('POST /wake/request: the budget rung in the answer', () => {
   it('names normal and not held while the ladder is calm', async () => {
-    const { post, ratioTo } = await ladderWorld()
-    await ratioTo(5)
+    const { post, paceTo } = await ladderWorld()
+    await paceTo(0.5)
     expect(await post('/wake/request', request(), PROMOTION_TOKEN)).toEqual({
       status: 200,
       body: { recorded: true, budget_rung: 'normal', budget_rung_held: false },
@@ -23,25 +23,25 @@ describe('POST /wake/request: the budget rung in the answer', () => {
   })
 
   it.each([
-    ['no_opus', 10.5],
-    ['no_new_slots', 12.5],
-    ['gate_only', 15.5],
-  ])('names %s when the ratio gives it', async (rung, burn) => {
-    const { post, ratioTo } = await ladderWorld()
-    await ratioTo(burn)
+    ['no_opus', 1.15],
+    ['no_new_slots', 1.3],
+    ['gate_only', 1.6],
+  ])('names %s when the pace gives it', async (rung, pace) => {
+    const { post, paceTo } = await ladderWorld()
+    await paceTo(pace)
     expect((await post('/wake/request', request(), PROMOTION_TOKEN)).body).toEqual({ recorded: true, budget_rung: rung, budget_rung_held: false })
   })
 
-  it('says a rung is held when hysteresis keeps it above what the ratio alone gives', async () => {
-    const { post, ratioTo } = await ladderWorld()
-    await ratioTo(10.5)
-    await ratioTo(9.7)
+  it('says a rung is held when hysteresis keeps it above what the pace alone gives', async () => {
+    const { post, paceTo } = await ladderWorld()
+    await paceTo(1.15)
+    await paceTo(1.07)
     expect((await post('/wake/request', request(), PROMOTION_TOKEN)).body).toMatchObject({ budget_rung: 'no_opus', budget_rung_held: true })
   })
 
   it('carries the rung on a coalesced press, which is still a 200', async () => {
-    const { post, ratioTo } = await ladderWorld()
-    await ratioTo(12.5)
+    const { post, paceTo } = await ladderWorld()
+    await paceTo(1.3)
     await post('/wake/request', request(), PROMOTION_TOKEN)
     expect(await post('/wake/request', request(), PROMOTION_TOKEN)).toEqual({
       status: 200,
@@ -50,9 +50,9 @@ describe('POST /wake/request: the budget rung in the answer', () => {
   })
 
   it('carries the rung on the 429 body, beside the retry time', async () => {
-    const { post, ratioTo, as, clock } = await ladderWorld()
+    const { post, paceTo, as, clock } = await ladderWorld()
     const aquila = await as('direction')
-    await ratioTo(10.5)
+    await paceTo(1.15)
     await post('/wake/request', request(), PROMOTION_TOKEN)
     await aquila.ok('status_tick', { thread_id: AQUILA_THREAD, directives_version: 'v1', needs_owner: [], window_used_percent: 20 })
     clock.advance(MINUTE)
@@ -66,12 +66,12 @@ describe('POST /wake/request: the budget rung in the answer', () => {
     })
   })
 
-  it('reads the rung from the latest AFK tick, so a ratio that eases reads normal', async () => {
-    const { post, ratioTo, clock } = await ladderWorld()
-    await ratioTo(10.5)
+  it('reads the rung from the latest AFK tick, so a pace that eases reads normal', async () => {
+    const { post, paceTo, clock } = await ladderWorld()
+    await paceTo(1.15)
     expect((await post('/wake/request', request(), PROMOTION_TOKEN)).body.budget_rung).toBe('no_opus')
     clock.advance(WAKE_REQUEST_COOLDOWN_MS)
-    await ratioTo(5)
+    await paceTo(0.5)
     expect((await post('/wake/request', request('deanjstone/argus#48'), PROMOTION_TOKEN)).body).toMatchObject({
       budget_rung: 'normal',
       budget_rung_held: false,
@@ -87,15 +87,15 @@ describe('POST /wake/request: the budget rung in the answer', () => {
   })
 
   it('does not name the rung to a caller the route refuses', async () => {
-    const { post, ratioTo } = await ladderWorld()
-    await ratioTo(15.5)
+    const { post, paceTo } = await ladderWorld()
+    await paceTo(1.6)
     const refused = await post('/wake/request', request(), null)
     expect(refused).toEqual({ status: 401, body: { error: 'unauthorized' } })
   })
 
   it('writes no slot, lease or directive while reading the rung', async () => {
-    const { post, ratioTo, afk } = await ladderWorld()
-    await ratioTo(15.5)
+    const { post, paceTo, afk } = await ladderWorld()
+    await paceTo(1.6)
     const before = { slots: await afk.ok('slot_list', {}), leases: await afk.ok('lease_read', {}), status: await afk.ok('status_read', {}) }
     await post('/wake/request', request(), PROMOTION_TOKEN)
     expect(await afk.ok('slot_list', {})).toEqual(before.slots)

@@ -4,28 +4,42 @@ import { AFK_THREAD, MINUTE, TOKENS, world } from './helpers.js'
 import { DAY, HOUR, WEEK, base, ladderWorld } from './ladder-world.js'
 
 /**
- * The remaining-budget ladder (argus#871, map argus-config#870).
- * allowance = (100 - used - reserve) / days left; burn = the trailing 24h rise in weekly %
- * used; ratio = burn / allowance. Above 1.0 no_opus + cap 1, above 1.2 no_new_slots, above 1.5
- * (or the allowance spent: 100 - reserve used) gate_only. A rung releases only below its threshold - 0.05.
+ * The weekly budget ladder (argus#62, owner 22 Nov 2026; before it argus#871's burn ÷ allowance).
+ * pace = weekly % used ÷ % of the week elapsed. Above 1.1 no_opus (the cap stays), above 1.25
+ * no_new_slots, above 1.5 (or the allowance spent: 100 - reserve used) gate_only. A rung releases
+ * only below its threshold - 0.05. Pace drives no rung in the first day of the week.
+ * Burn, allowance and ratio are still reported, as information.
  */
-describe('ladder v2: rung edges', () => {
+describe('ladder: rung edges on pace', () => {
   it.each([
-    [0, 'normal', 0],
-    [8, 'normal', 0.8],
-    [10, 'normal', 1],
-    [10.5, 'no_opus', 1.05],
-    [12, 'no_opus', 1.2],
-    [12.5, 'no_new_slots', 1.25],
-    [15, 'no_new_slots', 1.5],
-    [15.5, 'gate_only', 1.55],
-  ])('a burn of %s a day against an allowance of 10 is %s (ratio %s)', async (burn, level, ratio) => {
-    const { ratioTo } = await ladderWorld()
-    const pressure = await ratioTo(burn)
+    [0, 'normal'],
+    [0.8, 'normal'],
+    [1.0, 'normal'],
+    [1.1, 'normal'],
+    [1.15, 'no_opus'],
+    [1.25, 'no_opus'],
+    [1.3, 'no_new_slots'],
+    [1.5, 'no_new_slots'],
+    [1.55, 'gate_only'],
+  ])('a weekly pace of %s is %s', async (pace, level) => {
+    const { paceTo } = await ladderWorld()
+    const pressure = await paceTo(pace)
     expect(pressure.level).toBe(level)
-    expect(pressure.budget_ratio).toBeCloseTo(ratio, 10)
-    expect(pressure.burn_per_day).toBeCloseTo(burn, 10)
-    expect(pressure.allowance_per_day).toBeCloseTo(10, 10)
+    expect(pressure.weekly_pace).toBeCloseTo(pace, 10)
+  })
+
+  it('reads pace, not the burn: a busy day under even pace stays normal (22 Nov 2026)', async () => {
+    // 45% used with 41.6% of the week gone: a 1.8 burn ratio gated everything; pace 1.08 is normal.
+    const w = world()
+    const afk = await w.as('afk')
+    const resets = new Date(w.clock.now() + DAY + 0.584 * WEEK).toISOString()
+    await afk.ok('status_tick', { ...base, weekly_used_percent: 23, weekly_resets_at: resets, reserve_percent: 5 })
+    w.clock.advance(DAY)
+    await afk.ok('status_tick', { ...base, weekly_used_percent: 45, weekly_resets_at: resets, reserve_percent: 5 })
+    const { pressure } = await afk.ok('status_read')
+    expect(pressure.budget_ratio).toBeGreaterThan(1.5)
+    expect(pressure.weekly_pace).toBeCloseTo(1.08, 2)
+    expect(pressure).toMatchObject({ level: 'normal', budget_rung: 'normal' })
   })
 
   it('gate_only starts at 100 - reserve used, not at a fixed 90% (argus#1080)', async () => {
@@ -66,37 +80,39 @@ describe('ladder v2: rung edges', () => {
   it('refuses a reserve outside 0 to 100', async () => {
     const { afk, tick } = await ladderWorld()
     for (const reserve of [-1, 100, 101]) {
-      const result = await afk.call('status_tick', tick(5, { reserve_percent: reserve }))
+      const result = await afk.call('status_tick', tick(0.5, { reserve_percent: reserve }))
       expect(result.isError).toBe(true)
       expect(result.content[0]?.text).toMatch(/reserve_percent/)
     }
   })
 })
 
-describe('ladder v2: the burn', () => {
+describe('ladder: the burn, reported beside the rung', () => {
   it('uses the rise over the trailing 24h, normalised by the span of the readings', async () => {
     const w = await ladderWorld()
     w.clock.advance(12 * HOUR)
-    const pressure = await w.ratioTo(15)
-    // The baseline is the last reading at least 24h old: 36h back, a 15 point rise over 1.5 days.
+    const pressure = await w.paceTo(0.9)
+    // 45% used. The baseline is the last reading at least 24h old: 36h back, a 15 point rise over 1.5 days.
     expect(pressure.burn_per_day).toBeCloseTo(10, 10)
   })
 
   it('takes the latest reading at least 24h old as the baseline, not the oldest', async () => {
     const w = await ladderWorld()
     // A reading 30h before the next tick, higher than the baseline: the rise is measured from it.
-    await w.afk.ok('status_tick', w.tick(4))
+    await w.afk.ok('status_tick', w.tick(0.68))
     w.clock.advance(DAY)
-    const pressure = await w.ratioTo(4 + 6)
+    // 34% then 40% used.
+    const pressure = await w.paceTo(0.8)
     expect(pressure.burn_per_day).toBeCloseTo(6, 10)
   })
 
   it('never reports a negative burn', async () => {
-    const { ratioTo } = await ladderWorld()
-    expect((await ratioTo(-5)).burn_per_day).toBe(0)
+    const { paceTo } = await ladderWorld()
+    // 25% used, under the 30% baseline.
+    expect((await paceTo(0.5)).burn_per_day).toBe(0)
   })
 
-  it('has no burn while under 24h of readings: the week-start extrapolation engages nothing', async () => {
+  it('has no burn while under 24h of readings', async () => {
     // Half the week elapsed, 35% used (10 a day since the week began), but the only readings are 6h old.
     const w = world()
     const afk = await w.as('afk')
@@ -124,18 +140,31 @@ describe('ladder v2: the burn', () => {
     }
   })
 
-  it('drives the ladder once a reading 24h old exists', async () => {
+  it('reports burn and ratio once a reading 24h old exists, without letting them set the rung', async () => {
     const w = world()
     const afk = await w.as('afk')
     const resets = new Date(w.clock.now() + 3.5 * DAY).toISOString()
     await afk.ok('status_tick', { ...base, weekly_used_percent: 30, weekly_resets_at: resets, reserve_percent: 35 })
     w.clock.advance(DAY)
     await afk.ok('status_tick', { ...base, weekly_used_percent: 41, weekly_resets_at: resets, reserve_percent: 34 })
-    // 11 points over exactly 1 day against (100 - 41 - 34) / 2.5 = 10 a day.
+    // 11 points over exactly 1 day against (100 - 41 - 34) / 2.5 = 10 a day; pace 41 / 64.3 = 0.64.
     const { pressure } = await afk.ok('status_read')
     expect(pressure.burn_per_day).toBeCloseTo(11, 10)
     expect(pressure.budget_ratio).toBeCloseTo(1.1, 10)
-    expect(pressure.level).toBe('no_opus')
+    expect(pressure.level).toBe('normal')
+  })
+
+  it('drives no rung from pace in the first day of the week: a few early points are not a trend', async () => {
+    const w = world()
+    const afk = await w.as('afk')
+    // 12h into the week, 10% used: pace 1.4, but the week is too young to read.
+    const resets = new Date(w.clock.now() + WEEK - 12 * HOUR).toISOString()
+    await afk.ok('status_tick', { ...base, weekly_used_percent: 10, weekly_resets_at: resets })
+    expect((await afk.ok('status_read')).pressure).toMatchObject({ level: 'normal', budget_rung: 'normal' })
+    // A day in, the same pace counts.
+    w.clock.advance(12 * HOUR)
+    await afk.ok('status_tick', { ...base, weekly_used_percent: 20, weekly_resets_at: resets })
+    expect((await afk.ok('status_read')).pressure.level).toBe('no_new_slots')
   })
 
   it('has no ratio in the first hour of the week, but a spent allowance still gates', async () => {
@@ -168,91 +197,101 @@ describe('ladder v2: the burn', () => {
   })
 })
 
-describe('ladder v2: hysteresis', () => {
-  it('engages a rung only above its threshold, so a ratio just under it from calm stays calm', async () => {
-    const { ratioTo } = await ladderWorld()
-    expect((await ratioTo(9.7)).level).toBe('normal')
-    expect((await ratioTo(10.2)).level).toBe('no_opus')
+describe('ladder: hysteresis', () => {
+  it('engages a rung only above its threshold, so a pace just under it from calm stays calm', async () => {
+    const { paceTo } = await ladderWorld()
+    expect((await paceTo(1.08)).level).toBe('normal')
+    expect((await paceTo(1.12)).level).toBe('no_opus')
+  })
+
+  it('does not flap on the 25 Oct sequence: 1.09 to 1.12 around the 1.1 edge holds no_opus', async () => {
+    const { paceTo } = await ladderWorld()
+    const levels = []
+    for (const pace of [1.09, 1.12, 1.09, 1.11, 1.09, 1.12]) levels.push((await paceTo(pace)).level)
+    expect(levels).toEqual(['normal', 'no_opus', 'no_opus', 'no_opus', 'no_opus', 'no_opus'])
   })
 
   it.each([
-    ['no_opus', 10.5, 9.7, 'no_opus', 9.4, 'normal'],
-    ['no_new_slots', 12.5, 11.7, 'no_new_slots', 11.4, 'no_opus'],
-    ['gate_only', 15.5, 14.7, 'gate_only', 14.4, 'no_new_slots'],
-  ])('%s holds until the ratio is below its threshold - 0.05', async (rung, engage, within, held, below, released) => {
-    const { ratioTo } = await ladderWorld()
-    expect((await ratioTo(engage)).level).toBe(rung)
-    const heldPressure = await ratioTo(within)
+    ['no_opus', 1.15, 1.07, 'no_opus', 1.04, 'normal'],
+    ['no_new_slots', 1.3, 1.22, 'no_new_slots', 1.19, 'no_opus'],
+    ['gate_only', 1.55, 1.47, 'gate_only', 1.44, 'no_new_slots'],
+  ])('%s holds until the pace is below its threshold - 0.05', async (rung, engage, within, held, below, released) => {
+    const { paceTo } = await ladderWorld()
+    expect((await paceTo(engage)).level).toBe(rung)
+    const heldPressure = await paceTo(within)
     expect(heldPressure.level).toBe(held)
     expect(heldPressure.budget_rung_held).toBe(true)
-    const releasedPressure = await ratioTo(below)
+    const releasedPressure = await paceTo(below)
     expect(releasedPressure.level).toBe(released)
   })
 
-  it('does not mark a rung held when the ratio alone gives it', async () => {
-    const { ratioTo } = await ladderWorld()
-    expect((await ratioTo(10.5)).budget_rung_held).toBe(false)
+  it('does not mark a rung held when the pace alone gives it', async () => {
+    const { paceTo } = await ladderWorld()
+    expect((await paceTo(1.15)).budget_rung_held).toBe(false)
   })
 
   it('a quiet tick_gate carries the rung forward without a flip', async () => {
-    const { afk, ratioTo, tick } = await ladderWorld()
-    await ratioTo(10.5)
-    // 9.7 is inside the band: tick_gate sees the held rung, so no pressure change.
-    expect(await afk.ok('tick_gate', tick(9.7))).toMatchObject({ changed: false, recorded: true })
+    const { afk, paceTo, tick } = await ladderWorld()
+    await paceTo(1.15)
+    // 1.07 is inside the band: tick_gate sees the held rung, so no pressure change.
+    expect(await afk.ok('tick_gate', tick(1.07))).toMatchObject({ changed: false, recorded: true })
     expect((await afk.ok('status_read')).pressure).toMatchObject({ level: 'no_opus', budget_rung_held: true })
   })
 
   it('a rung released between ticks does not hold into the next week', async () => {
     const w = await ladderWorld()
-    await w.ratioTo(10.5)
+    await w.paceTo(1.15)
     w.clock.advance(5 * DAY)
-    const fresh = new Date(w.clock.now() + WEEK - DAY).toISOString()
-    // Ratio 0.97 on the new week: inside the old rung's release band, but that rung belonged to the old week.
-    await w.afk.ok('status_tick', { ...base, weekly_used_percent: 12.5, weekly_resets_at: fresh })
+    const fresh = new Date(w.clock.now() + WEEK - 1.5 * DAY).toISOString()
+    // Pace 1.07 on the new week: inside the old rung's release band, but that rung belonged to the old week.
+    await w.afk.ok('status_tick', { ...base, weekly_used_percent: 22.93, weekly_resets_at: fresh })
     expect((await w.afk.ok('status_read')).pressure).toMatchObject({ level: 'normal', budget_rung_held: false })
   })
 })
 
-describe('ladder v2: the effective level and cap', () => {
+describe('ladder: the effective level and cap', () => {
   it('is the stricter of the budget rung and the window ladder', async () => {
     const { afk, tick } = await ladderWorld()
-    await afk.ok('status_tick', tick(10.5, { window_used_percent: 90 }))
+    await afk.ok('status_tick', tick(1.15, { window_used_percent: 90 }))
     expect((await afk.ok('status_read')).pressure.level).toBe('no_new_slots')
-    await afk.ok('status_tick', tick(15.5, { window_used_percent: 72 }))
+    await afk.ok('status_tick', tick(1.55, { window_used_percent: 72 }))
     expect((await afk.ok('status_read')).pressure.level).toBe('gate_only')
-    await afk.ok('status_tick', tick(5, { window_used_percent: 72 }))
+    await afk.ok('status_tick', tick(0.5, { window_used_percent: 72 }))
     expect((await afk.ok('status_read')).pressure.level).toBe('no_opus')
   })
 
   it.each([
-    [3, 8, 3],
-    [3, 10, 3],
-    [3, 10.5, 1],
-    [undefined, 10.5, 1],
-    [undefined, 5, null],
-    [0, 10.5, 0],
-  ])('a total cap of %s at burn %s is an effective cap of %s', async (cap, burn, expected) => {
+    [3, 0.8, 3],
+    [3, 1.0, 3],
+    [3, 1.15, 3],
+    [undefined, 1.15, null],
+    [undefined, 0.5, null],
+    [0, 1.15, 0],
+    [3, 1.3, 0],
+    [3, 1.55, 0],
+    [undefined, 1.3, 0],
+  ])('a total cap of %s at pace %s is an effective cap of %s', async (cap, pace, expected) => {
     const { afk, tick } = await ladderWorld()
-    await afk.ok('status_tick', tick(burn, cap === undefined ? {} : { total_cap: cap }))
+    await afk.ok('status_tick', tick(pace, cap === undefined ? {} : { total_cap: cap }))
     expect((await afk.ok('status_read')).pressure.effective_slot_cap).toBe(expected)
   })
 
   it('still reads the legacy weekly fields', async () => {
     const { afk, tick } = await ladderWorld()
-    await afk.ok('status_tick', tick(5))
+    await afk.ok('status_tick', tick(0.7))
     expect((await afk.ok('status_read')).pressure).toMatchObject({ weekly_used_percent: 35, weekly_pace: expect.any(Number) })
   })
 
   it('takes slot_cap as the total cap from a caller that has not moved to total_cap', async () => {
     const { afk, tick } = await ladderWorld()
-    await afk.ok('status_tick', tick(5, { slot_cap: 2 }))
+    await afk.ok('status_tick', tick(0.5, { slot_cap: 2 }))
     expect((await afk.ok('status_read')).slots.cap).toBe(2)
-    await afk.ok('status_tick', tick(5, { slot_cap: 2, total_cap: 3 }))
+    await afk.ok('status_tick', tick(0.5, { slot_cap: 2, total_cap: 3 }))
     expect((await afk.ok('status_read')).slots.cap).toBe(3)
   })
 })
 
-describe('ladder v2: slot starts', () => {
+describe('ladder: slot starts', () => {
   const issue = (n: number) => `deanjstone/argus#${n}`
   const caps = { host_caps: { homelab: 1, wsl2: 2 }, total_cap: 3 }
 
@@ -277,13 +316,21 @@ describe('ladder v2: slot starts', () => {
     expect(refused.content[0]?.text).toMatch(/slot cap/)
   })
 
-  it('applies the rung cap of 1 across the hosts', async () => {
+  it('keeps the directives cap at no_opus: the rung limits the model, not the slot count', async () => {
     const { afk, tick } = await ladderWorld()
-    await afk.ok('status_tick', tick(10.5, caps))
+    await afk.ok('status_tick', tick(1.15, caps))
     await afk.ok('slot_start', { issue: issue(1), thread_id: 'w1', host: 'wsl2' })
-    const refused = await afk.call('slot_start', { issue: issue(2), thread_id: 'w2', host: 'homelab' })
+    await afk.ok('slot_start', { issue: issue(2), thread_id: 'w2', host: 'homelab' })
+    await afk.ok('slot_start', { issue: issue(3), thread_id: 'w3', host: 'wsl2' })
+    expect((await afk.call('slot_start', { issue: issue(4), thread_id: 'w4', host: 'wsl2' })).isError).toBe(true)
+  })
+
+  it('refuses every start from no_new_slots up', async () => {
+    const { afk, tick } = await ladderWorld()
+    await afk.ok('status_tick', tick(1.3, caps))
+    const refused = await afk.call('slot_start', { issue: issue(1), thread_id: 'w1', host: 'wsl2' })
     expect(refused.isError).toBe(true)
-    expect(refused.content[0]?.text).toMatch(/effective slot cap 1/)
+    expect(refused.content[0]?.text).toMatch(/pressure is no_new_slots/)
   })
 
   it('a host with no cap is limited only by the total', async () => {
@@ -330,7 +377,7 @@ describe('ladder v2: slot starts', () => {
   })
 })
 
-describe('ladder v2: the quiet-tick gate and wake', () => {
+describe('ladder: the quiet-tick gate and wake', () => {
   const check = (extra: Record<string, unknown> = {}) => ({
     role: 'afk',
     host: 'wsl2',
@@ -372,8 +419,8 @@ describe('ladder v2: the quiet-tick gate and wake', () => {
 
   it('a rung held by hysteresis is not a pressure change', async () => {
     const { afk, tick } = await ladderWorld()
-    await afk.ok('status_tick', tick(10.5))
-    expect(await afk.ok('tick_gate', tick(9.7))).toMatchObject({ changed: false })
-    expect(await afk.ok('tick_gate', tick(9.4))).toMatchObject({ changed: true, reasons: ['pressure'] })
+    await afk.ok('status_tick', tick(1.15))
+    expect(await afk.ok('tick_gate', tick(1.07))).toMatchObject({ changed: false })
+    expect(await afk.ok('tick_gate', tick(1.04))).toMatchObject({ changed: true, reasons: ['pressure'] })
   })
 })
