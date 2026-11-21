@@ -1349,8 +1349,11 @@ export function openStore(options: StoreOptions) {
   const freeSlotHeld = new Map<string, string>()
 
   /**
-   * Whether the waking thread's host could take another non-exempt slot under the total cap and its own
-   * (argus-config#1366: a thread starts slots only on its own host, so room on the other host is no reason to wake it).
+   * Whether the waking thread could start another non-exempt slot somewhere: room under the total cap and under
+   * the `host_caps` entry of a host it may start on. argus-config#1366: a homelab thread starts slots only on its
+   * own host, so room on the other host is no reason to wake it. argus#58: the wsl2 `afk` holder also fills free
+   * homelab slots through the linked environment (charter, "Starting slots" under Cross-env control), so room on
+   * any host wakes it. Only the lease holder reaches here: a standby returns earlier, and is never woken for a slot.
    */
   function slotRoom(status: Row, weekly: Weekly | null, host: Host): boolean {
     const totalCap = status.slot_cap === null ? null : Number(status.slot_cap)
@@ -1361,7 +1364,8 @@ export function openStore(options: StoreOptions) {
     const running = perHost.wsl2 + perHost.homelab
     if (cap !== null && running >= cap) return false
     const hostCaps = hostCapsOf(status)
-    return hostCaps?.[host] === undefined || perHost[host] < (hostCaps[host] as number)
+    const startHosts: readonly Host[] = host === 'wsl2' ? ['wsl2', 'homelab'] : [host]
+    return startHosts.some((candidate) => hostCaps?.[candidate] === undefined || perHost[candidate] < (hostCaps[candidate] as number))
   }
 
   /**

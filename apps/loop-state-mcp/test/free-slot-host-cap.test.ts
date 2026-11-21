@@ -5,7 +5,8 @@ import { AFK_THREAD, AQUILA_THREAD, TOKENS, world } from './helpers.js'
 /**
  * argus-config#1366: a thread starts slots only on its own host. With the total cap not reached but
  * the waker's own host at its `host_caps` entry, the free slot belongs to the other host, so a
- * `free_slot` wake would run the whole checklist and start nothing.
+ * `free_slot` wake would run the whole checklist and start nothing. That holds for a homelab holder; the wsl2
+ * holder also fills homelab slots (argus#58, pinned in wake.test.ts).
  */
 const HOMELAB_AFK = 'thread-afk-homelab-primary'
 

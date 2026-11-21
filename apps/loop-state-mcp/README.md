@@ -410,7 +410,7 @@ never wakes either gate.
 | `wsl2` holder | the comparison changed in a reason that can be acted on (see *Wake only when it can act*) | true | `changed:<reasons>` |
 | `wsl2` holder (direction) | the AFK loop is stalled with no open outage, or recovered with one open | true | `outage_opened` / `outage_closed` |
 | `wsl2` holder (afk) | a running slot has `pending_approvals > 0`, at any pressure | true | `pending_approvals` |
-| `wsl2` holder (afk) | a free slot on the caller's host (total cap and that host's `host_caps` entry both have room), `takeable > 0`, pressure below `no_new_slots`, `host_gates_ok` not `false`, and not already answered with this same slot set and counts | true | `free_slot` |
+| `wsl2` holder (afk) | a free slot on any host it may start on (total cap has room, and the `host_caps` entry of `wsl2` or of `homelab` does: the holder also fills homelab slots through the linked environment, [#58](https://github.com/deanjstone/argus/issues/58)), `takeable > 0`, pressure below `no_new_slots`, `host_gates_ok` not `false`, and not already answered with this same slot set and counts | true | `free_slot` |
 | `wsl2` holder (afk) | pressure `no_new_slots`, `takeable_exempt > 0`, no budget-exempt slot running, `host_gates_ok` not `false` | true | `free_slot` |
 | `wsl2` holder | no tick recorded by the model for 4 h | true | `heartbeat` |
 | `wsl2` holder | an earlier wake is still unanswered | true | `unanswered` |
@@ -529,11 +529,15 @@ check only: `tick_gate` still reports everything it always did.
   next free slot wakes once. A wake the model has not answered still wakes again. The back-off is in
   memory: a restart of the service costs one more wake.
 
-- **`free_slot` needs room on the caller's own host** (argus-config#1366). A thread starts slots only on its
-  own host, so a slot counts as free for the wake only when the total cap and the `host_caps` entry for the
-  `host` the poll names both have room. Room on the other host (homelab 1/1, wsl2 0/2, total 1/2) wakes
-  neither the homelab holder nor anything else: the wsl2 side wakes when a wsl2 holder polls. A host with no
-  `host_caps` entry is bounded by the total cap alone.
+- **`free_slot` needs room on a host the caller may start on** (argus-config#1366, [#58](https://github.com/deanjstone/argus/issues/58)).
+  A `homelab` thread starts slots only on its own host, so for it a slot counts as free for the wake only when the total
+  cap and the `host_caps` entry for the `host` the poll names both have room: room on the other host (homelab 1/1,
+  wsl2 0/2, total 1/2) wakes neither the homelab holder nor anything else. The `wsl2` `afk` holder also fills free
+  homelab slots through the linked environment (charter, "Starting slots" under Cross-env control), so for it the
+  slot is free when the total cap has room and either host's entry does: with wsl2 2/2 and homelab 0/1 it wakes for
+  the homelab slot, counted against homelab's entry, not wsl2's. The homelab standby that does not hold `afk` is
+  never woken for `free_slot` while the primary is alive. A host with no `host_caps` entry is bounded by the total
+  cap alone.
 
 The 4 h heartbeat is unchanged and remains the backstop for all five.
 
