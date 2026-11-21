@@ -244,6 +244,17 @@ counts every running slot in `slots.used`. `status_read`
 `pressure.budget_exempt_repos` returns the list; `effective_slot_cap` is unchanged. Schema
 version 9 adds the `budget_exempt_repos` column to `loop_status`.
 
+**Budget-exempt issues** ([argus#60](https://github.com/deanjstone/argus/issues/60)). The directives'
+`budget_exempt_issues` is an optional list of `owner/repo#N`, each an issue the owner named.
+`slot_start` reads it from the current directives, so the caller passes no flag. A listed issue
+passes `no_new_slots` and `gate_only`, skips the budget ladder's cut and every cap, and while it
+runs it is not counted toward the total, effective or host caps. One listed issue runs at a
+time: a second listed start is refused until the first closes. It does not use the
+`efficiency:orchestrator` slot above, so each keeps its own one at a time. Nothing else is
+waived: the memory, load and disk gates are the tick's, not the server's, and still apply. An
+issue not listed is refused at those levels as ever, and a later directives version that drops
+it ends the exemption. `status_read` `pressure.budget_exempt_issues` returns the list.
+
 **Budget-exempt slots** (argus#1171). An issue labelled `efficiency:orchestrator` (it cuts the
 orchestrator's token or tick cost) starts with `slot_start` `budget_exempt: true`; the caller
 passes it, the server does not read labels. Such a start is allowed at `no_new_slots` and still
