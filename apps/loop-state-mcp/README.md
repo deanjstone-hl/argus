@@ -210,6 +210,15 @@ reserve forward when the caller leaves them out, recomputing the ladder against 
 whose week has reset since stops counting. `status_tick` records what it is given and nothing
 else.
 
+**Ignoring the weekly ladder** ([argus-config#1573](https://github.com/deanjstone/argus-config/issues/1573)).
+The directives' `overrides` accept `{key: ignore_weekly_budget, value: true, until, reason}`
+(`true` only; `until` is exclusive, as for the other overrides). While one is live the server
+skips the budget ladder whatever a tick sends: weekly figures are validated and the readings
+still kept, but no rung is resolved, the effective level is the window ladder alone, and the
+total cap is not cut. It also holds for a rung an earlier tick stored, so it takes effect at
+once, with no new tick, and when the entry expires or a later version drops it the next tick
+that sends the figures applies the ladder again. `budget_rung` reads null while it is live.
+
 **Slot caps.** A tick passes the directives' `total_cap` and `host_caps` (`{"wsl2": 2,
 "homelab": 1}`; a host left out has no cap of its own). `slot_cap` still works as the total cap
 for a caller that has not moved to `total_cap`; if both are given `total_cap` wins. A tick that
