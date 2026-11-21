@@ -26,7 +26,16 @@ const KNOWN_KEYS: readonly string[] = [...REQUIRED_KEYS, ...OPTIONAL_KEYS]
 const HOSTS = ['wsl2', 'homelab']
 const GATE_KEYS = ['max_load', 'max_io_pressure', 'max_memory_pressure', 'max_disk_percent']
 const ORDER_GROUPS = ['bug', 'homelab', 'map_child', 'rest']
-const OVERRIDE_KEYS = ['max_slots', 'host_caps', 'max_load', 'max_memory_pressure', 'max_io_pressure', 'max_disk_percent', 'repo_holds']
+const OVERRIDE_KEYS = [
+  'max_slots',
+  'host_caps',
+  'max_load',
+  'max_memory_pressure',
+  'max_io_pressure',
+  'max_disk_percent',
+  'repo_holds',
+  'ignore_weekly_budget',
+]
 const OVERRIDE_FIELDS = ['key', 'value', 'until', 'reason']
 
 const REPO_NAME = /^[\w.-]+\/[\w.-]+$/
@@ -70,9 +79,28 @@ function valueProblem(key: string, value: unknown, maxSlots: unknown): string | 
       return Array.isArray(value) && value.length > 0 && value.every((repo) => typeof repo === 'string' && REPO_NAME.test(repo))
         ? null
         : 'repo_holds must be a non-empty list of owner/repo'
+    case 'ignore_weekly_budget':
+      return value === true ? null : 'ignore_weekly_budget must be true'
     default:
       return 'unknown key'
   }
+}
+
+/**
+ * argus-config#1573: whether a live `ignore_weekly_budget` override is in `record` at `atMs`. An entry applies
+ * only while now < until; an expired or malformed entry is ignored, as hooks/directives_effective.py does.
+ * The server reads this so the weekly ladder is skipped whatever figures a tick sends.
+ */
+export function ignoreWeeklyBudgetLive(record: unknown, atMs: number): boolean {
+  if (!isMapping(record) || !Array.isArray(record['overrides'])) return false
+  return record['overrides'].some(
+    (entry) =>
+      isMapping(entry) &&
+      entry['key'] === 'ignore_weekly_budget' &&
+      entry['value'] === true &&
+      isAwareDateTime(entry['until']) &&
+      atMs < Date.parse(String(entry['until']).trim().replace(' ', 'T')),
+  )
 }
 
 function overrideEntryProblems(entry: unknown, maxSlots: unknown): string[] {

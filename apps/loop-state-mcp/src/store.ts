@@ -1,6 +1,6 @@
 import { DatabaseSync, type SQLInputValue } from 'node:sqlite'
 
-import { directivesProblems } from './directives.js'
+import { directivesProblems, ignoreWeeklyBudgetLive } from './directives.js'
 import { planRebuild, type RebuildPlan, type World } from './rebuild.js'
 import type { Role } from './roles.js'
 
@@ -908,8 +908,18 @@ export function openStore(options: StoreOptions) {
     ...budgetOf(weekly.used, weekly.resetsAt, now(), reservePercent, prior),
   })
 
+  /**
+   * argus#60 (argus-config#1573): the owner's time-boxed `ignore_weekly_budget` override. While it is live the
+   * weekly ladder adds nothing, whatever a tick sends or an earlier tick stored, so every reader of a row's weekly
+   * figures (`weeklyOf`, `pressureOf`) sees none. Read from the current directives record, as `awaitingCiCap` is.
+   */
+  function weeklyBudgetIgnored(): boolean {
+    const row = selectCurrentDirectives.get() as Row | undefined
+    return row !== undefined && ignoreWeeklyBudgetLive(JSON.parse(String(row.record)), now())
+  }
+
   const weeklyOf = (row: Row): Weekly | null =>
-    row.weekly_used_percent === null || row.weekly_used_percent === undefined
+    row.weekly_used_percent === null || row.weekly_used_percent === undefined || weeklyBudgetIgnored()
       ? null
       : {
           used: Number(row.weekly_used_percent),
@@ -937,7 +947,8 @@ export function openStore(options: StoreOptions) {
 
   /** What a tick last recorded, read back from its loop_status row. */
   const pressureOf = (row: Row): Pressure => ({
-    level: row.pressure as PressureLevel,
+    // The stored level is the stricter of the window and weekly sides: while the weekly side is ignored, only the window's counts.
+    level: (weeklyBudgetIgnored() ? (row.window_level ?? row.pressure) : row.pressure) as PressureLevel,
     windowLevel: (row.window_level ?? row.pressure) as PressureLevel,
     percent: row.window_used_percent === null ? null : Number(row.window_used_percent),
     weekly: weeklyOf(row),
@@ -964,7 +975,9 @@ export function openStore(options: StoreOptions) {
       window = { level: input.pressure, percent: null }
     }
 
-    const given = parseWeekly(input)
+    // Still validated, so a malformed figure is refused as ever; while the override is live it is then dropped.
+    const sent = parseWeekly(input)
+    const given = weeklyBudgetIgnored() ? null : sent
     const reserve = requireReserve(input.reserve_percent)
     const carried = previous ? weeklyOf(previous) : null
     const carriedLive = carried !== null && carried.resetsAt > now() ? carried : null
@@ -2198,7 +2211,7 @@ export function openStore(options: StoreOptions) {
         needs_owner: JSON.parse(String(row.needs_owner)) as string[],
         errors: JSON.parse(String(row.errors)) as string[],
         pressure: {
-          level: row.pressure as PressureLevel,
+          level: pressureOf(row).level,
           window_used_percent: row.window_used_percent === null ? null : Number(row.window_used_percent),
           weekly_used_percent: weekly?.used ?? null,
           weekly_resets_at: weekly ? iso(weekly.resetsAt) : null,
