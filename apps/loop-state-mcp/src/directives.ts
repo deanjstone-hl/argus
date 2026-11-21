@@ -17,6 +17,7 @@ const OPTIONAL_KEYS = [
   'host_gates',
   'trunk_repos',
   'budget_exempt_repos',
+  'budget_exempt_issues',
   'order_groups',
   'map_order',
   'overrides',
@@ -103,6 +104,16 @@ export function ignoreWeeklyBudgetLive(record: unknown, atMs: number): boolean {
   )
 }
 
+/**
+ * argus#60: the owner-named issues in a record's `budget_exempt_issues`, sorted, without repeats. An entry that
+ * is not an `owner/repo#N` string is skipped (the validator refuses it at write), so a reader never throws.
+ */
+export function budgetExemptIssues(record: unknown): string[] {
+  const listed = isMapping(record) ? record['budget_exempt_issues'] : undefined
+  if (!Array.isArray(listed)) return []
+  return [...new Set(listed.filter((entry): entry is string => typeof entry === 'string' && ISSUE_REF.test(entry)))].sort()
+}
+
 function overrideEntryProblems(entry: unknown, maxSlots: unknown): string[] {
   if (!isMapping(entry)) return ['must be a mapping of key, value, until and reason']
   const found: string[] = []
@@ -174,6 +185,7 @@ export function directivesProblems(record: unknown): string[] {
 
   found.push(...listOfStrings(record, 'trunk_repos', REPO_NAME, 'owner/repo'))
   found.push(...listOfStrings(record, 'budget_exempt_repos', REPO_NAME, 'owner/repo'))
+  found.push(...listOfStrings(record, 'budget_exempt_issues', ISSUE_REF, 'owner/repo#N'))
 
   if ('order_groups' in record) {
     const groups = record['order_groups']

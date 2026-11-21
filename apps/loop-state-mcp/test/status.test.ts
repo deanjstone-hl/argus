@@ -14,6 +14,7 @@ const noWeekly = {
   budget_rung_held: false,
   reserve_percent: null,
   budget_exempt_repos: [],
+  budget_exempt_issues: [],
 }
 
 const base = { thread_id: AFK_THREAD, directives_version: 'a1b2c3', needs_owner: [] as string[] }

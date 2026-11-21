@@ -1,6 +1,6 @@
 import { DatabaseSync, type SQLInputValue } from 'node:sqlite'
 
-import { directivesProblems, ignoreWeeklyBudgetLive } from './directives.js'
+import { budgetExemptIssues, directivesProblems, ignoreWeeklyBudgetLive } from './directives.js'
 import { planRebuild, type RebuildPlan, type World } from './rebuild.js'
 import type { Role } from './roles.js'
 
@@ -918,6 +918,18 @@ export function openStore(options: StoreOptions) {
     return row !== undefined && ignoreWeeklyBudgetLive(JSON.parse(String(row.record)), now())
   }
 
+  /**
+   * argus#60: the directives' `budget_exempt_issues` as written. Read from the current record, as
+   * `awaitingCiCap` is, so a start needs no client flag.
+   */
+  function exemptIssuesOfDirectives(): string[] {
+    const row = selectCurrentDirectives.get() as Row | undefined
+    return row === undefined ? [] : budgetExemptIssues(JSON.parse(String(row.record)))
+  }
+
+  /** The same, lower-cased for comparing: GitHub names are case-insensitive. */
+  const listedExemptIssues = () => exemptIssuesOfDirectives().map((issue) => issue.toLowerCase())
+
   const weeklyOf = (row: Row): Weekly | null =>
     row.weekly_used_percent === null || row.weekly_used_percent === undefined || weeklyBudgetIgnored()
       ? null
@@ -1338,13 +1350,18 @@ export function openStore(options: StoreOptions) {
    */
   function runningByHost(exemptRepos: readonly string[], countExempt = false): Record<Host, number> {
     const counts: Record<Host, number> = { wsl2: 0, homelab: 0 }
+    const exemptIssues = listedExemptIssues()
     for (const row of selectRunning.all() as Row[]) {
-      if (!countExempt && (Number(row.budget_exempt) === 1 || exemptRepos.includes(repoOf(String(row.issue))))) continue
+      const exempt =
+        Number(row.budget_exempt) === 1 || exemptRepos.includes(repoOf(String(row.issue))) || exemptIssues.includes(String(row.issue).toLowerCase())
+      if (!countExempt && exempt) continue
       const host = String(row.host)
       if (host in counts) counts[host as Host] += 1
     }
     return counts
   }
+
+  const isListedExemptIssue = (issue: string) => listedExemptIssues().includes(issue.toLowerCase())
 
   const hasRunningExemptSlot = () => (selectRunning.all() as Row[]).some((row) => Number(row.budget_exempt) === 1)
 
@@ -1393,13 +1410,17 @@ export function openStore(options: StoreOptions) {
    * argus#1171: a `budgetExempt` start (an efficiency:orchestrator issue) is the same outside the
    * caps and the ladder's cut, but keeps one running exempt slot in all, passes no_new_slots and
    * still stops at gate_only.
+   *
+   * argus#60: an issue in the directives' `budget_exempt_issues` passes no_new_slots and gate_only, sits outside
+   * the caps and keeps one running such issue; the pressure ladders are the only gate the server holds for it.
    */
   function requireRoomForSlot(host: Host, issue: string, budgetExempt: boolean) {
     const status = selectStatus.get('afk') as Row | undefined
     if (!status) return
     const pressure = pressureOf(status)
-    // argus#1171: an efficiency:orchestrator start goes through no_new_slots, never gate_only.
-    if (pressure.level === 'gate_only' || (pressure.level === 'no_new_slots' && !budgetExempt)) {
+    const listed = isListedExemptIssue(issue)
+    // argus#1171: an efficiency:orchestrator start goes through no_new_slots, never gate_only. argus#60: a listed issue goes through both.
+    if ((pressure.level === 'gate_only' && !listed) || (pressure.level === 'no_new_slots' && !budgetExempt && !listed)) {
       throw new Refused(`pressure is ${pressure.level}: no new slot starts until it eases`)
     }
     const refusal = capRefusal(status, pressure, host, issue, budgetExempt)
@@ -1412,6 +1433,10 @@ export function openStore(options: StoreOptions) {
    * work, so pressure does not stop it, only the caps do.
    */
   function capRefusal(status: Row, pressure: Pressure, host: Host, issue: string, budgetExempt: boolean): string | null {
+    if (isListedExemptIssue(issue)) {
+      const running = (selectRunning.all() as Row[]).find((row) => row.issue !== issue && isListedExemptIssue(String(row.issue)))
+      return running === undefined ? null : `${String(running.issue)} already runs a budget-exempt issue: only one runs at a time`
+    }
     if (budgetExempt) {
       const running = (selectRunning.all() as Row[]).find((row) => Number(row.budget_exempt) === 1)
       return running === undefined ? null : `${String(running.issue)} already runs a budget-exempt slot: only one runs at a time`
@@ -2224,6 +2249,7 @@ export function openStore(options: StoreOptions) {
           reserve_percent: weekly?.reservePercent ?? null,
           effective_slot_cap: effectiveSlotCap(cap, weekly),
           budget_exempt_repos: exemptReposOf(row),
+          budget_exempt_issues: exemptIssuesOfDirectives(),
         },
         slots,
         liveness: { state, missed_ticks: missed, cadence_minutes, next_due_at: iso(lastSeen + cadenceMs) },
