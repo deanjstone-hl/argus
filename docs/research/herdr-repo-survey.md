@@ -44,7 +44,7 @@ integration — connect server to Claude Code ACP socket," "brrr.now integration
 *"PWA manifest,"* *"Tailscale cert,"* *"systemd service"* (`docs/TODO.md:9-16`). What
 exists today (`apps/server/src/routes/sessions.ts`, `engine.ts`, `projects.ts`) is a
 thin Fastify proxy: `/sessions/launch` forwards to an env-configured
-`LGN5_LISTENER_URL` (a listener on the Windows box, `LGN5`) to launch a session, and
+`LAPTOP_LISTENER_URL` (a listener on the Windows box, `LGN5`) to launch a session, and
 `/run` + `/search` proxy straight through to agent-engine's `/chat` and
 `/vector/search` endpoints (`apps/server/src/routes/engine.ts:23-53`). The PWA
 (`apps/web/src/App.tsx`) is a 3-tab shell — Launch / Run / Search — with no
