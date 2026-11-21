@@ -318,6 +318,57 @@ describe('POST /wake/check: the drain counts only running homelab slots', () => 
   })
 })
 
+/**
+ * argus#58: the afk lease holder, WSL2 while it is alive, also fills free homelab slots through the linked
+ * environment (charter, "Starting slots" under Cross-env control), so room on any host wakes it. The homelab
+ * standby that does not hold the lease is never woken for `free_slot`.
+ */
+describe('POST /wake/check: free_slot counts room on every host the holder may start on', () => {
+  const HOST_CAPS = { wsl2: 2, homelab: 1 }
+
+  /** Total cap 3, host caps wsl2 2 / homelab 1, two wsl2 slots running: wsl2 2/2, homelab 0/1. */
+  async function wsl2FullHomelabFree() {
+    const w = await ticked()
+    const tick = () => modelTick(AFK_THREAD, { slot_cap: 3, host_caps: HOST_CAPS, window_used_percent: 20 })
+    await w.afk.ok('status_tick', tick())
+    await w.afk.ok('slot_start', { issue: 'deanjstone/argus#5', thread_id: 'worker-5', host: 'wsl2' })
+    await w.afk.ok('slot_start', { issue: 'deanjstone/argus#6', thread_id: 'worker-6', host: 'wsl2' })
+    await w.afk.ok('status_tick', tick())
+    return { ...w, tick }
+  }
+
+  it('the wsl2 holder at wsl2 2/2 is woken for the free homelab slot (homelab 0/1)', async () => {
+    const { wake } = await wsl2FullHomelabFree()
+    expect((await wake(check('afk', AFK_THREAD, { takeable: 3 }))).body).toEqual({ wake: true, reason: 'free_slot', recorded: false })
+  })
+
+  it('the homelab standby that does not hold afk is not woken for it while the primary is alive', async () => {
+    const { wake } = await wsl2FullHomelabFree()
+    expect((await wake(check('afk', AFK_STANDBY, { host: 'homelab', takeable: 3 }))).body).toEqual({ wake: false, reason: 'primary_alive', recorded: false })
+  })
+
+  it('the homelab entry bounds the homelab room: homelab 1/1 and wsl2 2/2 under a total of 4 wakes nobody', async () => {
+    const { wake, afk } = await wsl2FullHomelabFree()
+    await afk.ok('status_tick', modelTick(AFK_THREAD, { slot_cap: 4, host_caps: HOST_CAPS, window_used_percent: 20 }))
+    await afk.ok('slot_start', { issue: 'deanjstone/homelab#400', thread_id: 'worker-400', host: 'homelab' })
+    await afk.ok('status_tick', modelTick(AFK_THREAD, { slot_cap: 4, host_caps: HOST_CAPS, window_used_percent: 20 }))
+    expect((await wake(check('afk', AFK_THREAD, { takeable: 3 }))).body).toMatchObject({ wake: false })
+  })
+
+  it('the total cap still bounds it: wsl2 2/2, homelab 1/1 and a total of 3 wakes nobody', async () => {
+    const { wake, afk, tick } = await wsl2FullHomelabFree()
+    await afk.ok('slot_start', { issue: 'deanjstone/homelab#400', thread_id: 'worker-400', host: 'homelab' })
+    await afk.ok('status_tick', tick())
+    expect((await wake(check('afk', AFK_THREAD, { takeable: 3 }))).body).toMatchObject({ wake: false })
+  })
+
+  it('the wsl2 holder at wsl2 2/2 with the homelab entry at 0 is not woken: homelab has no room either', async () => {
+    const { wake, afk } = await wsl2FullHomelabFree()
+    await afk.ok('status_tick', modelTick(AFK_THREAD, { slot_cap: 3, host_caps: { wsl2: 2, homelab: 0 }, window_used_percent: 20 }))
+    expect((await wake(check('afk', AFK_THREAD, { takeable: 3 }))).body).toMatchObject({ wake: false })
+  })
+})
+
 describe('POST /wake/check: taking a lease answers a wake', () => {
   it('a standby woken to drain, then failing over, is not stalled by that older wake', async () => {
     const { wake, afk, aquila, clock } = await ticked()
