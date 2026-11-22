@@ -26,6 +26,9 @@ const KNOWN_KEYS: readonly string[] = [...REQUIRED_KEYS, ...OPTIONAL_KEYS]
 
 const HOSTS = ['wsl2', 'homelab']
 const GATE_KEYS = ['max_load', 'max_io_pressure', 'max_memory_pressure', 'max_disk_percent']
+// argus#69 (argus-config#1427): quiet_window is a host_gates key only, not a numeric gate: it has no top-level
+// value and is never an override key.
+const HOST_GATE_KEYS = [...GATE_KEYS, 'quiet_window']
 const ORDER_GROUPS = ['bug', 'homelab', 'map_child', 'rest']
 const OVERRIDE_KEYS = [
   'max_slots',
@@ -38,6 +41,9 @@ const OVERRIDE_KEYS = [
   'ignore_weekly_budget',
 ]
 const OVERRIDE_FIELDS = ['key', 'value', 'until', 'reason']
+
+// HH:MM-HH:MM, 24-hour, as argus-config's hooks/directives_effective.py QUIET_WINDOW.
+const QUIET_WINDOW = /^([01]\d|2[0-3]):([0-5]\d)-([01]\d|2[0-3]):([0-5]\d)$/
 
 const REPO_NAME = /^[\w.-]+\/[\w.-]+$/
 const ISSUE_REF = /^[\w.-]+\/[\w.-]+#[1-9]\d*$/
@@ -55,9 +61,19 @@ const isText = (value: unknown): value is string => typeof value === 'string' &&
 const isAwareDateTime = (value: unknown): boolean =>
   typeof value === 'string' && AWARE_DATE_TIME.test(value.trim()) && Number.isFinite(Date.parse(value.trim().replace(' ', 'T')))
 
+/** A valid `HH:MM-HH:MM` quiet window: start and end differ, start after end spans midnight. */
+function isQuietWindow(value: unknown): boolean {
+  if (typeof value !== 'string') return false
+  const match = QUIET_WINDOW.exec(value)
+  if (!match) return false
+  return Number(match[1]) * 60 + Number(match[2]) !== Number(match[3]) * 60 + Number(match[4])
+}
+
 /** Why `value` is not valid for an override or gate `key`, or null. */
 function valueProblem(key: string, value: unknown, maxSlots: unknown): string | null {
   switch (key) {
+    case 'quiet_window':
+      return isQuietWindow(value) ? null : 'quiet_window must be HH:MM-HH:MM (Sydney time, start and end differ), e.g. 04:00-05:00'
     case 'max_slots':
       return isPositiveInteger(value) ? null : 'max_slots must be a positive integer'
     case 'max_load':
@@ -228,8 +244,8 @@ export function directivesProblems(record: unknown): string[] {
       found.push('host_gates must be a mapping of wsl2 and/or homelab')
     } else {
       for (const [host, entry] of Object.entries(gates)) {
-        if (!isMapping(entry) || Object.keys(entry).length === 0 || !Object.keys(entry).every((key) => GATE_KEYS.includes(key))) {
-          found.push(`host_gates.${host} must be a mapping of ${GATE_KEYS.join(', ')}`)
+        if (!isMapping(entry) || Object.keys(entry).length === 0 || !Object.keys(entry).every((key) => HOST_GATE_KEYS.includes(key))) {
+          found.push(`host_gates.${host} must be a mapping of ${HOST_GATE_KEYS.join(', ')}`)
           continue
         }
         for (const [key, value] of Object.entries(entry)) {

@@ -266,6 +266,66 @@ describe('directives_set: the record is validated as the directives file is', ()
     expect((await set(aquila, { record })).isError).toBeFalsy()
   })
 
+  // argus#69 (argus-config#1427): host_gates.<host>.quiet_window, `HH:MM-HH:MM` Sydney time, the same
+  // rule as argus-config's hooks/directives_effective.py parse_quiet_window.
+  it.each(['04:00-05:00', '00:30-05:00', '22:00-02:00', '23:59-00:00', '00:00-23:59'])('accepts host_gates quiet_window %s', async (window) => {
+    const aquila = await ownerPresent(world())
+    const record = { ...MINIMAL, host_gates: { wsl2: { quiet_window: window } } }
+    expect((await set(aquila, { record })).isError).toBeFalsy()
+  })
+
+  it('accepts a quiet_window beside the numeric gates, and on both hosts', async () => {
+    const aquila = await ownerPresent(world())
+    const record = {
+      ...MINIMAL,
+      host_gates: { wsl2: { max_disk_percent: 95, quiet_window: '04:00-05:00' }, homelab: { quiet_window: '00:30-05:00' } },
+    }
+    expect((await set(aquila, { record })).isError).toBeFalsy()
+  })
+
+  it('stores the quiet_window it accepts', async () => {
+    const aquila = await ownerPresent(world())
+    const record = { ...MINIMAL, host_gates: { wsl2: { max_disk_percent: 95, quiet_window: '04:00-05:00' } } }
+    await set(aquila, { record })
+    const read = (await aquila.ok('directives_read')) as { directives: { record: { host_gates: unknown } } }
+    expect(read.directives.record.host_gates).toEqual(record.host_gates)
+  })
+
+  it('accepts a record with no quiet_window', async () => {
+    const aquila = await ownerPresent(world())
+    const record = { ...MINIMAL, host_gates: { wsl2: { max_disk_percent: 95 } } }
+    expect((await set(aquila, { record })).isError).toBeFalsy()
+  })
+
+  it.each([
+    ['too short', '4:00-05:00'],
+    ['no separator', '04:00 05:00'],
+    ['seconds', '04:00:00-05:00:00'],
+    ['hour 24', '24:00-05:00'],
+    ['hour 25', '04:00-25:00'],
+    ['minute 60', '04:60-05:00'],
+    ['start equals end', '04:00-04:00'],
+    ['a trailing space', '04:00-05:00 '],
+    ['empty', ''],
+  ])('refuses a malformed host_gates quiet_window: %s', (_label, window) =>
+    refused({ ...MINIMAL, host_gates: { wsl2: { quiet_window: window } } }, /host_gates\.wsl2\.quiet_window must be HH:MM-HH:MM/))
+
+  it.each([
+    ['a number', 400],
+    ['null', null],
+    ['a list', ['04:00-05:00']],
+    ['a mapping', { start: '04:00', end: '05:00' }],
+  ])('refuses a quiet_window that is %s', (_label, window) =>
+    refused({ ...MINIMAL, host_gates: { wsl2: { quiet_window: window } } }, /host_gates\.wsl2\.quiet_window must be HH:MM-HH:MM/))
+
+  it('names quiet_window among the keys a host_gates entry may carry', () =>
+    refused({ ...MINIMAL, host_gates: { wsl2: { bogus: 1 } } }, /host_gates\.wsl2 must be a mapping of max_load, max_io_pressure, max_memory_pressure, max_disk_percent, quiet_window/))
+
+  it('refuses quiet_window at the top level', () => refused({ ...MINIMAL, quiet_window: '04:00-05:00' }, /unknown key: quiet_window/))
+
+  it('refuses quiet_window as an override key', () =>
+    refused({ ...MINIMAL, overrides: [{ key: 'quiet_window', value: '04:00-05:00', until: '2026-11-06T00:00:00+11:00', reason: 'x' }] }, /overrides\[0\]: key must be one of/))
+
   it('accepts an override of max_disk_percent', async () => {
     const aquila = await ownerPresent(world())
     const record = { ...MINIMAL, overrides: [{ key: 'max_disk_percent', value: 95, until: '2026-11-06T00:00:00+11:00', reason: 'disk' }] }
