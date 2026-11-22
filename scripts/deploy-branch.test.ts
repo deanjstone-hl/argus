@@ -556,31 +556,31 @@ describe("the wiring", () => {
       expect(yaml).toContain("if: github.ref == 'refs/heads/deploy'");
     });
 
-    // Three jobs (argus#1168, rule argus-config#1167): `gate` asks whether anything would ship
-    // and whether main's CI already proved the SHA, `test` is the fallback full gate, `release`
-    // needs both. A promotion of only chore/docs/ci commits runs no test and cuts no version.
+    // Two jobs (argus#65, argus-config#1595, rule #1167): `gate` asks whether anything would ship and
+    // then whether main's CI on the SHA and the daily full run are green; `release` needs it. No
+    // suite runs on the deploy push. A promotion of only chore/docs/ci commits runs no gate and cuts
+    // no version.
     const job = (name: string): string => {
-      const order = ["gate", "test", "release"];
+      const order = ["gate", "release"];
       const from = yaml.indexOf(`\n  ${name}:`);
       const next = order.slice(order.indexOf(name) + 1).map(other => yaml.indexOf(`\n  ${other}:`)).find(at => at > from);
       return yaml.slice(from, next ?? yaml.length);
     };
     const folded = (text: string): string => text.replace(/\s+/g, " ");
 
-    it("has gate, test and release jobs in that order", () => {
+    it("has gate and release jobs, and no job that runs a suite", () => {
       const jobs = [...yaml.slice(yaml.indexOf("\njobs:")).matchAll(/^ {2}([\w-]+):$/gm)].map(match => match[1]);
-      expect(jobs).toEqual(["gate", "test", "release"]);
+      expect(jobs).toEqual(["gate", "release"]);
+      expect(yaml).not.toMatch(/run: scripts\/ci\.sh/);
+      expect(yaml).not.toContain("release-proof");
     });
 
-    it("tests first in jobs named for what they prove, and releases only if they pass", () => {
+    it("tests first in a job named for what it proves, and releases only if it passes", () => {
       const gate = job("gate");
-      const test = job("test");
       const releaseJob = job("release");
-      expect(gate).toContain("name: Test before release (main CI on this SHA)");
+      expect(gate).toContain("name: Test before release (main CI plus the daily full run)");
       expect(gate).toContain("if: github.ref == 'refs/heads/deploy'");
-      expect(test).toContain("name: Test before release (the full gate)");
-      expect(test).toMatch(/\n {4}needs: gate\n/);
-      expect(releaseJob).toMatch(/\n {4}needs: \[gate, test\]\n/);
+      expect(releaseJob).toMatch(/\n {4}needs: gate\n/);
       expect(releaseJob).toContain("name: Release\n");
       expect(releaseJob).toContain("github.ref == 'refs/heads/deploy'");
     });
@@ -590,93 +590,44 @@ describe("the wiring", () => {
       const gate = job("gate");
       expect(gate).toMatch(/uses: actions\/checkout@v4\n {8}with:\n {10}fetch-depth: 0\n/);
       expect(gate).toMatch(/id: anything\n {8}run: bash scripts\/ci\/release-needed\.sh\n/);
-      expect(gate.indexOf("release-needed.sh")).toBeLessThan(gate.indexOf("release-proof.sh"));
+      expect(gate.indexOf("release-needed.sh")).toBeLessThan(gate.indexOf("release-gate.sh"));
       expect(gate).toContain("release: ${{ steps.anything.outputs.release }}");
     });
 
-    it("skips the proof, the full gate and the release when nothing is releasable", () => {
-      expect(folded(job("gate"))).toContain("if: steps.anything.outputs.release == 'true' run: | if ! grep -q");
-      expect(folded(job("test"))).toContain(
-        "if: >- github.ref == 'refs/heads/deploy' && needs.gate.outputs.release == 'true' && needs.gate.outputs.reuse != 'true'",
-      );
+    it("skips the gate and the release when nothing is releasable", () => {
+      expect(folded(job("gate"))).toContain("if: steps.anything.outputs.release == 'true' run: bash scripts/ci/release-gate.sh");
       expect(folded(job("release"))).toContain("needs.gate.outputs.release == 'true'");
     });
 
-    // argus#1120: the promoted SHA is already on main, so the deploy push reuses main's
-    // green run of the whole gate and runs scripts/ci.sh itself only when none exists.
-    it("asks scripts/ci/release-proof.sh whether main's CI already proved the SHA", () => {
+    // argus#65: main's CI on the exact promoted SHA (a scoped run counts) plus a daily full run
+    // under 24 hours old. The vendored script hard-codes nothing, so the workflow names what is
+    // this repo's: the CI workflow, the daily workflow file and the job that reports the verdict.
+    it("runs scripts/ci/release-gate.sh with this repo's workflow names", () => {
       const gate = job("gate");
-      expect(gate).toMatch(/- name: [^\n]*\n {8}id: proof\n {8}if: [^\n]*\n {8}run: \|\n(?: {10}[^\n]*\n)+? {10}bash scripts\/ci\/release-proof\.sh\n {8}env:\n {10}GH_TOKEN: \$\{\{ github\.token \}\}/);
+      const step = gate.slice(gate.indexOf("bash scripts/ci/release-gate.sh"));
+      expect(step).toMatch(/env:\n {10}GH_TOKEN: \$\{\{ github\.token \}\}\n/);
+      expect(step).toMatch(/RELEASE_GATE_CI_WORKFLOW: CI\n/);
+      expect(step).toMatch(/RELEASE_GATE_DAILY_WORKFLOW: daily-full\.yml\n/);
+      expect(step).toMatch(/RELEASE_GATE_DAILY_JOBS: Daily full suite passed\n/);
       expect(gate).toMatch(/permissions:\n {6}contents: read\n {6}actions: read\n/);
-      expect(gate).toContain("reuse: ${{ steps.proof.outputs.reuse }}");
-    });
-
-    // argus#1190: release-proof.sh is vendored from argus-config and hard-codes nothing, so the
-    // workflow passes this repo's differences as env. Unset, it reuses nothing.
-    it("sets the proof env the vendored script no longer hard-codes", () => {
-      const proof = job("gate").slice(job("gate").indexOf("id: proof"));
-      expect(proof).toMatch(/env:[\s\S]*?RELEASE_PROOF_WORKFLOW: CI\n/);
-      expect(proof).toMatch(/env:[\s\S]*?RELEASE_PROOF_EVENTS: push\n/);
-    });
-
-    it("requires Build plus one Build (<package>) per nested package, read from scripts/ci.sh", () => {
-      const proof = job("gate").slice(job("gate").indexOf("id: proof"));
-      const block = proof.match(/run: \|\n((?: {10}[^\n]*\n)+)/)?.[1] ?? "";
-      const dir = mkdtempSync(join(work, "proof-env-"));
-      mkdirSync(join(dir, "scripts", "ci"), { recursive: true });
-      writeFileSync(join(dir, "scripts", "ci.sh"), "readonly nested_packages=(email other)\n");
-      writeFileSync(join(dir, "scripts", "ci", "release-proof.sh"), 'printf "[%s]" "$RELEASE_PROOF_JOBS"\n');
-      const ran = spawnSync("bash", ["-e", "-c", block.replace(/^ {10}/gm, "")], {
-        cwd: dir,
-        encoding: "utf8",
-        env: { ...process.env, GITHUB_OUTPUT: join(dir, "out") },
-      });
-      expect(ran.stdout).toBe("[Build\nBuild (email)\nBuild (other)]");
-
-      // No nested package at all still asks for the Build job and reuses main's run.
-      writeFileSync(join(dir, "scripts", "ci.sh"), "readonly nested_packages=()\n");
-      const none = spawnSync("bash", ["-e", "-c", block.replace(/^ {10}/gm, "")], {
-        cwd: dir,
-        encoding: "utf8",
-        env: { ...process.env, GITHUB_OUTPUT: join(dir, "out") },
-      });
-      expect(none.stdout).toBe("[Build]");
-
-      writeFileSync(join(dir, "scripts", "ci.sh"), "# no list here\n");
-      const unreadable = spawnSync("bash", ["-e", "-c", block.replace(/^ {10}/gm, "")], {
-        cwd: dir,
-        encoding: "utf8",
-        env: { ...process.env, GITHUB_OUTPUT: join(dir, "out") },
-      });
-      expect(unreadable.status).toBe(0);
-      expect(unreadable.stdout).toContain("reuse=false");
-      expect(readFileSync(join(dir, "out"), "utf8")).toContain("reuse=false");
     });
 
     it("vendors the release scripts: a lock beside them names the argus-config source", () => {
       const lock = read("scripts/ci/release-scripts.lock");
       expect(lock).toMatch(/^source deanjstone\/argus-config [0-9a-f]{40}$/m);
-      for (const name of ["release-proof.sh", "release-scripts-check.sh", "release-with-retry.sh"]) {
+      for (const name of ["release-gate.sh", "release-proof.sh", "release-scripts-check.sh", "release-with-retry.sh"]) {
         expect(lock).toMatch(new RegExp(`^[0-9a-f]{64}  ${name}$`, "m"));
       }
     });
 
-    it("runs the full gate only when no green full run exists, never a scoped one", () => {
-      const test = job("test");
-      expect(test).toContain("run: scripts/ci.sh\n");
-      expect(test).not.toContain("--changed");
-      expect(test).not.toContain("release-proof");
-    });
-
-    it("releases only after a passing test: main's green run (test skipped) or the full gate", () => {
+    it("releases only after the gate passed", () => {
       const releaseJob = folded(job("release"));
-      expect(releaseJob).toContain("!cancelled()");
-      expect(releaseJob).toContain("needs.gate.result == 'success'");
-      expect(releaseJob).toContain("needs.test.result == 'success'");
-      expect(releaseJob).toContain("needs.test.result == 'skipped' && needs.gate.outputs.reuse == 'true'");
+      expect(releaseJob).toContain("needs: gate");
+      expect(releaseJob).toContain("needs.gate.outputs.release == 'true'");
+      expect(releaseJob).not.toContain("needs.test");
     });
 
-    it("releases only the SHA the test job vouched for", () => {
+    it("releases only the SHA the gate vouched for", () => {
       expect(yaml).toContain('"$(git rev-parse HEAD)" == "${GITHUB_SHA}"');
       expect(yaml).toContain("steps.tested.outputs.current == 'true'");
     });

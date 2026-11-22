@@ -4,16 +4,18 @@ name: Release
 # push to `deploy`, never by a merge to `main`. A promotion made only of chore/docs/ci
 # commits releases nothing: semantic-release finds no releasable commit and exits 0.
 #
-# Three jobs, one workflow (argus#1168, rule argus-config#1167). `gate` asks first whether
-# the promotion carries anything semantic-release would publish (scripts/ci/release-needed.sh:
-# a feat, fix, perf, revert or breaking change since the last root tag). When nothing is
-# releasable, no test runs and no version is cut. Otherwise it reuses main's green run of the
-# whole gate on that SHA (scripts/ci/release-proof.sh) and fails on a red main run. `test`
-# runs the full gate itself (scripts/ci.sh: typecheck, lint, build and unit tests for the
-# root workspace and every nested package) only when main has no full run of the SHA
-# (argus#1120). `release` needs both, so a red test means no version. There is no
-# workflow_run trigger: on workflow_run GITHUB_REF is the default branch, so semantic-release
-# would see `main` and silently dry-run (design-system#190).
+# Two jobs, one workflow (argus#1168, argus#65, rule argus-config#1167, #1595). No test suite
+# runs on the deploy push. `gate` asks first whether the promotion carries anything
+# semantic-release would publish (scripts/ci/release-needed.sh: a feat, fix, perf, revert or
+# breaking change since the last root tag); when nothing is releasable, no gate runs and no
+# version is cut. Otherwise it runs scripts/ci/release-gate.sh, which passes only when main's
+# CI is green on this exact SHA (a scoped run counts: it ran the tests its push touched) and
+# the latest daily full run (daily-full.yml) is green and under 24 hours old. A red SHA, or a
+# red or stale daily run, blocks the release and the log names the failing half. To clear a
+# daily run, fix the cause, rerun or dispatch Daily full, then run Release again. `release`
+# needs `gate`, so a failed gate means no version. There is no workflow_run trigger: on
+# workflow_run GITHUB_REF is the default branch, so semantic-release would see `main` and
+# silently dry-run (design-system#190).
 #
 # No job reads github.event.commits to decide whether to run. A push event lists 20
 # commits at most and a promotion can ship more, so a filter could skip a promotion that
@@ -49,8 +51,8 @@ permissions:
 
 jobs:
   gate:
-    name: Test before release (main CI on this SHA)
-    # A manual dispatch from main (or any other ref) would test and tag unpromoted code.
+    name: Test before release (main CI plus the daily full run)
+    # A manual dispatch from main (or any other ref) would tag unpromoted code.
     if: github.ref == 'refs/heads/deploy'
     runs-on: ubuntu-latest
     permissions:
@@ -58,89 +60,41 @@ jobs:
       actions: read
     outputs:
       release: ${{ steps.anything.outputs.release }}
-      reuse: ${{ steps.proof.outputs.reuse }}
     steps:
-      # The promoted SHA (github.sha), which is what the proof vouches for. Full history:
+      # The promoted SHA (github.sha), which is what the gate vouches for. Full history:
       # the next step reads every commit since the last root tag.
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
           persist-credentials: false
 
-      # argus#1168: nothing releasable means no test and no version. Reads git, never the
+      # argus#1168: nothing releasable means no gate and no version. Reads git, never the
       # push event, which lists 20 commits at most.
       - name: Anything to release?
         id: anything
         run: bash scripts/ci/release-needed.sh
 
-      # argus#1120: the promoted SHA is already on main. Reuse main's result when a push run
-      # of CI on it ran the whole gate and passed and no main run on it is red; a red main
-      # run fails this step, so a red SHA never releases. A pull_request run, a scoped run
-      # and a Guard-skipped run prove nothing. With no full run on main, the `test` job runs
-      # the full gate here, as before. scripts/ci/release-proof.sh is vendored from
-      # argus-config (argus#1190) and synced, never edited: this step passes what differs
-      # here as RELEASE_PROOF_* env (the workflow, its events, and the jobs that only a
-      # whole run executes: Build plus one Build (<package>) per nested package in
-      # scripts/ci.sh, read here because the script no longer reads it).
-      - name: Did main's CI already test this SHA in full?
-        id: proof
+      # scripts/ci/release-gate.sh is vendored from argus-config (argus#1190) and synced, never
+      # edited: this step passes what differs here as RELEASE_GATE_* env. CI is this repo's
+      # main CI; daily-full.yml's last job reports the whole suite's verdict. The script never
+      # starts a run, so a missing or stale daily run blocks instead of testing here.
+      - name: Main CI is green on this SHA and the daily full run is green and fresh
         if: steps.anything.outputs.release == 'true'
-        run: |
-          if ! grep -q '^readonly nested_packages=(.*)$' scripts/ci.sh; then
-            echo "reuse=false" >> "$GITHUB_OUTPUT"
-            echo "release-proof: reuse=false (could not read nested_packages from scripts/ci.sh)"
-            exit 0
-          fi
-          nested=$(sed -n 's/^readonly nested_packages=(\(.*\))$/\1/p' scripts/ci.sh)
-          jobs="Build"
-          for package in $nested; do
-            jobs+=$'\n'"Build (${package})"
-          done
-          export RELEASE_PROOF_JOBS="$jobs"
-          bash scripts/ci/release-proof.sh
+        run: bash scripts/ci/release-gate.sh
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_PROOF_WORKFLOW: CI
-          RELEASE_PROOF_EVENTS: push
-
-  # The fallback: main has no full green run of the promoted SHA.
-  test:
-    name: Test before release (the full gate)
-    needs: gate
-    if: >-
-      github.ref == 'refs/heads/deploy'
-      && needs.gate.outputs.release == 'true'
-      && needs.gate.outputs.reuse != 'true'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: pnpm/action-setup@v4
-
-      # No `cache: pnpm` — see the note in ci.yml.
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
-      # The same definition of CI that runs on a PR and on main, over the whole repo.
-      - name: Full test gate
-        run: scripts/ci.sh
+          RELEASE_GATE_CI_WORKFLOW: CI
+          RELEASE_GATE_DAILY_WORKFLOW: daily-full.yml
+          RELEASE_GATE_DAILY_JOBS: Daily full suite passed
 
   release:
     name: Release
-    needs: [gate, test]
-    # Runs only after a passing test: main's green full run of this SHA (reuse, `test`
-    # skipped) or the full gate in `test`. `!cancelled()` lets it run when `test` was
-    # skipped. A promotion with nothing releasable skips it (argus#1168).
+    needs: gate
+    # Runs only after the gate passed: main's green CI on this SHA and a green, fresh daily
+    # full run. A promotion with nothing releasable skips it (argus#1168).
     if: >-
-      !cancelled()
-      && github.ref == 'refs/heads/deploy'
-      && needs.gate.result == 'success'
+      github.ref == 'refs/heads/deploy'
       && needs.gate.outputs.release == 'true'
-      && (needs.test.result == 'success'
-          || (needs.test.result == 'skipped' && needs.gate.outputs.reuse == 'true'))
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -153,7 +107,7 @@ jobs:
           ref: deploy
           fetch-depth: 0
 
-      # Release only what `test` vouched for. If another promotion moved deploy past this
+      # Release only what `gate` vouched for. If another promotion moved deploy past this
       # run's SHA, the run for that push tests and releases the newer tip.
       - name: Check deploy is still the tested SHA
         id: tested
