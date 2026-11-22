@@ -143,6 +143,15 @@ kept; nothing edits or deletes one.
 
   A write is a `directives_set` loop event, so the AFK gate sees a change.
 
+  `host_gates.<host>` (`wsl2` or `homelab`) takes `max_load`, `max_io_pressure`,
+  `max_memory_pressure`, `max_disk_percent` and `quiet_window` (argus#69, argus-config#1427).
+  `quiet_window` is a string `HH:MM-HH:MM` in Sydney time: both times are valid 24-hour times,
+  start and end differ, and a start after the end spans midnight (`22:00-02:00`). It is a
+  `host_gates` key only: never a top-level key and never an `overrides` key. The server only
+  stores it; `hooks/loop-wake.sh` and the tick read it, and `slot_start` ignores it, so the
+  server gates slot starts exactly as before. A malformed window is refused, as
+  `tests/check_directives.py` refuses it.
+
 The owner-only guard is the direction token, the lease and owner presence. Presence is a
 30-minute window, not a per-write approval: Aquila decides what the owner asked for inside it,
 as it does for every other write it makes.
