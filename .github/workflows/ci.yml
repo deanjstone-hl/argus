@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+  # The daily full run (daily-full.yml) calls this file. Its event is the caller's (schedule or
+  # workflow_dispatch), neither a push nor a pull request, so every job below runs whole.
+  workflow_call:
 
 permissions:
   contents: read
@@ -69,8 +72,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       # A PR run checks only what the PR touches (`scripts/ci.sh --changed`), which
-      # needs the history to find the merge base with main. A run on main stays
-      # shallow and checks everything. The 0 sits last because it is falsy in an
+      # needs the history to find the merge base with main. A push to main is scoped too
+      # (argus#65, argus-config#1586), against the push's own `before` SHA, so it stays shallow:
+      # ci.sh fetches that one commit (CI_BASE_REF below). A schedule or dispatch run is the
+      # daily full run and checks everything. The 0 sits last because it is falsy in an
       # expression, so putting it in the middle always yields 1 (the first attempt, argus#1043).
       - uses: actions/checkout@v4
         with:
@@ -82,6 +87,18 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+
+      # The pnpm store, cached on the lockfile (argus#65). actions/cache only warns when the
+      # path was never made, which is why it replaces `cache: pnpm` above.
+      - name: Find the pnpm store
+        id: pnpm-store
+        run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: pnpm-store-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-store-${{ runner.os }}-
 
       # The scrub scan in scripts/public-safe.test.ts needs gitleaks (argus#1207). A pinned
       # release, checked against its published sha256, never a moving download.
@@ -99,12 +116,18 @@ jobs:
 
       # Every check lives in scripts/ci.sh, shared with the .githooks/pre-push
       # gate so local and GitHub CI cannot drift. Why the tests run serialized
-      # is recorded there. On a PR it narrows to the packages the change touches
-      # and their dependants; a change to the root config files (or to ci.sh
-      # itself) still checks the whole root workspace. Before this, every PR ran
-      # all 15 root packages for 17-19 minutes (argus#1009).
+      # is recorded there. A pull request and a push to main narrow to the packages the
+      # change touches and their dependants (argus#1009, argus#65): a change to the root config
+      # files (or to ci.sh itself) still checks the whole root workspace, and a change
+      # confined to docs/ runs only the docs index and the scrub scan. The whole suite runs
+      # once a day instead (daily-full.yml), and the Release gate needs that run green and
+      # under 24 hours old, so a scoped push never skips a test for good.
       - name: CI (root workspace)
-        run: scripts/ci.sh ${{ github.event_name == 'pull_request' && '--changed' || '' }} root
+        run: scripts/ci.sh ${{ (github.event_name == 'pull_request' || github.event_name == 'push') && '--changed' || '' }} root
+        env:
+          # The push's `before`: origin/main already holds HEAD on a push to main, so the merge
+          # base would select nothing. Empty on a pull request (the merge base is right there).
+          CI_BASE_REF: ${{ github.event_name == 'push' && github.event.before || '' }}
 
   # The packages that carry their own nested pnpm workspace and are excluded
   # from the root one (see pnpm-workspace.yaml). Each installs and builds from

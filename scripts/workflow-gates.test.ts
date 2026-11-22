@@ -122,3 +122,66 @@ describe("vendored release scripts (argus#1190)", () => {
     expect(block).toContain("run: bash scripts/ci/release-scripts-check.sh");
   });
 });
+
+// argus#65 (argus-config#1586, map #1591): a push to main runs the tests its change touches, the
+// whole suite runs once a day, and the deploy push runs no suite at all.
+describe("CI cost: scoped pushes and one daily full run", () => {
+  // Comments explain the wiring and name the things it avoids; the checks read YAML only.
+  const uncommented = (text: string): string =>
+    text
+      .split("\n")
+      .filter((line) => !line.trim().startsWith("#"))
+      .join("\n");
+  const buildJob = ci.slice(ci.indexOf("\n  build:\n"), ci.indexOf("\n  nested:\n"));
+  const daily = uncommented(readFileSync(join(workflows, "daily-full.yml"), "utf8"));
+
+  it("scopes a push to main as well as a pull request, and keeps the whole run for schedule and dispatch", () => {
+    expect(buildJob).toContain(
+      "scripts/ci.sh ${{ (github.event_name == 'pull_request' || github.event_name == 'push') && '--changed' || '' }} root",
+    );
+  });
+
+  it("hands ci.sh the push's before SHA as the diff base, on a push only", () => {
+    expect(buildJob).toContain("CI_BASE_REF: ${{ github.event_name == 'push' && github.event.before || '' }}");
+  });
+
+  it("stays shallow on a push: ci.sh fetches the one commit it diffs against", () => {
+    expect(buildJob).toContain("fetch-depth: ${{ github.event_name != 'pull_request' && 1 || 0 }}");
+  });
+
+  it("caches the pnpm store, keyed on the lockfile, without setup-node's cache: pnpm", () => {
+    const yaml = uncommented(buildJob);
+    expect(yaml).toContain("actions/cache@v4");
+    expect(yaml).toContain("hashFiles('pnpm-lock.yaml')");
+    expect(yaml).not.toMatch(/cache: pnpm/);
+  });
+
+  it("can be called by the daily full run", () => {
+    const events = ci.slice(ci.indexOf("\non:"), ci.indexOf("\npermissions:"));
+    expect(events).toContain("workflow_call:");
+  });
+
+  it("runs the whole suite daily and on dispatch, by calling ci.yml with no --changed", () => {
+    const events = daily.slice(daily.indexOf("\non:"), daily.indexOf("\npermissions:"));
+    expect(events).toMatch(/schedule:\n {4}- cron: "[^"]+"/);
+    expect(events).toContain("workflow_dispatch:");
+    expect(events).not.toContain("push:");
+    expect(events).not.toContain("pull_request");
+    expect(daily).toContain("uses: ./.github/workflows/ci.yml");
+    expect(daily).toMatch(/\n {2}passed:\n {4}name: Daily full suite passed\n {4}needs: full\n {4}if: always\(\)\n/);
+  });
+
+  it("queues the daily run in its own group and never cancels one", () => {
+    expect(daily).toMatch(/concurrency:\n {2}group: daily-full\n {2}cancel-in-progress: false/);
+  });
+
+  it("keeps the superseded-run cancel to pull requests: every main commit needs its own CI", () => {
+    expect(ci).toContain("cancel-in-progress: ${{ github.event_name == 'pull_request' }}");
+  });
+
+  it("is public-safe: the daily run grants its caller nothing a fork could use", () => {
+    expect(daily).not.toMatch(/secrets\./);
+    expect(daily).not.toContain("self-hosted");
+    expect(daily).not.toContain("CI_RUNS_ON");
+  });
+});

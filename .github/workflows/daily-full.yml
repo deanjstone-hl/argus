@@ -1,0 +1,49 @@
+name: Daily full
+
+# The daily full run (argus#65, argus-config#1595, map #1591): the other half of the Release
+# gate. A push to main runs only the tests its change touches, and a push to `deploy` runs no
+# suite. scripts/ci/release-gate.sh passes a release when main's CI is green on the promoted
+# SHA (a scoped run counts) and the latest completed run of THIS file is green and under 24
+# hours old. A red or stale run blocks promotion until it is fixed: rerun it, or dispatch this
+# workflow, once the cause is fixed.
+#
+# It calls ci.yml with no `--changed`: ci.yml scopes only a pull request and a push, and this
+# run's event is `schedule` or `workflow_dispatch`, so every job runs whole. The job named
+# `Daily full suite passed` is what the gate checks, so keep its name.
+#
+# Public repo (argus#1207): hosted runners and no secret, as in ci.yml.
+on:
+  schedule:
+    - cron: "0 15 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One daily run at a time, never cancelled midway.
+concurrency:
+  group: daily-full
+  cancel-in-progress: false
+
+jobs:
+  full:
+    name: Full suite
+    # ci.yml's Changes job asks for these; a called workflow may not ask for more than its caller grants.
+    permissions:
+      contents: read
+      pull-requests: read
+    uses: ./.github/workflows/ci.yml
+
+  passed:
+    name: Daily full suite passed
+    needs: full
+    # `always()` so a red or cancelled full run still ends this job red, and the gate sees why.
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: The full suite must have succeeded
+        env:
+          FULL_RESULT: ${{ needs.full.result }}
+        run: |
+          echo "Full suite: $FULL_RESULT"
+          test "$FULL_RESULT" = success
