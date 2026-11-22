@@ -58,8 +58,15 @@ scripts/ci.sh                         # everything: root workspace, then any nes
 ```
 
 Run `pnpm check` before every push (a PR branch, or `main` once the repo is trunk) and quote its
-result in the PR's test plan or the ticket's Resolution. Every push to `main` runs CI in full: no
-commit subject or committer skips it.
+result in the PR's test plan or the ticket's Resolution. Every push to `main` runs CI: no commit
+subject or committer skips it. A push (and a pull request) runs only the tests its change touches:
+`ci.yml` hands `scripts/ci.sh --changed` the push's `before` SHA (`CI_BASE_REF`), so the packages
+it changed and their dependants run, a change confined to `docs/` runs only the docs index and the
+scrub scan, and a change to a file a scripts test reads (`scripts/`, workflows, `links.json`,
+deploy scripts, systemd units) runs the scripts suite. The whole suite runs once a day instead:
+`daily-full.yml` (schedule, 15:00 UTC, and a dispatch) calls `ci.yml` in full, and its last job,
+`Daily full suite passed`, is what the Release gate reads. The pnpm store is cached on
+`pnpm-lock.yaml`.
 
 ## Links come from the registry
 
@@ -99,15 +106,18 @@ bash scripts/bws-store-secret.sh --dry-run   # same variables; says create or re
 - Commits and PR titles are [Conventional Commits](CONTRIBUTING.md). Merging to `main` runs CI and
   deploys nothing and publishes no release. Versions are cut on promotion: the push to `deploy`
   runs `release.yml`, which first checks that the promotion carries a feat, fix, perf, revert
-  or breaking change (`scripts/ci/release-needed.sh`), then vouches for the promoted SHA (it
-  reuses `main`'s green full CI run of it, or runs the full gate when there is none) and then
-  runs semantic-release (one version track per package). A promotion of only chore/docs/ci
-  commits deploys, runs no test and cuts no version. The `ecosystem` release asset is
+  or breaking change (`scripts/ci/release-needed.sh`), then runs the gate
+  (`scripts/ci/release-gate.sh`: `main`'s CI is green on the exact promoted SHA, a scoped run
+  counts, and the latest `daily-full.yml` run is green and under 24 hours old) and then runs
+  semantic-release (one version track per package). No test suite runs on the `deploy` push. A
+  red or stale daily run blocks the release until it is fixed: rerun or dispatch `Daily full`,
+  then run `Release` again. A promotion of only chore/docs/ci commits deploys, runs no gate and
+  cuts no version. The `ecosystem` release asset is
   published on the `deploy` push too (`ecosystem-release.yml`).
-- The release scripts in `scripts/ci/` (`release-proof.sh`, plus `release-with-retry.sh`,
-  `release-scripts-check.sh` and `release-scripts.lock`) are vendored from argus-config
-  (`scripts/sync-release-scripts.sh`) and are synced, never edited here. `release.yml` passes
-  this repo's differences to `release-proof.sh` as `RELEASE_PROOF_*` env, and the `Release
+- The release scripts in `scripts/ci/` (`release-gate.sh`, plus `release-proof.sh`,
+  `release-with-retry.sh`, `release-scripts-check.sh` and `release-scripts.lock`) are vendored from
+  argus-config (`scripts/sync-release-scripts.sh`) and are synced, never edited here. `release.yml`
+  passes this repo's differences to `release-gate.sh` as `RELEASE_GATE_*` env, and the `Release
   scripts` CI job runs `release-scripts-check.sh` on every push and pull request, failing on a
   hand-edited copy. argus-config tests the script bodies.
 - The PR template asks for a README line. A change to setup, commands, config, env or deploy

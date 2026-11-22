@@ -18,9 +18,10 @@ argus-config#504 (map), #506, #507, #508, #509, #519, #548. Pilot: myargus
 
 | Event | Workflow | Result |
 |---|---|---|
-| push to `main` | `ci.yml` | build, test; no deploy |
+| push to `main` | `ci.yml` | build, test what the push changed (`scripts/ci.sh --changed` against the push's `before` SHA); no deploy |
+| schedule (15:00 UTC daily), or a dispatch | `daily-full.yml` | calls `ci.yml` in full; its job `Daily full suite passed` is the other half of the Release gate |
 | push to `main` touching `ecosystem/**`, weekly, or a dispatch | `ecosystem-skills.yml` | the ecosystem manifest's skill entries against the installed skills (needs `SKILLS_READ_TOKEN`, skips without it); never on a pull request |
-| push to `deploy`, or a dispatch on `deploy` | `release.yml` | job `Test before release (main CI on this SHA)` first checks that something is releasable (`scripts/ci/release-needed.sh`) and reuses `main`'s green full CI run of the promoted SHA; job `Test before release (the full gate)` runs `scripts/ci.sh` only when there is no such run; job `Release` (`needs:` both) then runs semantic-release for every track. A promotion with nothing releasable runs no test and cuts no version. See *Versions* |
+| push to `deploy`, or a dispatch on `deploy` | `release.yml` | job `Test before release (main CI plus the daily full run)` first checks that something is releasable (`scripts/ci/release-needed.sh`), then runs `scripts/ci/release-gate.sh`; job `Release` (`needs:` it) then runs semantic-release for every track. No suite runs on the push. A promotion with nothing releasable runs no gate and cuts no version. See *Versions* |
 | push to `deploy` touching `ecosystem/manifest.json`, or a dispatch on `deploy` | `ecosystem-release.yml` | validates the manifest and replaces the `ecosystem.json` asset of the `ecosystem` release, which the ops hub fetches hourly (`ecosystem/README.md`) |
 | push to `deploy` touching `apps/watchtower/**` or `packages/watchtower-contract/**` | `watchtower-deploy.yml` | Cloudflare Pages `watchtower` (the dashboard only) |
 | push to `deploy` touching `apps/watchtower/**`, `packages/watchtower-contract/**` or `packages/bearer-auth/**`, or a dispatch on `deploy` | `watchtower-deploy-worker.yml` | dry-run, D1 migrations, then the `argus-watchtower-api` Worker |
@@ -71,33 +72,33 @@ already matches `main`; run the workflow's last `main` run as the check.
 A version is cut when the owner promotes, never by a merge to `main` (argus#1066,
 argus-config#1048, #1167). `release.yml` runs on every push to `deploy` (and a dispatch,
 refused unless the ref is `deploy`; a dispatch is an owner step, as it cuts a real version)
-as three jobs:
+as two jobs:
 
-1. `Test before release (main CI on this SHA)` (job `gate`) first asks whether anything
-   would ship (argus#1168). `scripts/ci/release-needed.sh` reads git from the last root
+1. `Test before release (main CI plus the daily full run)` (job `gate`) first asks whether
+   anything would ship (argus#1168). `scripts/ci/release-needed.sh` reads git from the last root
    `v<X.Y.Z>` tag to the promoted SHA and says `release=true` for a `feat`, `fix`, `perf` or
    `revert` subject or a `BREAKING CHANGE`, the commits semantic-release publishes, and for a
    missing tag or any git error (a skipped release is the failure to avoid). With nothing
-   releasable the other two jobs skip: no test, no version. The root tag is the anchor because
-   the release step tags the root last and stops at the first failure, so a half-failed run
-   leaves it where it was and a retry sees the same range. Then it vouches for the promoted
-   SHA, which is already on `main` (argus#1120). `scripts/ci/release-proof.sh` (vendored from
-   argus-config and synced, never edited; `release.yml` sets `RELEASE_PROOF_WORKFLOW=CI`,
-   `RELEASE_PROOF_EVENTS=push` and the required jobs, and the `Release scripts` CI job fails a
-   hand-edited copy) reuses `main`'s
-   result when a push run of `CI` on that SHA ran the whole gate and passed: its `Build` job
-   and one `Build (<package>)` job for every nested package, all `success`. A `main` run on
-   the SHA that is red fails the job, so a red SHA never releases. A pull_request run, a
-   scoped run (Changes started only the touched packages), a run whose Build job skipped, a
-   running or a cancelled one prove nothing: with no full green run (or on any API error)
-   the next job runs the full gate. Most pushes to `main` are scoped, so the reuse applies
-   when the promoted SHA's own push ran in full (a change to `scripts/ci.sh`, `ci.yml` or
-   `.github/actions/`).
-2. `Test before release (the full gate)` (job `test`) runs only when the gate found
-   something releasable and no full green `main` run: `scripts/ci.sh` (root workspace, repo
-   scripts and every nested package).
-3. `Release` `needs:` both, so a red test means no version. It runs after a passing `test`, or
-   after the gate when `main`'s green run was reused. It checks out `deploy`, skips itself
+   releasable the `Release` job skips and the gate runs nothing: no test, no version. The root
+   tag is the anchor because the release step tags the root last and stops at the first
+   failure, so a half-failed run leaves it where it was and a retry sees the same range. Then
+   it runs `scripts/ci/release-gate.sh` (argus#65, argus-config#1595; vendored from
+   argus-config and synced, never edited; `release.yml` sets `RELEASE_GATE_CI_WORKFLOW=CI`,
+   `RELEASE_GATE_DAILY_WORKFLOW=daily-full.yml` and `RELEASE_GATE_DAILY_JOBS=Daily full suite
+   passed`, and the `Release scripts` CI job fails a hand-edited copy). It passes only when
+   both halves hold, and names a failing half in the log:
+   - **main CI half:** every `push` or `schedule` run on `main` for the promoted SHA is
+     green, at least one is a green `CI` run, and none is still running or cancelled. A scoped
+     run counts: it ran the tests its push touched. A red run fails the gate, so a red SHA never
+     releases.
+   - **daily full half:** the newest completed `daily-full.yml` run on `main` is green, its job
+     `Daily full suite passed` succeeded, and it finished under 24 hours ago. A red or stale run
+     blocks promotion until fixed: fix the cause, rerun it or dispatch `Daily full`, then run
+     `Release` again (owner step, as it cuts a version). `daily-full.yml` calls `ci.yml` with no
+     `--changed`, so it runs the whole root workspace and every nested package.
+   The script never starts a run, so a missing or stale daily run blocks the release; it never
+   falls back to a full suite on the `deploy` push.
+2. `Release` `needs:` the gate, so a failed gate means no version. It checks out `deploy`, skips itself
    if `deploy` has moved past the tested SHA (the run for the newer push releases it), then
    runs semantic-release once per track: each package under `apps/` and `packages/` with a
    `.releaserc.json` (tag `@argus/<name>-v<X.Y.Z>`, commits touching that package only), then
@@ -106,8 +107,8 @@ as three jobs:
 Rules:
 
 - **A promotion of only `chore`/`docs`/`ci`/`refactor`/`test` commits deploys and cuts no
-  version.** The gate finds nothing releasable and the test and release jobs skip, so no test
-  runs either. No job filters on the push's commit list: a push event lists 20 commits at most
+  version.** The gate finds nothing releasable and the release job skips, so no gate runs
+  either. No job filters on the push's commit list: a push event lists 20 commits at most
   and a promotion can ship more.
 - **Nothing is committed back.** `deploy` is fast-forwarded from `main`, so a commit made on it
   would fork the branches. Every `.releaserc.json` keeps only commit-analyzer,
@@ -115,7 +116,7 @@ Rules:
   Release notes are the changelog from here on. Each package's `CHANGELOG.md` and
   `package.json` `version` stay at their last released value and no longer track the tag.
 - **No `workflow_run`.** On `workflow_run` GitHub sets `GITHUB_REF` to the default branch, so
-  semantic-release would see `main` and silently dry-run (design-system#190). The test gate
+  semantic-release would see `main` and silently dry-run (design-system#190). The gate
   runs in the same workflow instead.
 - **One release at a time**, group `release`, never cancelled. A tag made with `GITHUB_TOKEN`
   starts no other workflow.

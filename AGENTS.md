@@ -134,7 +134,9 @@ that differ from `origin/main`, plus their dependents. Enable the gate once per 
 check: agents run it before every push, whether to a PR branch or straight to `main`, and
 quote its result in the PR's test plan or the ticket's Resolution. GitHub CI remains the
 enforcing check, and it runs on every push to `main`: nothing skips a push by its commit
-subject or committer (argus-config#1183). Its `Changes` job (`scripts/ci-changes.ts`) starts only the jobs a change touches: the
+subject or committer (argus-config#1183). A push runs only the tests it touches (`ci.sh --changed`
+against the push's `before` SHA); `daily-full.yml` runs the whole suite once a day, and the
+Release gate needs that run green and under 24 hours old (argus#65). Its `Changes` job (`scripts/ci-changes.ts`) starts only the jobs a change touches: the
 root workspace and each changed nested package. The ecosystem manifest's skills check
 (`scripts/ci.sh ecosystem-skills`, which needs the `SKILLS_READ_TOKEN` secret and skips without
 it; see `ecosystem/README.md`) is its own workflow, `ecosystem-skills.yml`, which no pull request starts. A change to `scripts/ci.sh`, `ci.yml` or
