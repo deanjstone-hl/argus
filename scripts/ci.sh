@@ -11,7 +11,15 @@
 #                                   those installed skills (argus#928); the workflow
 #                                   checks out the two private repos that hold them
 #   scripts/ci.sh --changed [...]   only what differs from origin/main — the
-#                                   pre-push mode, since the full suite is slow
+#                                   pre-push mode, since the full suite is slow. On a
+#                                   push to main CI sets CI_BASE_REF to the push's
+#                                   `before` SHA and the diff is against that instead,
+#                                   because origin/main already holds HEAD. A CI_BASE_REF
+#                                   the checkout cannot resolve (new branch, force-push)
+#                                   checks everything.
+#
+# A schedule or dispatch run passes no --changed: the daily full run (daily-full.yml) is the
+# whole suite, and the Release gate counts it (argus#65, argus-config#1595).
 #
 # Nested packages carry their own pnpm workspace and lockfile, so the root
 # workspace cannot reach them (see AGENTS.md, "Subtree-merged packages"). Their
@@ -42,6 +50,15 @@ readonly nested_packages=()
 # Root-level files that can change any package's outcome. When one of these
 # differs from the base, --changed widens to the full root workspace.
 readonly root_config_files=(package.json pnpm-lock.yaml pnpm-workspace.yaml scripts/ci.sh tools)
+
+# Repo-level paths a scripts test reads: a change to one runs the scripts suite. The docs index
+# (docs/) is the one thing a change under docs/ can break, and it needs no install, so a change
+# confined to docs/ runs only that and the scrub scan. A list of globs: git pathspecs, where `*`
+# crosses `/`.
+readonly repo_script_code_paths=(
+  scripts .github/actions .github/workflows package.json links.json .gitleaks.toml .githooks
+  'apps/*/deploy.sh' 'apps/*/systemd/*' 'apps/*/.env.example' 'apps/*/wrangler.jsonc'
+)
 
 changed_only=false
 base_ref=""
@@ -82,7 +99,23 @@ nested_config() {
   esac
 }
 
+have_commit() {
+  git cat-file -e "$1^{commit}" 2> /dev/null && return 0
+  git fetch --quiet --depth=1 origin "$1" 2> /dev/null && git cat-file -e "$1^{commit}" 2> /dev/null
+}
+
 resolve_base() {
+  # A push to main: HEAD is origin/main, so the merge base is HEAD and would select nothing.
+  # CI hands over the push's `before`; a shallow checkout fetches just that commit.
+  if [[ -n "${CI_BASE_REF:-}" ]]; then
+    if [[ "$CI_BASE_REF" =~ ^0+$ ]] || ! have_commit "$CI_BASE_REF"; then
+      echo "CI_BASE_REF $CI_BASE_REF is not a commit this checkout can read — checking everything."
+      changed_only=false
+      return
+    fi
+    base_ref="$CI_BASE_REF"
+    return
+  fi
   git fetch --quiet origin main
   base_ref="$(git merge-base HEAD origin/main)"
 }
@@ -131,12 +164,31 @@ run_root() {
 # behind .github/actions and the workflows (scripts/workflow-gates.test.ts reads
 # .github/workflows/*.yml).
 run_repo_scripts() {
-  if [[ "$changed_only" == true && -z "$(changed_paths docs scripts .github/actions .github/workflows package.json)" ]]; then
-    echo "docs/, scripts/, .github/actions/ and .github/workflows/ unchanged since $base_ref — skipping."
-    return
+  local docs_only=false
+  if [[ "$changed_only" == true ]]; then
+    if [[ -z "$(changed_paths docs "${repo_script_code_paths[@]}")" ]]; then
+      echo "docs/, scripts/, .github/ and the files the scripts tests read are unchanged since $base_ref — skipping."
+      return
+    fi
+    if [[ -z "$(changed_paths "${repo_script_code_paths[@]}")" ]]; then
+      docs_only=true
+    fi
   fi
 
   step "Docs index" node scripts/docs-list.ts --check
+
+  if [[ "$docs_only" == true ]]; then
+    # Only docs/ changed since $base_ref: the docs index above is what it can break. The public
+    # tree's scrub scan (scripts/public-safe.test.ts runs it too) still covers a leaked value,
+    # without the install and the vitest run.
+    if command -v gitleaks > /dev/null; then
+      step "Scrub scan" bash scripts/scrub-scan.sh
+    else
+      echo "gitleaks is not on PATH — the scrub scan runs in CI and in the scripts tests."
+    fi
+    return
+  fi
+
   step "Install (scripts)" pnpm install --frozen-lockfile
   # Unbounded, vitest forks one worker per core and each gets the full heap cap. On
   # the 7.8 GB homelab, shared with production, that peak is what systemd-oomd kills

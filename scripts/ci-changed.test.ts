@@ -20,9 +20,18 @@ function git(cwd: string, ...args: string[]): void {
   if (result.status !== 0) throw new Error(`git ${args.join(" ")}: ${result.stderr}`);
 }
 
+interface ScratchOptions {
+  // A push to main: origin/main already holds HEAD, so the merge base with origin/main is HEAD
+  // itself and only CI_BASE_REF (the push's `before`) says what the push changed.
+  pushed?: boolean;
+  // Put a gitleaks on PATH, as the CI job does.
+  gitleaks?: boolean;
+}
+
 // A scratch repo whose origin/main holds one commit and whose HEAD adds `changedFile`;
-// returns the pnpm calls `ci.sh --changed root` makes.
-function pnpmCalls(changedFile: string, extraEnv: Record<string, string> = {}): string[] {
+// returns the pnpm calls `ci.sh --changed root` makes. An extraEnv value of `$BASE` stands for
+// the SHA of the first commit.
+function pnpmCalls(changedFile: string, extraEnv: Record<string, string> = {}, options: ScratchOptions = {}): string[] {
   const root = mkdtempSync(join(tmpdir(), "ci-changed-"));
   const origin = join(root, "origin.git");
   const work = join(root, "work");
@@ -33,6 +42,7 @@ function pnpmCalls(changedFile: string, extraEnv: Record<string, string> = {}): 
   for (const [name, body] of [
     ["pnpm", fakePnpm],
     ["node", 'echo "node $*" >> "$CI_TEST_LOG"\n'],
+    ...(options.gitleaks ? [["gitleaks", "exit 0\n"]] : []),
   ]) {
     writeFileSync(join(bin, name), `#!/usr/bin/env bash\n${body.replace(/^#!.*\n/, "")}`);
     chmodSync(join(bin, name), 0o755);
@@ -49,15 +59,19 @@ function pnpmCalls(changedFile: string, extraEnv: Record<string, string> = {}): 
   // lock file local, so this test never waits on, or takes, the real host lock.
   copyFileSync(heavyLockScript, join(work, "scripts", "heavy-lock.sh"));
   writeFileSync(join(work, "README.md"), "base\n");
+  writeFileSync(join(work, "scripts", "scrub-scan.sh"), 'echo "scrub-scan $*" >> "$CI_TEST_LOG"\n');
   git(work, "add", "-A");
   git(work, "commit", "--quiet", "-m", "base");
   git(work, "remote", "add", "origin", origin);
   git(work, "push", "--quiet", "origin", "main");
+  const baseSha = spawnSync("git", ["rev-parse", "HEAD"], { cwd: work, encoding: "utf8" }).stdout.trim();
 
   mkdirSync(dirname(join(work, changedFile)), { recursive: true });
   writeFileSync(join(work, changedFile), "changed\n");
   git(work, "add", "-A");
   git(work, "commit", "--quiet", "-m", "change");
+  if (options.pushed) git(work, "push", "--quiet", "origin", "main");
+  const env = Object.fromEntries(Object.entries(extraEnv).map(([key, value]) => [key, value === "$BASE" ? baseSha : value]));
 
   const result = spawnSync("bash", ["scripts/ci.sh", "--changed", "root"], {
     cwd: work,
@@ -70,7 +84,7 @@ function pnpmCalls(changedFile: string, extraEnv: Record<string, string> = {}): 
       GIT_CONFIG_SYSTEM: "/dev/null",
       HEAVY_LOCK_FILE: join(root, "heavy.lock"),
       HEAVY_LOCK_PSI_FILE: join(root, "no-pressure-file"),
-      ...extraEnv,
+      ...env,
     },
   });
   if (result.status !== 0) throw new Error(`ci.sh exited ${result.status}: ${result.stdout}${result.stderr}`);
@@ -99,6 +113,62 @@ describe("ci.sh --changed root", () => {
   it("skips the scripts tests and the root workspace for an unrelated file", () => {
     expect(pnpmCalls("README.md")).not.toContain("pnpm run test:scripts");
   });
+});
+
+// A trunk push to main is scoped to what the push changed (argus#65, argus-config#1586): CI
+// gives ci.sh the push's `before` SHA as CI_BASE_REF, since origin/main already holds HEAD.
+describe("ci.sh --changed on a push to main", () => {
+  const scriptsTest = "pnpm run test:scripts --maxWorkers=1";
+
+  it("diffs against CI_BASE_REF, so a push that changed scripts/ still runs the scripts tests", () => {
+    const calls = pnpmCalls("scripts/other.test.ts", { CI_BASE_REF: "$BASE" }, { pushed: true });
+    expect(calls).toContain(scriptsTest);
+  });
+
+  it("skips the root workspace and the scripts tests when the push changed nothing they cover", () => {
+    const calls = pnpmCalls("README.md", { CI_BASE_REF: "$BASE" }, { pushed: true });
+    expect(calls).not.toContain(scriptsTest);
+    expect(calls.some((call) => call.startsWith("pnpm install"))).toBe(false);
+    expect(calls.some((call) => call.includes("run typecheck"))).toBe(false);
+  });
+
+  it("without CI_BASE_REF a pushed HEAD diffs against itself and checks nothing (the old behaviour this replaces)", () => {
+    expect(pnpmCalls("scripts/other.test.ts", {}, { pushed: true })).not.toContain(scriptsTest);
+  });
+
+  it.each([
+    ["an all-zero before (a new branch)", "0000000000000000000000000000000000000000"],
+    ["a before the checkout cannot find (a force-push)", "1111111111111111111111111111111111111111"],
+  ])("checks the whole root workspace for %s", (_name, before) => {
+    const calls = pnpmCalls("README.md", { CI_BASE_REF: before }, { pushed: true });
+    expect(calls).toContain("pnpm -r --if-present run typecheck");
+    expect(calls).toContain(scriptsTest);
+  });
+});
+
+// Docs-only changes skip the heavy jobs (argus#65): the docs index and the scrub scan are the
+// only checks a change under docs/ can break, and neither needs an install.
+describe("ci.sh --changed for a docs-only change", () => {
+  it("runs the docs index and the scrub scan, with no install and no scripts tests", () => {
+    const calls = pnpmCalls("docs/guide.md", {}, { gitleaks: true });
+    expect(calls).toContain("node scripts/docs-list.ts --check");
+    expect(calls.some((call) => call.startsWith("scrub-scan"))).toBe(true);
+    expect(calls.some((call) => call.startsWith("pnpm install"))).toBe(false);
+    expect(calls).not.toContain("pnpm run test:scripts --maxWorkers=1");
+  });
+
+  it("still runs the docs index where gitleaks is missing (a local pre-push)", () => {
+    const calls = pnpmCalls("docs/guide.md");
+    expect(calls).toContain("node scripts/docs-list.ts --check");
+    expect(calls.some((call) => call.startsWith("scrub-scan"))).toBe(false);
+  });
+
+  it.each([["links.json"], [".gitleaks.toml"], [".githooks/pre-push"], ["apps/agent-cli/deploy.sh"]])(
+    "runs the scripts tests for %s, which a scripts test reads",
+    (file) => {
+      expect(pnpmCalls(file, {}, { gitleaks: true })).toContain("pnpm run test:scripts --maxWorkers=1");
+    },
+  );
 });
 
 describe("ci.yml checkout depth", () => {
