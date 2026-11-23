@@ -21,6 +21,7 @@ const OPTIONAL_KEYS = [
   'order_groups',
   'map_order',
   'overrides',
+  'pace_slot_bonus',
 ] as const
 const KNOWN_KEYS: readonly string[] = [...REQUIRED_KEYS, ...OPTIONAL_KEYS]
 
@@ -45,6 +46,7 @@ const LIFT_FIELDS = ['slots', 'models', 'weekly_ceiling_percent']
 /** argus#73: the worker models a `lift_budget_rung` override may allow; Opus is never one of them. */
 const LIFT_MODELS = ['sonnet', 'haiku'] as const
 const OVERRIDE_FIELDS = ['key', 'value', 'until', 'reason']
+const PACE_BONUS_FIELDS = ['below_pace', 'total_cap']
 
 // HH:MM-HH:MM, 24-hour, as argus-config's hooks/directives_effective.py QUIET_WINDOW.
 const QUIET_WINDOW = /^([01]\d|2[0-3]):([0-5]\d)-([01]\d|2[0-3]):([0-5]\d)$/
@@ -124,6 +126,32 @@ function liftProblem(value: unknown, maxSlots: unknown): string | null {
   return null
 }
 
+/** Why `value` is not a valid `pace_slot_bonus` mapping (argus#64), or null. */
+function paceBonusProblem(value: unknown, maxSlots: unknown): string | null {
+  if (!isMapping(value)) return 'pace_slot_bonus must be a mapping of below_pace and total_cap'
+  const extra = Object.keys(value).filter((field) => !PACE_BONUS_FIELDS.includes(field))
+  if (extra.length > 0) return `pace_slot_bonus has unknown field: ${extra.sort().join(', ')}`
+  if (!('below_pace' in value)) return 'pace_slot_bonus needs below_pace'
+  if (!('total_cap' in value)) return 'pace_slot_bonus needs total_cap'
+  if (!isPositiveNumber(value['below_pace'])) return 'pace_slot_bonus below_pace must be a positive number'
+  if (!isPositiveInteger(value['total_cap'])) return 'pace_slot_bonus total_cap must be a positive integer'
+  if (isPositiveInteger(maxSlots) && value['total_cap'] < maxSlots) return 'pace_slot_bonus total_cap must be at least max_slots'
+  return null
+}
+
+/** The `pace_slot_bonus` setting (argus#64): the total cap while the week's pace is below `belowPace`. */
+export interface PaceSlotBonus {
+  belowPace: number
+  totalCap: number
+}
+
+/** argus#64: the `pace_slot_bonus` in `record`, or null when it is absent or malformed (the validator refuses it at write). */
+export function paceSlotBonus(record: unknown): PaceSlotBonus | null {
+  if (!isMapping(record) || !('pace_slot_bonus' in record) || paceBonusProblem(record['pace_slot_bonus'], undefined) !== null) return null
+  const value = record['pace_slot_bonus'] as Mapping
+  return { belowPace: value['below_pace'] as number, totalCap: value['total_cap'] as number }
+}
+
 const modelsOf = (value: unknown): string[] | null =>
   Array.isArray(value) && value.length > 0 && value.every((model) => (LIFT_MODELS as readonly unknown[]).includes(model))
     ? [...new Set(value as string[])]
@@ -161,6 +189,22 @@ export function budgetRungLift(record: unknown, atMs: number): BudgetRungLift | 
     if (found === null || lift.slots < found.slots) found = lift
   }
   return found
+}
+
+/**
+ * argus#64: whether a live `max_slots` override is in `record` at `atMs`. The owner set the total cap by hand, so
+ * the pace bonus does not move it. An expired or malformed entry is ignored, as for the other overrides.
+ */
+export function maxSlotsOverrideLive(record: unknown, atMs: number): boolean {
+  if (!isMapping(record) || !Array.isArray(record['overrides'])) return false
+  return record['overrides'].some(
+    (entry) =>
+      isMapping(entry) &&
+      entry['key'] === 'max_slots' &&
+      isPositiveInteger(entry['value']) &&
+      isAwareDateTime(entry['until']) &&
+      atMs < Date.parse(String(entry['until']).trim().replace(' ', 'T')),
+  )
 }
 
 /**
@@ -285,6 +329,11 @@ export function directivesProblems(record: unknown): string[] {
       })
       if (new Set(maps.map(String)).size !== maps.length) found.push('map_order must not repeat a map')
     }
+  }
+
+  if ('pace_slot_bonus' in record) {
+    const problem = paceBonusProblem(record['pace_slot_bonus'], maxSlots)
+    if (problem) found.push(problem)
   }
 
   const overrides = record['overrides']
