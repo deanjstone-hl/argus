@@ -229,6 +229,23 @@ total cap is the directives cap. It also holds for a rung an earlier tick stored
 once, with no new tick, and when the entry expires or a later version drops it the next tick
 that sends the figures applies the ladder again. `budget_rung` reads null while it is live.
 
+**Lifting the budget rung for a time-boxed sprint** ([argus#73](https://github.com/deanjstone/argus/issues/73)).
+The directives' `overrides` accept `{key: lift_budget_rung, value: {slots, models, weekly_ceiling_percent}, until, reason}`:
+`slots` is a positive integer at most `max_slots`, `weekly_ceiling_percent` is above 0 and at most 100, and `models`
+is a non-empty list of `sonnet` and/or `haiku` (default both; Opus is never allowed). `until` is exclusive and the
+entry is time-boxed like the others. While it is live, the week used is under the ceiling and the budget rung is
+`no_opus` or `no_new_slots`: the effective total cap is `slots` (never above the directives total cap) in place of
+the ladder's cut, `slot_start` is no longer refused for a `no_new_slots` rung, and the effective level reads
+`no_opus` so Opus stays barred. A `slot_start` that passes `model` must name one of the override's models; leaving
+`model` out is accepted, and a budget-exempt start is not held to it. Nothing else is lifted: a `gate_only` level
+from either ladder, a window level of `no_new_slots` or the host caps still refuse as ever. The override ends at
+`until` or at the first tick that records a week used at or past the ceiling, and a refusal then says so. It takes
+effect and ends with no new tick otherwise, as `ignore_weekly_budget` does, and that one wins when both are live.
+`status_read` `pressure` returns `budget_override_until`, `budget_override_slots`, `budget_override_models`,
+`budget_override_ceiling_percent` (null with no live entry) and `budget_override_active` (true while it lifts the
+rung now). argus-config's directives check and `directives_effective.py` must accept the key before a record
+carrying it is written.
+
 **Slot caps.** A tick passes the directives' `total_cap` and `host_caps` (`{"wsl2": 2,
 "homelab": 1}`; a host left out has no cap of its own). `slot_cap` still works as the total cap
 for a caller that has not moved to `total_cap`; if both are given `total_cap` wins. A tick that
