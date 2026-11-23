@@ -701,6 +701,14 @@ is appended to `MIGRATIONS` in `src/store.ts`, never edited in place.
 `pnpm test`. The suites build the server in-process on a temp SQLite file with a test clock
 and call the MCP tools as each role (argus-config#662, test seam 1).
 
+`test/lease-model.test.ts` is a bounded model check of the direction lease. It runs every
+sequence of primary behaviours (tick, owner work, busy, down) up to 4 steps, plus 120 seeded
+walks, against the real store, and checks four properties after each step: no failover of a live
+primary, always one holder, a dead primary loses the lease, a returning primary reclaims it. It
+replays the bugs fixed by `b2366f4` and `80120a3f`. The project skill
+`.claude/skills/verify-loop-state-leases` says when to run it, how to read a failure, and which
+code it covers. `LEASE_MODEL_DEPTH` and `LEASE_MODEL_WALKS` raise the bound.
+
 ## Deploy
 
 On the homelab, from `~/repos/argus` (the deploy copy, on `main`):
