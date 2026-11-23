@@ -179,3 +179,27 @@ describe('deploy.sh Worker origin', () => {
     expect(await readFile(envFile(), 'utf8')).toMatch(/^WATCHTOWER_WORKER_URL=http:\/\/127\.0\.0\.1:8787$/m)
   })
 })
+
+describe('deploy.sh D1 write flag (argus#66)', () => {
+  const envFile = () => path.join(home, '.config', 'argus', 'watchtower-collector.env')
+
+  it('writes WATCHTOWER_D1=off when the deploy shell sets nothing, so a deploy never resumes the D1 write', async () => {
+    await runDeploy()
+
+    expect(await readFile(envFile(), 'utf8')).toMatch(/^WATCHTOWER_D1=off$/m)
+  })
+
+  it('writes WATCHTOWER_D1=on only when the deploy shell sets it to on', async () => {
+    await runDeploy({ WATCHTOWER_D1: 'on' })
+
+    expect(await readFile(envFile(), 'utf8')).toMatch(/^WATCHTOWER_D1=on$/m)
+  })
+
+  it.each(['off', 'true', '1', ''])('writes WATCHTOWER_D1=off for the deploy-shell value %j', async (value) => {
+    await runDeploy({ WATCHTOWER_D1: value })
+
+    const written = await readFile(envFile(), 'utf8')
+    expect(written).toMatch(/^WATCHTOWER_D1=off$/m)
+    expect(written.match(/^WATCHTOWER_D1=/gm)).toHaveLength(1)
+  })
+})

@@ -14,8 +14,8 @@ function readFlag(env: Env, name: string): 'on' | 'off' | undefined {
 }
 
 // The stores each check is written to (argus#1200, decided in argus#1165): D1
-// through the Worker, and the ops hub. They are written side by side for about
-// a week, then D1 is turned off (`WATCHTOWER_D1=off`).
+// through the Worker, and the ops hub. They were written side by side, then D1
+// was turned off (`WATCHTOWER_D1=off`, which deploy.sh now writes by default, argus#66).
 //
 // - d1: on unless WATCHTOWER_D1=off; needs WATCHTOWER_WORKER_URL.
 // - hub: on when WATCHTOWER_HUB_URL and WATCHTOWER_HUB_TOKEN are both set,

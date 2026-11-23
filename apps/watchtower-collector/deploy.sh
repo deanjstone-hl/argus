@@ -159,8 +159,12 @@ WATCHTOWER_WORKER_URL="${WATCHTOWER_WORKER_URL:-${WORKER_API_BASE%%/watchtower*}
 # The ops hub gets every check too (argus#1200), once WATCHTOWER_HUB_TOKEN is
 # in the env file: deploy.sh writes it from the BWS secret
 # notice-board-token-watchtower-collector (argus#52; the secret is an owner
-# step, argus#1202). WATCHTOWER_D1 / WATCHTOWER_HUB set
-# to off turn a store off; unset leaves each on its default.
+# step, argus#1202). The hub is the collector's store: WATCHTOWER_D1 is written
+# off on every deploy, so a promotion never resumes the D1 write (argus#66, the argus#44
+# cutover). Set WATCHTOWER_D1=on in the deploy shell to write D1 again. WATCHTOWER_HUB
+# set to off turns the hub off; unset leaves it on its default.
+WATCHTOWER_D1_FLAG="off"
+[[ "${WATCHTOWER_D1:-}" == "on" ]] && WATCHTOWER_D1_FLAG="on"
 WATCHTOWER_HUB_URL="${WATCHTOWER_HUB_URL:-$NOTICE_BOARD_URL}"
 # The USB printer, shared by ipp-usb on homelab. localhost, not an IP: the
 # printer answers 400 to an IP-literal host. Set it empty to turn the adapter off.
@@ -177,7 +181,7 @@ chmod 600 "$ENV_FILE"
   echo "WATCHTOWER_COLLECTOR_TOKEN=${WATCHTOWER_COLLECTOR_TOKEN}"
   echo "WATCHTOWER_HUB_URL=${WATCHTOWER_HUB_URL}"
   [[ -n "$WATCHTOWER_HUB_TOKEN" ]] && echo "WATCHTOWER_HUB_TOKEN=${WATCHTOWER_HUB_TOKEN}"
-  [[ -n "${WATCHTOWER_D1:-}" ]] && echo "WATCHTOWER_D1=${WATCHTOWER_D1}"
+  echo "WATCHTOWER_D1=${WATCHTOWER_D1_FLAG}"
   [[ -n "${WATCHTOWER_HUB:-}" ]] && echo "WATCHTOWER_HUB=${WATCHTOWER_HUB}"
   echo "SYSTEMD_UNITS=${SYSTEMD_UNITS}"
   echo "SYNCTHING_URL=${SYNCTHING_URL}"
