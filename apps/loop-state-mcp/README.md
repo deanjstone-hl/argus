@@ -152,6 +152,14 @@ kept; nothing edits or deletes one.
   server gates slot starts exactly as before. A malformed window is refused, as
   `tests/check_directives.py` refuses it.
 
+  Each key and the places it may appear (the record's top level, a `host_gates.<host>` entry, an
+  override's `key`) is declared once, in `KEY_RULES` in `src/directives.ts`. A numeric gate is
+  declared with `gate(...)`, which allows all three places at once. `directive-keys.json` is the
+  same table as JSON, for argus-config's checks to compare against: after changing `KEY_RULES`, run
+  `pnpm --filter @argus/loop-state-mcp directive-keys`. `test/directive-keys.test.ts` fails while
+  the file is stale, and fails on a key with no sample value for a place it is allowed.
+  `pr_flow_repos` is an optional list of `owner/repo`, the repos exempt from trunk (argus#40).
+
 The owner-only guard is the direction token, the lease and owner presence. Presence is a
 30-minute window, not a per-write approval: Aquila decides what the owner asked for inside it,
 as it does for every other write it makes.
