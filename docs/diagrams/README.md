@@ -15,7 +15,7 @@ Claude Code plugin (v2.6.119, default skin) in the house style of
 [argus#1208](https://github.com/deanjstone/argus/issues/1208)). Open the `.html` file in a browser.
 
 Each step node is a `<g id="step-<flow>-<step>">`, the deep-link contract of
-[ops-hub#13](https://github.com/deanjstone/ops-hub/issues/13): the hub links
+[ops-hub#13](https://github.com/deanjstone-hl/ops-hub/issues/13): the hub links
 `#/diagrams/<repo>/<path>#<step-id>`, and the page also highlights the targeted step (`:target`).
 Anything inferred is marked `[speculation]` in the diagram or its source line.
 

@@ -15,7 +15,7 @@ validates the manifest and replaces the release asset; the hub has the new copy 
 hourly sync. If a promotion ran no workflow, replay it with
 `gh workflow run ecosystem-release.yml -R deanjstone/argus --ref deploy` (an owner step). The contract is `parseManifest` in
 `scripts/ecosystem/manifest.ts`, shared with the ops hub's copy in
-[`deanjstone/ops-hub`](https://github.com/deanjstone/ops-hub) (`src/ecosystem/manifest.ts`, which
+[`deanjstone-hl/ops-hub`](https://github.com/deanjstone-hl/ops-hub) (`src/ecosystem/manifest.ts`, which
 validates on fetch) and the shell's reader in myargus (`apps/shell/src/lib/ecosystem.ts`): change
 them together.
 

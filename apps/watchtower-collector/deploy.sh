@@ -149,7 +149,7 @@ HOST_REPORT_WSL2_UNITS="${HOST_REPORT_WSL2_UNITS:-agent-engine.service,memory-re
 # homelab as directories, from the WSL2 shim's report by name (argus#686).
 VAULT_DIRS="${VAULT_DIRS-${HOME}/CONTEXT,${HOME}/CORTEX}"
 HOST_REPORT_WSL2_VAULTS="${HOST_REPORT_WSL2_VAULTS:-CONTEXT,CORTEX}"
-# The notice board on this host, on loopback (served by deanjstone/ops-hub).
+# The notice board on this host, on loopback (served by deanjstone-hl/ops-hub).
 NOTICE_BOARD_URL="${NOTICE_BOARD_URL:-http://127.0.0.1:3790}"
 # service_checks writes now go through the argus-watchtower-api Worker
 # (argus#252 cutover), not Supabase directly — see worker-client.ts.

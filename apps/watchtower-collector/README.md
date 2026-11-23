@@ -2,7 +2,7 @@
 
 Standalone Node service that polls infra and usage sources and records service checks for
 [watchtower](../watchtower/). Runs on homelab under its own systemd user unit; writes every check
-to the [ops hub](https://github.com/deanjstone/ops-hub) with `POST /watchtower/checks`
+to the [ops hub](https://github.com/deanjstone-hl/ops-hub) with `POST /watchtower/checks`
 ([argus#1200](https://github.com/deanjstone/argus/issues/1200), decided in
 [argus#1165](https://github.com/deanjstone/argus/issues/1165)). The dual write to D1 through the
 `argus-watchtower-api` Worker is off by default since the cutover

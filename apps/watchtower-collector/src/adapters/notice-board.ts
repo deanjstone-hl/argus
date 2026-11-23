@@ -1,7 +1,7 @@
 import type { NoticeBoardQueueDetail, NoticeBoardRepoDetail } from '@argus/watchtower-contract'
 import { CheckError, type Adapter, type HealthResult } from '../adapter.js'
 
-// The notice board's queue (served by deanjstone/ops-hub), read on homelab, where the
+// The notice board's queue (served by deanjstone-hl/ops-hub), read on homelab, where the
 // board listens on loopback. Unacked means queued (no session has opened the
 // repo yet) or claimed (a session took it and its Stop hook has not acked).
 // Read-only: GET /repos, then GET messages by state for repos that have any.
