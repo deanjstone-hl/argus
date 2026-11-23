@@ -2,16 +2,17 @@
 
 Standalone Node service that polls infra and usage sources and records service checks for
 [watchtower](../watchtower/). Runs on homelab under its own systemd user unit; writes every check
-to two stores for about a week ([argus#1200](https://github.com/deanjstone/argus/issues/1200),
-decided in [argus#1165](https://github.com/deanjstone/argus/issues/1165)): `POST /watchtower/checks` on
-the `argus-watchtower-api` Worker (D1), and the same payload to `POST /watchtower/checks` on the
-[ops hub](https://github.com/deanjstone/ops-hub). Then D1 is turned off.
+to the [ops hub](https://github.com/deanjstone/ops-hub) with `POST /watchtower/checks`
+([argus#1200](https://github.com/deanjstone/argus/issues/1200), decided in
+[argus#1165](https://github.com/deanjstone/argus/issues/1165)). The dual write to D1 through the
+`argus-watchtower-api` Worker is off by default since the cutover
+([argus#66](https://github.com/deanjstone/argus/issues/66), [argus#44](https://github.com/deanjstone/argus/issues/44)).
 
 ## Where checks are written
 
 | Variable | Meaning |
 |---|---|
-| `WATCHTOWER_D1` | `off` stops writing to D1. Unset or `on`: write, which needs `WATCHTOWER_WORKER_URL` (and `WATCHTOWER_COLLECTOR_TOKEN`, the Worker's bearer) |
+| `WATCHTOWER_D1` | `off` stops writing to D1. `on` writes, which needs `WATCHTOWER_WORKER_URL` (and `WATCHTOWER_COLLECTOR_TOKEN`, the Worker's bearer). `deploy.sh` writes `off` on every deploy unless the deploy shell sets `WATCHTOWER_D1=on`; a hand-edited env file is overwritten at the next deploy. With the variable unset (no `deploy.sh`, a bare `node dist/index.js`) the collector still defaults to `on` |
 | `WATCHTOWER_HUB` | `off` stops writing to the hub. Unset: write when `WATCHTOWER_HUB_URL` and `WATCHTOWER_HUB_TOKEN` are both set. `on`: the same, but a missing URL or token stops the collector at start |
 | `WATCHTOWER_HUB_URL` | The hub's origin, no path; `deploy.sh` defaults it to `NOTICE_BOARD_URL` (`http://127.0.0.1:3790` on homelab) |
 | `WATCHTOWER_HUB_TOKEN` | The collector's own hub device token (a `watchtower-collector` entry in the hub's `NOTICE_BOARD_TOKENS`). `deploy.sh` writes it from the BWS secret `notice-board-token-watchtower-collector` ([argus#52](https://github.com/deanjstone/argus/issues/52)) and writes no line, with a warning and no failure, while the secret is missing; the ops hub's `deploy.sh` reads the same secret. Creating the secret is an owner step ([argus#1202](https://github.com/deanjstone/argus/issues/1202)); until it exists the hub is not written and the collector logs that at start |
@@ -19,8 +20,13 @@ the `argus-watchtower-api` Worker (D1), and the same payload to `POST /watchtowe
 A flag that is neither `on` nor `off`, or every store off, stops the collector at start, so a typo cannot
 silently stop recording. The two writes are independent: a hub that is down does not cost a D1 write,
 nor the other way round, and a failure is logged with the store's name (`d1:` or `hub:`). Each store
-retries a network failure or a 5xx once, never a 4xx. The cutover is `WATCHTOWER_D1=off` once the hub
-has held the checks for the week.
+retries a network failure or a 5xx once, never a 4xx. The cutover is `WATCHTOWER_D1=off`, which `deploy.sh`
+now writes by default; to write D1 again for a deployment, run it as `WATCHTOWER_D1=on bash deploy.sh`.
+
+The public-surface probes (`endpoint:<host>` and `tls:<host>`) come from the links registry's live entries.
+The `watchtower` dashboard entry is skipped (`NOT_PROBED` in `src/adapters/endpoints.ts`) because its Pages
+project is deleted by [argus#44](https://github.com/deanjstone/argus/issues/44); the registry is vendored and
+drops the entry itself with [argus#45](https://github.com/deanjstone/argus/issues/45).
 
 ## Run
 

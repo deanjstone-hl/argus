@@ -60,7 +60,6 @@ describe('PUBLIC_ENDPOINTS', () => {
       ['https://stockade.myargus.cc/', 200],
       ['https://ops.myargus.cc/', 302],
       ['https://mail.myargus.cc/', 302],
-      ['https://watchtower.myargus.cc/', 200],
       ['https://capture.myargus.cc/', 302],
       ['https://taskview.myargus.cc/', 302],
       ['https://api.myargus.cc/watchtower/checks', 401],
@@ -85,6 +84,12 @@ describe('PUBLIC_ENDPOINTS', () => {
     }
   })
 
+  it('leaves out the retired watchtower dashboard, which is still live in the registry until argus#45 (argus#66)', () => {
+    expect(PUBLIC_ENDPOINTS.map((endpoint) => endpoint.url)).not.toContain('https://watchtower.myargus.cc/')
+    expect(PUBLIC_HOSTS).not.toContain('watchtower.myargus.cc')
+    expect(createEndpointAdapters(PUBLIC_ENDPOINTS).map((found) => found.key)).not.toContain('endpoint:watchtower.myargus.cc')
+  })
+
   it('lists each host once for the certificate checks', () => {
     expect(PUBLIC_HOSTS).toEqual([
       'myargus.cc',
@@ -92,7 +97,6 @@ describe('PUBLIC_ENDPOINTS', () => {
       'stockade.myargus.cc',
       'ops.myargus.cc',
       'mail.myargus.cc',
-      'watchtower.myargus.cc',
       'capture.myargus.cc',
       'taskview.myargus.cc',
       'api.myargus.cc',
@@ -172,7 +176,6 @@ describe('endpoint probes', () => {
     expect(new Set(keys).size).toBe(keys.length)
     expect(keys).toEqual(expect.arrayContaining([
       'endpoint:mail.myargus.cc',
-      'endpoint:watchtower.myargus.cc',
       'endpoint:mcp.myargus.cc',
       'endpoint:memory.myargus.cc',
       'endpoint:myargus.cc',

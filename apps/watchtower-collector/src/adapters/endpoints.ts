@@ -58,10 +58,16 @@ function baseUrl(entry: (typeof REGISTRY.entries)[number]): string | null {
   }
 }
 
+// Registry entries that are no longer probed. The registry is vendored from deanjstone/frontend
+// and still lists the watchtower dashboard as live: its Pages project is deleted by argus#44
+// and the registry entry goes with argus#45, so until then the collector skips it, and a
+// deleted project does not turn the probe and the certificate check red (argus#66).
+const NOT_PROBED: ReadonlySet<LinkId> = new Set<LinkId>(['watchtower'])
+
 function endpointsFromRegistry(): PublicEndpoint[] {
   const endpoints: PublicEndpoint[] = []
   for (const entry of REGISTRY.entries) {
-    if (entry.status !== 'live') continue
+    if (entry.status !== 'live' || NOT_PROBED.has(entry.id)) continue
     const deeper = DEEPER_PROBES[entry.id]
     const expected = deeper?.expected ?? entry.probe?.status
     const base = baseUrl(entry)

@@ -25,11 +25,6 @@
       "status": 401,
       "location": null,
       "latencyMs": 276
-    },
-    "https://watchtower.myargus.cc/": {
-      "status": 200,
-      "location": null,
-      "latencyMs": 201
     }
   }
 }

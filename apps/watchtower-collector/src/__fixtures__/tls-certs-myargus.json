@@ -58,17 +58,5 @@
       "CN": "myargus.cc"
     },
     "subjectaltname": "DNS:myargus.cc, DNS:*.myargus.cc"
-  },
-  "watchtower.myargus.cc": {
-    "valid_from": "Sep  8 10:34:57 2026 GMT",
-    "valid_to": "Dec  7 11:34:53 2026 GMT",
-    "issuer": {
-      "O": "Google Trust Services",
-      "CN": "WE1"
-    },
-    "subject": {
-      "CN": "watchtower.myargus.cc"
-    },
-    "subjectaltname": "DNS:watchtower.myargus.cc"
   }
 }
