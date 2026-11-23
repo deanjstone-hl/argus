@@ -1,6 +1,6 @@
 import { DatabaseSync, type SQLInputValue } from 'node:sqlite'
 
-import { budgetExemptIssues, directivesProblems, ignoreWeeklyBudgetLive } from './directives.js'
+import { budgetExemptIssues, budgetRungLift, directivesProblems, ignoreWeeklyBudgetLive, type BudgetRungLift } from './directives.js'
 import { planRebuild, type RebuildPlan, type World } from './rebuild.js'
 import type { Role } from './roles.js'
 
@@ -708,8 +708,11 @@ function stricter(windowLevel: PressureLevel, weeklyLevel: PressureLevel): Press
  * The directives total cap under the budget ladder (argus#62): unchanged at `normal` and `no_opus` (Sonnet or Haiku
  * workers only), 0 from `no_new_slots` up, where the level already refuses new starts.
  */
-export function effectiveSlotCap(slotCap: number | null, weekly: Weekly | null): number | null {
-  if (weekly === null || weekly.rung === 'normal' || weekly.rung === 'no_opus') return slotCap
+export function effectiveSlotCap(slotCap: number | null, weekly: Weekly | null, lift: BudgetRungLift | null = null): number | null {
+  if (weekly === null || weekly.rung === 'normal') return slotCap
+  // argus#73: a live lift_budget_rung override sets the cap at no_opus and no_new_slots, never above the directives total cap.
+  if (lift !== null) return slotCap === null ? lift.slots : Math.min(slotCap, lift.slots)
+  if (weekly.rung === 'no_opus') return slotCap
   return 0
 }
 
@@ -941,6 +944,54 @@ export function openStore(options: StoreOptions) {
   /** The same, lower-cased for comparing: GitHub names are case-insensitive. */
   const listedExemptIssues = () => exemptIssuesOfDirectives().map((issue) => issue.toLowerCase())
 
+  /**
+   * argus#73: the time-live `lift_budget_rung` override, read from the current record as `awaitingCiCap` is. Where
+   * it applies, see `liftOf`.
+   */
+  function budgetRungLiftOfDirectives(): BudgetRungLift | null {
+    const row = selectCurrentDirectives.get() as Row | undefined
+    return row === undefined ? null : budgetRungLift(JSON.parse(String(row.record)), now())
+  }
+
+  /**
+   * argus#73: the override as it applies to `weekly`, or null. It lifts only a budget rung of no_opus or no_new_slots
+   * (never normal, where there is nothing to lift, nor gate_only), of a week still running, and only while the week
+   * used is under its ceiling: at the ceiling the rung applies again, with no tick needed beyond the one that
+   * recorded the figure.
+   */
+  function liftOf(weekly: Weekly | null): BudgetRungLift | null {
+    if (weekly === null || weekly.resetsAt <= now()) return null
+    if (weekly.rung !== 'no_opus' && weekly.rung !== 'no_new_slots') return null
+    const lift = budgetRungLiftOfDirectives()
+    return lift !== null && weekly.used < lift.weeklyCeilingPercent ? lift : null
+  }
+
+  /** The directives total cap under the budget ladder and any live override: `effectiveSlotCap` with the override applied. */
+  const effectiveCapOf = (slotCap: number | null, weekly: Weekly | null) => effectiveSlotCap(slotCap, weekly, liftOf(weekly))
+
+  /** What status_read shows of the override (argus#73): the live entry, and whether it is lifting the rung right now. */
+  function budgetOverrideShown(weekly: Weekly | null) {
+    const lift = budgetRungLiftOfDirectives()
+    return {
+      budget_override_until: lift === null ? null : iso(lift.until),
+      budget_override_slots: lift?.slots ?? null,
+      budget_override_models: lift?.models ?? null,
+      budget_override_ceiling_percent: lift?.weeklyCeilingPercent ?? null,
+      budget_override_active: liftOf(weekly) !== null,
+    }
+  }
+
+  /** Why a live override no longer lifts the rung, for the refusal's tail: the week used reached its ceiling. Else ''. */
+  function liftEndedNote(weekly: Weekly | null): string {
+    if (weekly === null || weekly.resetsAt <= now() || (weekly.rung !== 'no_opus' && weekly.rung !== 'no_new_slots')) return ''
+    const lift = budgetRungLiftOfDirectives()
+    if (lift === null || weekly.used < lift.weeklyCeilingPercent) return ''
+    return ` (budget override ended: the week used ${weekly.used}% reached its ${lift.weeklyCeilingPercent}% ceiling)`
+  }
+
+  /** The weekly side of a level: a lifted no_new_slots is no_opus, so Opus stays barred while starts are allowed. */
+  const weeklyLevelOf = (weekly: Weekly): PressureLevel => (weekly.rung === 'no_new_slots' && liftOf(weekly) !== null ? 'no_opus' : weekly.rung)
+
   const weeklyOf = (row: Row): Weekly | null =>
     row.weekly_used_percent === null || row.weekly_used_percent === undefined || weeklyBudgetIgnored()
       ? null
@@ -969,13 +1020,21 @@ export function openStore(options: StoreOptions) {
   }
 
   /** What a tick last recorded, read back from its loop_status row. */
-  const pressureOf = (row: Row): Pressure => ({
-    // The stored level is the stricter of the window and weekly sides: while the weekly side is ignored, only the window's counts.
-    level: (weeklyBudgetIgnored() ? (row.window_level ?? row.pressure) : row.pressure) as PressureLevel,
-    windowLevel: (row.window_level ?? row.pressure) as PressureLevel,
-    percent: row.window_used_percent === null ? null : Number(row.window_used_percent),
-    weekly: weeklyOf(row),
-  })
+  function pressureOf(row: Row): Pressure {
+    const windowLevel = (row.window_level ?? row.pressure) as PressureLevel
+    const weekly = weeklyOf(row)
+    // The stored level is the stricter of the window and weekly sides: while the weekly side is ignored, only the window's counts,
+    // and while a lift_budget_rung override lifts it (argus#73), the window's against the lifted weekly side.
+    const level = weeklyBudgetIgnored()
+      ? windowLevel
+      : weekly !== null && liftOf(weekly) !== null
+        ? stricter(windowLevel, weeklyLevelOf(weekly))
+        : // A tick recorded under the override stored the lifted level: once it no longer lifts, the rung's own level is the floor again.
+          weekly !== null && weekly.rung === 'no_new_slots' && weekly.resetsAt > now()
+          ? stricter(row.pressure as PressureLevel, 'no_new_slots')
+          : (row.pressure as PressureLevel)
+    return { level, windowLevel, percent: row.window_used_percent === null ? null : Number(row.window_used_percent), weekly }
+  }
 
   /**
    * The effective pressure of a tick: the stricter of the window ladder and the budget ladder.
@@ -1014,7 +1073,7 @@ export function openStore(options: StoreOptions) {
         ? deriveWeekly(carriedLive, reserve ?? carriedLive.reservePercent, prior)
         : null
     return {
-      level: weekly ? stricter(resolvedWindow.level, weekly.rung) : resolvedWindow.level,
+      level: weekly ? stricter(resolvedWindow.level, weeklyLevelOf(weekly)) : resolvedWindow.level,
       windowLevel: resolvedWindow.level,
       percent: resolvedWindow.percent,
       weekly,
@@ -1400,7 +1459,7 @@ export function openStore(options: StoreOptions) {
     const totalCap = status.slot_cap === null ? null : Number(status.slot_cap)
     const exemptRepos = exemptReposOf(status)
     // The poll does not know which repo the takeable work is in: while any repo is exempt, count room against the uncut total.
-    const cap = exemptRepos.length > 0 ? totalCap : effectiveSlotCap(totalCap, weekly)
+    const cap = exemptRepos.length > 0 ? totalCap : effectiveCapOf(totalCap, weekly)
     const perHost = runningByHost(exemptRepos)
     const running = perHost.wsl2 + perHost.homelab
     if (cap !== null && running >= cap) return false
@@ -1424,15 +1483,23 @@ export function openStore(options: StoreOptions) {
    *
    * argus#60: an issue in the directives' `budget_exempt_issues` passes no_new_slots and gate_only, sits outside
    * the caps and keeps one running such issue; the pressure ladders are the only gate the server holds for it.
+   *
+   * argus#73: a live `lift_budget_rung` override lifts a budget rung of no_opus or no_new_slots (not gate_only):
+   * the effective cap becomes the override's, and a start that names a model must name one the override allows.
    */
-  function requireRoomForSlot(host: Host, issue: string, budgetExempt: boolean) {
+  function requireRoomForSlot(host: Host, issue: string, budgetExempt: boolean, model?: string) {
     const status = selectStatus.get('afk') as Row | undefined
     if (!status) return
     const pressure = pressureOf(status)
     const listed = isListedExemptIssue(issue)
     // argus#1171: an efficiency:orchestrator start goes through no_new_slots, never gate_only. argus#60: a listed issue goes through both.
     if ((pressure.level === 'gate_only' && !listed) || (pressure.level === 'no_new_slots' && !budgetExempt && !listed)) {
-      throw new Refused(`pressure is ${pressure.level}: no new slot starts until it eases`)
+      throw new Refused(`pressure is ${pressure.level}: no new slot starts until it eases${liftEndedNote(pressure.weekly)}`)
+    }
+    // argus#73: while a lift_budget_rung override is what lifts the rung, only its worker models start.
+    const lift = liftOf(pressure.weekly)
+    if (lift !== null && model !== undefined && !budgetExempt && !listed && !lift.models.some((allowed) => model.toLowerCase().includes(allowed))) {
+      throw new Refused(`the budget override allows only ${lift.models.join(', ')} workers, not ${model}`)
     }
     const refusal = capRefusal(status, pressure, host, issue, budgetExempt)
     if (refusal !== null) throw new Refused(refusal)
@@ -1459,7 +1526,7 @@ export function openStore(options: StoreOptions) {
       return sameRepo ? `${repo} already runs a slot (${String(sameRepo.issue)}): a budget-exempt repo keeps one running slot` : null
     }
     const totalCap = status.slot_cap === null ? null : Number(status.slot_cap)
-    const cap = effectiveSlotCap(totalCap, pressure.weekly)
+    const cap = effectiveCapOf(totalCap, pressure.weekly)
     const perHost = runningByHost(exemptRepos)
     const running = perHost.wsl2 + perHost.homelab
     if (cap !== null && running >= cap) return `the effective slot cap ${cap} is reached (${running} running)`
@@ -1581,7 +1648,7 @@ export function openStore(options: StoreOptions) {
   }
 
   return {
-    slotStart(role: Role, issue: string, threadId: string, host: Host = 'wsl2', callerThreadId?: string, budgetExempt = false): SlotWrite {
+    slotStart(role: Role, issue: string, threadId: string, host: Host = 'wsl2', callerThreadId?: string, budgetExempt = false, model?: string): SlotWrite {
       permit(role, 'slot_start')
       requireIssue(issue)
       requireText(threadId, 'thread_id')
@@ -1591,7 +1658,7 @@ export function openStore(options: StoreOptions) {
         const existing = selectSlot.get(issue) as Row | undefined
         const at = now()
         if (existing?.state === 'awaiting_ci') throw new Refused(`${issue} awaits CI: it resumes only after Aquila resumes it (slot_resume_ci)`)
-        if (existing?.state !== 'running') requireRoomForSlot(host, issue, budgetExempt)
+        if (existing?.state !== 'running') requireRoomForSlot(host, issue, budgetExempt, model)
         if (existing) {
           if (existing.state === 'parked') throw new Refused(`${issue} is parked: it resumes only after Aquila un-parks it`)
           if (existing.state === 'running') {
@@ -2258,7 +2325,8 @@ export function openStore(options: StoreOptions) {
           budget_rung: weekly?.rung ?? null,
           budget_rung_held: weekly?.held ?? false,
           reserve_percent: weekly?.reservePercent ?? null,
-          effective_slot_cap: effectiveSlotCap(cap, weekly),
+          effective_slot_cap: effectiveCapOf(cap, weekly),
+          ...budgetOverrideShown(weekly),
           budget_exempt_repos: exemptReposOf(row),
           budget_exempt_issues: exemptIssuesOfDirectives(),
         },

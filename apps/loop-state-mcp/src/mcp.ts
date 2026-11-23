@@ -152,7 +152,7 @@ export function createMcpServer(store: Store, role: Role, threadHeader?: string)
       {
         title: 'Start a slot',
         description:
-          'Put a worker thread on an issue. Refused if the issue already holds a running slot, or is parked; a ready (un-parked) issue resumes here with its new thread. Also refused when the last recorded AFK tick put the effective pressure at no_new_slots or gate_only, or the running slots already fill the effective slot cap (the directives total cap; 0 once the budget ladder reaches no_new_slots), or the starting host already runs its own cap. Running slots in a repo in budget_exempt_repos are not counted toward any of those caps, and a start in such a repo skips them; it is refused only if that repo already runs a slot. Pass budget_exempt: true for an issue labelled efficiency:orchestrator (argus#1171): the start is allowed at no_new_slots but still refused at gate_only, skips every cap, is not counted toward them while it runs, and only one budget-exempt slot runs at a time. Use Sonnet or Haiku for it. An issue in the directives\' budget_exempt_issues (argus#60) needs no flag: the server passes it at no_new_slots and gate_only, outside every cap, one such issue running at a time; slot_list shows budget_exempt on each slot.',
+          'Put a worker thread on an issue. Refused if the issue already holds a running slot, or is parked; a ready (un-parked) issue resumes here with its new thread. Also refused when the last recorded AFK tick put the effective pressure at no_new_slots or gate_only, or the running slots already fill the effective slot cap (the directives total cap; 0 once the budget ladder reaches no_new_slots), or the starting host already runs its own cap. Running slots in a repo in budget_exempt_repos are not counted toward any of those caps, and a start in such a repo skips them; it is refused only if that repo already runs a slot. Pass budget_exempt: true for an issue labelled efficiency:orchestrator (argus#1171): the start is allowed at no_new_slots but still refused at gate_only, skips every cap, is not counted toward them while it runs, and only one budget-exempt slot runs at a time. Use Sonnet or Haiku for it. An issue in the directives\' budget_exempt_issues (argus#60) needs no flag: the server passes it at no_new_slots and gate_only, outside every cap, one such issue running at a time; slot_list shows budget_exempt on each slot. argus#73: a live lift_budget_rung override in the directives lifts a budget rung of no_opus or no_new_slots (never gate_only) while the week used is under its ceiling: the effective cap becomes the override\'s slots, bounded by the total cap, and only its models (Sonnet, Haiku) may start; status_read pressure shows budget_override_until and budget_override_active.',
         inputSchema: {
           issue,
           thread_id: threadId.describe('The worker thread taking the issue.'),
@@ -162,10 +162,14 @@ export function createMcpServer(store: Store, role: Role, threadHeader?: string)
             .boolean()
             .optional()
             .describe('True when the issue is labelled efficiency:orchestrator: passes no_new_slots, refused at gate_only, outside every cap, one running at a time.'),
+          model: z
+            .string()
+            .optional()
+            .describe('The model the worker runs on (e.g. claude-sonnet-5-5). While a lift_budget_rung override is what lifts the budget rung, a start naming a model outside the override\'s models is refused; leaving it out is accepted.'),
         },
         annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
       },
-      guarded((args) => store.slotStart(role, args.issue, args.thread_id, args.host, actingAs('slot_start', args.caller_thread_id), args.budget_exempt === true)),
+      guarded((args) => store.slotStart(role, args.issue, args.thread_id, args.host, actingAs('slot_start', args.caller_thread_id), args.budget_exempt === true, args.model)),
     )
   }
 

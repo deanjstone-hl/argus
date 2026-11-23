@@ -39,7 +39,11 @@ const OVERRIDE_KEYS = [
   'max_disk_percent',
   'repo_holds',
   'ignore_weekly_budget',
+  'lift_budget_rung',
 ]
+const LIFT_FIELDS = ['slots', 'models', 'weekly_ceiling_percent']
+/** argus#73: the worker models a `lift_budget_rung` override may allow; Opus is never one of them. */
+const LIFT_MODELS = ['sonnet', 'haiku'] as const
 const OVERRIDE_FIELDS = ['key', 'value', 'until', 'reason']
 
 // HH:MM-HH:MM, 24-hour, as argus-config's hooks/directives_effective.py QUIET_WINDOW.
@@ -98,9 +102,65 @@ function valueProblem(key: string, value: unknown, maxSlots: unknown): string | 
         : 'repo_holds must be a non-empty list of owner/repo'
     case 'ignore_weekly_budget':
       return value === true ? null : 'ignore_weekly_budget must be true'
+    case 'lift_budget_rung':
+      return liftProblem(value, maxSlots)
     default:
       return 'unknown key'
   }
+}
+
+/** Why `value` is not a valid `lift_budget_rung` mapping (argus#73), or null. */
+function liftProblem(value: unknown, maxSlots: unknown): string | null {
+  if (!isMapping(value)) return 'lift_budget_rung must be a mapping of slots, models and weekly_ceiling_percent'
+  const extra = Object.keys(value).filter((field) => !LIFT_FIELDS.includes(field))
+  if (extra.length > 0) return `lift_budget_rung has unknown field: ${extra.sort().join(', ')}`
+  if (!('slots' in value)) return 'lift_budget_rung needs slots'
+  if (!('weekly_ceiling_percent' in value)) return 'lift_budget_rung needs weekly_ceiling_percent'
+  if (!isPositiveInteger(value['slots'])) return 'lift_budget_rung slots must be a positive integer'
+  if (isPositiveInteger(maxSlots) && value['slots'] > maxSlots) return 'lift_budget_rung slots must be at most max_slots'
+  const ceiling = value['weekly_ceiling_percent']
+  if (!(isPositiveNumber(ceiling) && ceiling <= 100)) return 'lift_budget_rung weekly_ceiling_percent must be above 0 and at most 100'
+  if ('models' in value && !modelsOf(value['models'])) return 'lift_budget_rung models must be a non-empty list of sonnet and/or haiku'
+  return null
+}
+
+const modelsOf = (value: unknown): string[] | null =>
+  Array.isArray(value) && value.length > 0 && value.every((model) => (LIFT_MODELS as readonly unknown[]).includes(model))
+    ? [...new Set(value as string[])]
+    : null
+
+/** A live `lift_budget_rung` override (argus#73): the cap and models it sets and the weekly use it stops at. */
+export interface BudgetRungLift {
+  slots: number
+  models: string[]
+  weeklyCeilingPercent: number
+  /** When the override ends, as the record wrote it. */
+  until: number
+}
+
+/**
+ * argus#73: the `lift_budget_rung` override in `record` that is time-live at `atMs`, or null. Like
+ * `ignoreWeeklyBudgetLive` an expired or malformed entry is ignored; of several live ones the one that
+ * allows the fewest slots wins, so a second entry can never widen the first. The weekly ceiling is not
+ * checked here: it needs the week's use, which the store has.
+ */
+export function budgetRungLift(record: unknown, atMs: number): BudgetRungLift | null {
+  if (!isMapping(record) || !Array.isArray(record['overrides'])) return null
+  let found: BudgetRungLift | null = null
+  for (const entry of record['overrides']) {
+    if (!isMapping(entry) || entry['key'] !== 'lift_budget_rung' || !isAwareDateTime(entry['until'])) continue
+    const until = Date.parse(String(entry['until']).trim().replace(' ', 'T'))
+    if (atMs >= until || liftProblem(entry['value'], undefined) !== null) continue
+    const value = entry['value'] as Mapping
+    const lift: BudgetRungLift = {
+      slots: value['slots'] as number,
+      models: 'models' in value ? (modelsOf(value['models']) as string[]) : [...LIFT_MODELS],
+      weeklyCeilingPercent: value['weekly_ceiling_percent'] as number,
+      until,
+    }
+    if (found === null || lift.slots < found.slots) found = lift
+  }
+  return found
 }
 
 /**
