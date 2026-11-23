@@ -20,6 +20,10 @@ const noWeekly = {
   budget_override_models: null,
   budget_override_ceiling_percent: null,
   budget_override_active: false,
+  pace_slot_bonus: null,
+  pace_slot_bonus_active: false,
+  pace_slot_bonus_suspended: false,
+  slot_cap_reason: expect.any(String),
 }
 
 const base = { thread_id: AFK_THREAD, directives_version: 'a1b2c3', needs_owner: [] as string[] }

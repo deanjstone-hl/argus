@@ -1,6 +1,15 @@
 import { DatabaseSync, type SQLInputValue } from 'node:sqlite'
 
-import { budgetExemptIssues, budgetRungLift, directivesProblems, ignoreWeeklyBudgetLive, type BudgetRungLift } from './directives.js'
+import {
+  budgetExemptIssues,
+  budgetRungLift,
+  directivesProblems,
+  ignoreWeeklyBudgetLive,
+  maxSlotsOverrideLive,
+  paceSlotBonus,
+  type BudgetRungLift,
+  type PaceSlotBonus,
+} from './directives.js'
 import { planRebuild, type RebuildPlan, type World } from './rebuild.js'
 import type { Role } from './roles.js'
 
@@ -716,6 +725,40 @@ export function effectiveSlotCap(slotCap: number | null, weekly: Weekly | null, 
   return 0
 }
 
+/** Why the pace bonus did or did not apply: the pace was read, or it could not be and counts as below. */
+export type PaceBonusBasis = 'pace' | 'no_figure' | 'first_day'
+
+export interface PaceBonusReading {
+  /** The week's pace is below the bonus's `belowPace`, or is unknown and so counts as below. */
+  below: boolean
+  basis: PaceBonusBasis
+  pace: number | null
+}
+
+/**
+ * argus#64: whether the week's pace is below the bonus's edge at `at`. The pace is taken from the week's use against
+ * now, not from the tick's stored figure, so it follows the clock between ticks. Where it cannot be read it counts
+ * as below, as the first hour of a week does: no weekly figure (none sent, or the weekly ladder is ignored), a week
+ * that has reset since the last tick, and the first day, where the ladder reads no pace either (a few early points
+ * swing it far past every edge).
+ */
+export function paceBonusReading(weekly: Weekly | null, bonus: PaceSlotBonus, at: number): PaceBonusReading {
+  if (weekly === null || weekly.resetsAt <= at) return { below: true, basis: 'no_figure', pace: null }
+  if (at - (weekly.resetsAt - WEEK_MS) < PACE_READABLE_AFTER_MS) return { below: true, basis: 'first_day', pace: null }
+  const pace = weeklyPace(weekly.used, weekly.resetsAt, at)
+  return { below: pace === null || pace < bonus.belowPace, basis: 'pace', pace }
+}
+
+/**
+ * The directives total cap under the pace bonus (argus#64): `bonus.totalCap` while the pace is below its edge, the
+ * tick's cap otherwise. It only raises a cap, never lowers one a tick already sent at the bonus. A live `max_slots`
+ * override (`suspended`) is the owner's own cap and the bonus leaves it. The budget ladder applies on top of this.
+ */
+export function paceBonusCap(slotCap: number | null, weekly: Weekly | null, bonus: PaceSlotBonus | null, suspended: boolean, at: number): number | null {
+  if (slotCap === null || bonus === null || suspended) return slotCap
+  return paceBonusReading(weekly, bonus, at).below ? Math.max(slotCap, bonus.totalCap) : slotCap
+}
+
 /** Per-host caps from the directives. A host left out has no cap of its own. */
 export type HostCaps = Partial<Record<Host, number>>
 
@@ -966,8 +1009,63 @@ export function openStore(options: StoreOptions) {
     return lift !== null && weekly.used < lift.weeklyCeilingPercent ? lift : null
   }
 
-  /** The directives total cap under the budget ladder and any live override: `effectiveSlotCap` with the override applied. */
-  const effectiveCapOf = (slotCap: number | null, weekly: Weekly | null) => effectiveSlotCap(slotCap, weekly, liftOf(weekly))
+  /**
+   * argus#64: the directives' `pace_slot_bonus` and whether a live `max_slots` override suspends it, read from the
+   * current record as `awaitingCiCap` is, so a start needs no client flag.
+   */
+  function paceBonusOfDirectives(): { bonus: PaceSlotBonus | null; suspended: boolean } {
+    const row = selectCurrentDirectives.get() as Row | undefined
+    if (row === undefined) return { bonus: null, suspended: false }
+    const record = JSON.parse(String(row.record))
+    return { bonus: paceSlotBonus(record), suspended: maxSlotsOverrideLive(record, now()) }
+  }
+
+  /** The tick's total cap with the pace bonus applied, before the budget ladder: what the server counts the slots against. */
+  function bonusCapOf(slotCap: number | null, weekly: Weekly | null): number | null {
+    const { bonus, suspended } = paceBonusOfDirectives()
+    return paceBonusCap(slotCap, weekly, bonus, suspended, now())
+  }
+
+  /**
+   * The directives total cap under the pace bonus, the budget ladder and any live override: `effectiveSlotCap` with
+   * the bonus applied first and the override after.
+   */
+  const effectiveCapOf = (slotCap: number | null, weekly: Weekly | null) => effectiveSlotCap(bonusCapOf(slotCap, weekly), weekly, liftOf(weekly))
+
+  /** What status_read shows of the pace bonus (argus#64) and why the effective cap is what it is. */
+  function slotCapShown(slotCap: number | null, weekly: Weekly | null) {
+    const { bonus, suspended } = paceBonusOfDirectives()
+    const at = now()
+    const base = paceBonusCap(slotCap, weekly, bonus, suspended, at)
+    const effective = effectiveCapOf(slotCap, weekly)
+    const reading = bonus === null ? null : paceBonusReading(weekly, bonus, at)
+    const active = slotCap !== null && base !== null && base > slotCap
+    const paceText = reading?.pace === null || reading === null ? null : String(Number(reading.pace.toFixed(2)))
+    const edge = bonus === null ? '' : String(bonus.belowPace)
+    const basisText =
+      reading === null || bonus === null
+        ? ''
+        : reading.basis === 'pace'
+          ? `pace ${paceText} ${reading.below ? 'is below' : 'is not below'} ${edge}`
+          : reading.basis === 'first_day'
+            ? `first day of the week, so no pace is read and it counts as below ${edge}`
+            : `no pace to read (no weekly figure, or the weekly ladder is ignored), so it counts as below ${edge}`
+    let reason: string
+    if (slotCap === null) reason = 'no total cap recorded yet'
+    else if (weekly !== null && (weekly.rung === 'no_new_slots' || weekly.rung === 'gate_only') && liftOf(weekly) === null) {
+      reason = `budget rung ${weekly.rung}: no new slots (cap 0)`
+    } else if (weekly !== null && liftOf(weekly) !== null) reason = `budget override: the cap is ${effective} at rung ${weekly.rung}`
+    else if (bonus === null) reason = `total cap ${slotCap} from the tick`
+    else if (suspended) reason = `total cap ${slotCap} from the tick: a max_slots override is live, so the pace bonus is off`
+    else if (active) reason = `pace bonus: ${basisText}, so the total cap is ${base} (the tick sent ${slotCap})`
+    else reason = `total cap ${slotCap} from the tick: ${basisText}`
+    return {
+      pace_slot_bonus: bonus === null ? null : { below_pace: bonus.belowPace, total_cap: bonus.totalCap },
+      pace_slot_bonus_active: active,
+      pace_slot_bonus_suspended: bonus !== null && suspended,
+      slot_cap_reason: reason,
+    }
+  }
 
   /** What status_read shows of the override (argus#73): the live entry, and whether it is lifting the rung right now. */
   function budgetOverrideShown(weekly: Weekly | null) {
@@ -1459,7 +1557,7 @@ export function openStore(options: StoreOptions) {
     const totalCap = status.slot_cap === null ? null : Number(status.slot_cap)
     const exemptRepos = exemptReposOf(status)
     // The poll does not know which repo the takeable work is in: while any repo is exempt, count room against the uncut total.
-    const cap = exemptRepos.length > 0 ? totalCap : effectiveCapOf(totalCap, weekly)
+    const cap = exemptRepos.length > 0 ? bonusCapOf(totalCap, weekly) : effectiveCapOf(totalCap, weekly)
     const perHost = runningByHost(exemptRepos)
     const running = perHost.wsl2 + perHost.homelab
     if (cap !== null && running >= cap) return false
@@ -2286,6 +2384,7 @@ export function openStore(options: StoreOptions) {
             budget_rung_held: false,
             reserve_percent: null,
             effective_slot_cap: null,
+            ...slotCapShown(null, null),
           },
           slots,
           liveness: { state: livenessState(of), missed_ticks: null, cadence_minutes, next_due_at: null },
@@ -2326,6 +2425,7 @@ export function openStore(options: StoreOptions) {
           budget_rung_held: weekly?.held ?? false,
           reserve_percent: weekly?.reservePercent ?? null,
           effective_slot_cap: effectiveCapOf(cap, weekly),
+          ...slotCapShown(cap, weekly),
           ...budgetOverrideShown(weekly),
           budget_exempt_repos: exemptReposOf(row),
           budget_exempt_issues: exemptIssuesOfDirectives(),

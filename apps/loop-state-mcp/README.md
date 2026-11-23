@@ -246,6 +246,22 @@ effect and ends with no new tick otherwise, as `ignore_weekly_budget` does, and 
 rung now). argus-config's directives check and `directives_effective.py` must accept the key before a record
 carrying it is written.
 
+**The pace-gated third slot** ([argus#64](https://github.com/deanjstone/argus/issues/64), owner 22 Nov 2026: "Max slots to 3 when
+pace is less than x1.00"). The directives accept `pace_slot_bonus: {below_pace, total_cap}`: `below_pace` is a positive
+number, `total_cap` a positive integer at least `max_slots`, and no other field. While it is set, the server counts slots
+against `total_cap` whenever the week's pace is strictly below `below_pace`, and against the total cap the tick sent (the
+directives `max_slots`) otherwise. It only raises a cap: a tick that already sends the bonus cap keeps it. The pace is
+used ÷ the elapsed share of the week, taken against now rather than from the last tick, so a start or a wake check sees
+it fall as the week goes on. It uses the ladder's first-day rule: in the first day of a week no pace is read, so it counts
+as below, as the first hour does; so does a week with no weekly figure (none sent, or `ignore_weekly_budget` is live) and
+a week that has reset since the last tick. The bonus is the first step, and the rest still applies on top: the budget rung
+cuts the cap to 0 from `no_new_slots` up (or to a live `lift_budget_rung` override's `slots`, bounded by the bonus cap),
+and `host_caps` still bound each host. A live `max_slots` override suspends the bonus, since the owner set that cap by
+hand. `slot_start`, `slot_resume_ci` and `POST /wake/check`'s `free_slot` room use the same cap. `status_read` `pressure`
+returns `pace_slot_bonus` (the setting, or null), `pace_slot_bonus_active` (true while it raises the cap above the tick's),
+`pace_slot_bonus_suspended` and `slot_cap_reason`, a sentence naming the cap that applied and why. argus-config's
+directives check and `directives_effective.py` must accept the key before a record carrying it is written.
+
 **Slot caps.** A tick passes the directives' `total_cap` and `host_caps` (`{"wsl2": 2,
 "homelab": 1}`; a host left out has no cap of its own). `slot_cap` still works as the total cap
 for a caller that has not moved to `total_cap`; if both are given `total_cap` wins. A tick that
