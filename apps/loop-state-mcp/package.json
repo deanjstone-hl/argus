@@ -2,7 +2,7 @@
   "name": "@argus/loop-state-mcp",
   "version": "0.1.0",
   "private": true,
-  "description": "Loop-state MCP \u2014 slots, loop status and the quiet-tick gate shared by the AFK loop and Aquila, one SQLite db behind typed tools",
+  "description": "Loop-state MCP — slots, loop status and the quiet-tick gate shared by the AFK loop and Aquila, one SQLite db behind typed tools",
   "type": "module",
   "engines": {
     "node": ">=22.13"
@@ -12,8 +12,7 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json",
-    "test": "vitest run",
-    "directive-keys": "tsx scripts/directive-keys.ts"
+    "test": "vitest run"
   },
   "dependencies": {
     "@argus/bearer-auth": "workspace:*",
