@@ -1,0 +1,66 @@
+---
+name: verify-loop-state-slots
+description: Check a change to loop-state's slot lifecycle or cap counting against the bounded model of the slots. Use before landing any edit to apps/loop-state-mcp/src/store.ts that touches standingOf, runningSlots, runningByHost, capRefusal, requireRoomForSlot, any slot* method or status_read's slot counts, or when the slot model test fails.
+---
+
+# Verify loop-state slots
+
+`apps/loop-state-mcp/test/slot-model.test.ts` plays the slot lifecycle against the real store, on a real SQLite db. The model keeps its own copy of each slot's state. From the README's slot diagram and cap rules it says what each operation must do: `start`, `park`, `unpark`, `await_ci`, `resume_ci`, `resume_report_only`, `close`, `free`. It uses eight issues: two capped per host, two in `budget_exempt_issues` ("listed"), two started with `budget_exempt` ("flagged"). The caps are total 2, wsl2 1, homelab 2, awaiting CI 3. The search visits every slot state within 4 operations of an empty db and tries every operation from each, refused ones included. Then one seeded walk of 20,000 operations reaches the deep states.
+
+## Properties
+
+1. **The store follows the slot diagram.** Each operation is accepted or refused exactly as the diagram and the caps say, and `slot_list` shows the state the diagram gives. Harm if broken: a slot is stuck (a finished worker cannot close), or a refused start blocks work the caps allow.
+2. **Slots running work never exceed a cap.** Capped slots stay within the total cap and each host cap. At most one listed and one flagged slot run. A green `report_only` resume is the one slot allowed past a cap (argus/37). Harm if broken: more workers than the host has memory for.
+3. **Every report agrees on what is exempt and what is running.** `slot_list`'s `budget_exempt`, `status_read`'s `budget_exempt_running`, `used`, `parked`, `ready` and `awaiting_ci` match the diagram. Harm if broken: the tick launches a worker that `slot_start` then refuses (argus#77).
+
+## Run
+
+```bash
+cd apps/loop-state-mcp && npx vitest run test/slot-model.test.ts
+```
+
+It takes about 20 s. `SLOT_MODEL_DEPTH=5 SLOT_MODEL_WALK_STEPS=200000` searches deeper; use that after a large change. CI runs the default bound through `scripts/ci.sh` whenever loop-state changes, and in the daily full run.
+
+## Reading a failure
+
+A failure prints the broken property and the operations that led to it from an empty db:
+
+```
+start wsl2-b is refused by the slot diagram and the caps, but the store accepted it
+  start wsl2-a
+  start wsl2-b
+```
+
+A walk failure prints its seed and only the last operations that changed a slot. Rerun the search at a higher `SLOT_MODEL_DEPTH` to get the shortest path.
+
+- **A real bug.** The trace is something a tick or a worker can do. Fix `store.ts`. Never loosen the property.
+- **A modelling error.** The store is right and the model's `expected()` or `hasRoom()` says otherwise. Fix the model so it matches the README, and say why in the commit.
+- **An intended change.** For example, a new slot state or cap rule. Change `expected()` and `hasRoom()` in the same commit as the code and the README, and update this file.
+
+## Proven able to fail
+
+Each mutant below was applied to `src/store.ts`, and the model test failed on it:
+
+| Mutant | Past fix it undoes | Caught by |
+| --- | --- | --- |
+| `standingOf` gives `budgetExempt: flagged` only | `1f8727b2` (argus#77) | the argus#77 replay, the search, the walk |
+| `slot_close` refuses a `ready` slot | `ca60c4a4` (argus#1197) | the argus#1197 replay, the walk |
+| `report_only` resume still checks the caps | argus/37 | the argus/37 replay, the walk |
+| `standingOf` counts a listed issue as capped | argus#60 | the search, the walk |
+| host cap compares with `>` | none: an off-by-one | the argus#1197 replay, the search, the walk |
+| awaiting cap compares with `>` | none: an off-by-one | the walk |
+
+## Not covered
+
+- Pressure levels (`no_new_slots`, `gate_only`), the budget ladder, `lift_budget_rung` and `pace_slot_bonus`: the model runs at normal pressure with fixed caps.
+- `budget_exempt_repos`, `slot_rebuild`, `slot_report`, and the afk lease check on slot writes.
+- Wakes: `free_slot` and `drain` are not part of this model.
+- Concurrent connections: each call is one transaction on one connection.
+- A pass covers these eight issues, depth 4 and the walk. It does not prove every state.
+
+## Coverage record
+
+- Covered: `apps/loop-state-mcp/src/store.ts` `standingOf`, `standingOfRow`, `runningSlots`, `runningByHost`, `budgetExemptRunning`, `toShownSlot`, `capRefusal`, `requireRoomForSlot` (its cap half), `slotStart`, `slotPark`, `slotUnpark`, `slotAwaitCi`, `slotResumeCi`, `slotClose`, `slotFree`, `slotList`, and the `slots` block of `statusRead`.
+- Last confirmed against: `9ba66db3`.
+
+After changing covered code, run the test. Move the commit above forward only once you have confirmed that the test still describes the code at the new commit. Check with `git log 9ba66db3.. -- apps/loop-state-mcp/src/store.ts` whether it has fallen behind.

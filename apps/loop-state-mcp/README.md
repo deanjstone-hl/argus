@@ -733,6 +733,17 @@ replays the bugs fixed by `b2366f4` and `80120a3f`. The project skill
 `.claude/skills/verify-loop-state-leases` says when to run it, how to read a failure, and which
 code it covers. `LEASE_MODEL_DEPTH` and `LEASE_MODEL_WALKS` raise the bound.
 
+`test/slot-model.test.ts` is the same kind of check for the slot lifecycle. It visits every slot
+state within 4 operations of an empty db, tries every slot operation from each, then walks 20,000
+seeded operations, against the real store. After each operation it checks that the store followed
+the slot diagram above, that slots running work stay within every cap, and that `slot_list` and
+`status_read` agree on what is running and what is budget-exempt. It replays argus#77, argus#1197
+and argus/37. The project skill `.claude/skills/verify-loop-state-slots` says when to run it and
+how to read a failure. `SLOT_MODEL_DEPTH` and `SLOT_MODEL_WALK_STEPS` raise the bound.
+
+How a slot counts toward the caps (capped, exempt repo, flagged, listed) is decided by `standingOf`
+in `src/store.ts` and nowhere else; `test/standing-lint.test.ts` fails on a second copy of the rule.
+
 ## Deploy
 
 On the homelab, from `~/repos/argus` (the deploy copy, on `main`):
