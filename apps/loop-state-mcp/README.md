@@ -759,6 +759,12 @@ prompt) stay within every cap, and that `slot_list` and `status_read` agree on w
 what is budget-exempt. It replays argus#77, argus#1197, argus/37 and argus-config#1688. The project skill `.claude/skills/verify-loop-state-slots` says when to run it and
 how to read a failure. `SLOT_MODEL_DEPTH` and `SLOT_MODEL_WALK_STEPS` raise the bound.
 
+`test/wake-model.test.ts` checks which thread the `afk` wake goes to. It builds every arrangement of
+holder, liveness, slots per host, the holder's tick errors and `takeable` (320 of them), asks
+`wake_check` once per poller, and compares the answer with the wake table above: the standby is told
+`failover`, `drain` or `primary_alive`, and the holder `free_slot` exactly when it can start a slot.
+It replays argus#57, `87513abb`, argus#58, `f1bed5b9` and argus-config#1357. The same skill covers it.
+
 How a slot counts toward the caps (capped, exempt repo, flagged, listed) is decided by `standingOf`
 in `src/store.ts` and nowhere else; `test/standing-lint.test.ts` fails on a second copy of the rule.
 
