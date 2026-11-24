@@ -610,6 +610,11 @@ export const MIGRATIONS = [
     set_at    INTEGER NOT NULL
   );
   `,
+  // argus#63: which ladder wrote a row's rung. A row with none was written before the pace ladder (or by the build
+  // that shipped it), so its rung gives the next tick no hysteresis credit.
+  `
+  ALTER TABLE loop_status ADD COLUMN budget_ladder INTEGER;
+  `,
 ]
 
 const GREEN_NOTE_PATTERN = /^\s*checks green\b/i
@@ -655,6 +660,8 @@ const BUDGET_EDGES = [
   { rung: 'gate_only', over: 1.5 },
 ] as const
 const HYSTERESIS = 0.05
+/** The ladder a row's rung came from (argus#63): 2 is the weekly pace ladder. A row with none came from the burn ladder. */
+const BUDGET_LADDER = 2
 /** How much of the week must be gone before pace sets a rung (argus#62); before it only the spent allowance gates. */
 const PACE_READABLE_AFTER_MS = DAY_MS
 
@@ -1105,8 +1112,12 @@ export function openStore(options: StoreOptions) {
           reservePercent: row.reserve_percent === null || row.reserve_percent === undefined ? DEFAULT_RESERVE_PERCENT : Number(row.reserve_percent),
         }
 
-  /** The rung a row last held, unless its week is over: a new week starts with no rung to hold. */
+  /**
+   * The rung a row last held, unless its week is over (a new week starts with no rung to hold) or another ladder
+   * wrote it (argus#63): an old burn rung says nothing about a pace, so it earns no hysteresis.
+   */
   const heldRungOf = (row: Row | undefined): BudgetRung => {
+    if (row !== undefined && Number(row.budget_ladder ?? 0) !== BUDGET_LADDER) return 'normal'
     const weekly = row ? weeklyOf(row) : null
     return weekly !== null && weekly.resetsAt > now() ? weekly.rung : 'normal'
   }
@@ -1183,8 +1194,8 @@ export function openStore(options: StoreOptions) {
                              slot_cap, errors, pressure, window_used_percent,
                              window_level, weekly_used_percent, weekly_resets_at, weekly_pace,
                              host_caps, reserve_percent, budget_rung, budget_held, burn_per_day, allowance_per_day, budget_ratio,
-                             budget_exempt_repos)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                             budget_exempt_repos, budget_ladder)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT (role) DO UPDATE SET
       thread_id = excluded.thread_id, last_tick_at = excluded.last_tick_at, event_cursor = excluded.event_cursor,
       directives_version = excluded.directives_version, needs_owner = excluded.needs_owner,
@@ -1194,7 +1205,7 @@ export function openStore(options: StoreOptions) {
       weekly_pace = excluded.weekly_pace, host_caps = excluded.host_caps, reserve_percent = excluded.reserve_percent,
       budget_rung = excluded.budget_rung, budget_held = excluded.budget_held, burn_per_day = excluded.burn_per_day,
       allowance_per_day = excluded.allowance_per_day, budget_ratio = excluded.budget_ratio,
-      budget_exempt_repos = excluded.budget_exempt_repos`)
+      budget_exempt_repos = excluded.budget_exempt_repos, budget_ladder = excluded.budget_ladder`)
 
   interface TickValues {
     slotCap: number | null
@@ -1235,6 +1246,7 @@ export function openStore(options: StoreOptions) {
       values.pressure.weekly?.allowancePerDay ?? null,
       values.pressure.weekly?.ratio ?? null,
       values.exemptRepos === null ? null : JSON.stringify(values.exemptRepos),
+      values.pressure.weekly ? BUDGET_LADDER : null,
     )
     // Only a figure the caller gave is a reading; one carried forward is not new information.
     if (input.weekly_used_percent !== undefined && input.weekly_resets_at !== undefined) {

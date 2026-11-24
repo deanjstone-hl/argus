@@ -220,7 +220,7 @@ the time gone:
 
 A rung engages above its edge and releases only below the edge − 0.05, so a pace hovering at
 an edge does not flip the level each tick (on 25 Oct it hovered at 1.09–1.12). `budget_rung_held`
-is true while hysteresis is holding a rung the pace alone would not give. A new week starts with no rung held. The
+is true while hysteresis is holding a rung the pace alone would not give. A new week starts with no rung held. A row written before the pace ladder (no `budget_ladder` mark) gives no hysteresis credit either, so the first tick after a deploy resolves from pace alone (argus#63). The
 effective `pressure.level` is the stricter of the budget rung and the window ladder, and a
 change in it is a `pressure` change for the gate. A `normal` rung adds no limit, so an unread
 window stays `unknown`. `tick_gate` and `POST /wake/check` carry the last weekly figure and
@@ -331,6 +331,8 @@ Schema version 7 added `window_level`, `weekly_used_percent`, `weekly_resets_at`
 `allowance_per_day` and `budget_ratio` to `loop_status`; each applies once, in place, and
 existing rows keep their level as the window side. Rolling back the code leaves the added
 columns and table unused, which an older build ignores.
+
+A later migration adds `budget_ladder` to `loop_status`: the ladder that wrote a row's rung (2 is the pace ladder). Rows from before it hold null.
 
 `tick_gate` is the first call of every tick. It takes the same input as `status_tick` and
 compares it with the caller's last recorded tick:

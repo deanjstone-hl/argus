@@ -1,6 +1,8 @@
+import { DatabaseSync } from 'node:sqlite'
+
 import { describe, expect, it } from 'vitest'
 
-import { AFK_THREAD, MINUTE, TOKENS, world } from './helpers.js'
+import { AFK_THREAD, MINUTE, TOKENS, tempDbPath, world } from './helpers.js'
 import { DAY, HOUR, WEEK, base, ladderWorld } from './ladder-world.js'
 
 /**
@@ -422,5 +424,43 @@ describe('ladder: the quiet-tick gate and wake', () => {
     await afk.ok('status_tick', tick(1.15))
     expect(await afk.ok('tick_gate', tick(1.07))).toMatchObject({ changed: false })
     expect(await afk.ok('tick_gate', tick(1.04))).toMatchObject({ changed: true, reasons: ['pressure'] })
+  })
+})
+
+describe('ladder: a rung from before the pace ladder gives no hysteresis (argus#63)', () => {
+  /** Rewrite the stored row as an older build left it: a rung, held or not, with no ladder version. */
+  const asOldLadder = (path: string, rung: string) => {
+    const db = new DatabaseSync(path)
+    db.prepare("UPDATE loop_status SET budget_rung = ?, budget_ladder = NULL WHERE role = 'afk'").run(rung)
+    db.close()
+  }
+
+  it.each(['no_opus', 'no_new_slots', 'gate_only'])('a stored %s from the old ladder does not hold at pace 1.094', async (rung) => {
+    // 22 Nov 2026: the first tick after argus#62 read the old gate_only and held no_opus at 1.094.
+    const path = tempDbPath()
+    const { paceTo } = await ladderWorld({ path })
+    await paceTo(1.0)
+    asOldLadder(path, rung)
+    const pressure = await paceTo(1.094)
+    expect(pressure).toMatchObject({ level: 'normal', budget_rung: 'normal', budget_rung_held: false })
+  })
+
+  it('a tick_gate after the old row resolves from pace alone too', async () => {
+    const path = tempDbPath()
+    const { afk, paceTo, tick } = await ladderWorld({ path })
+    await paceTo(1.0)
+    asOldLadder(path, 'gate_only')
+    await afk.ok('tick_gate', tick(1.094))
+    expect((await afk.ok('status_read')).pressure).toMatchObject({ level: 'normal', budget_rung_held: false })
+  })
+
+  it('a row written by this ladder still holds on the next tick', async () => {
+    const path = tempDbPath()
+    const { paceTo } = await ladderWorld({ path })
+    await paceTo(1.0)
+    asOldLadder(path, 'gate_only')
+    await paceTo(1.094)
+    expect((await paceTo(1.15)).level).toBe('no_opus')
+    expect(await paceTo(1.094)).toMatchObject({ level: 'no_opus', budget_rung_held: true })
   })
 })
