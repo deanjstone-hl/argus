@@ -329,9 +329,9 @@ version 9 adds the `budget_exempt_repos` column to `loop_status`.
 `budget_exempt_issues` is an optional list of `owner/repo#N`, each an issue the owner named.
 `slot_start` reads it from the current directives, so the caller passes no flag. A listed issue
 passes `no_new_slots` and `gate_only`, skips every cap, and while it
-runs it is not counted toward the total, effective or host caps. One listed issue runs at a
-time: a second listed start is refused until the first closes. It does not use the
-`efficiency:orchestrator` slot above, so each keeps its own one at a time. Nothing else is
+runs it is not counted toward the total, effective or host caps. A listed issue shares one running
+place with the `efficiency:orchestrator` slot below ([argus#87](https://github.com/deanjstone-hl/argus/issues/87)):
+only one budget-exempt slot of either kind runs at a time, and a second start is refused until the first closes. Nothing else is
 waived: the memory, load and disk gates are the tick's, not the server's, and still apply. An
 issue not listed is refused at those levels as ever, and a later directives version that drops
 it ends the exemption. `status_read` `pressure.budget_exempt_issues` returns the list.
@@ -346,7 +346,7 @@ orchestrator's token or tick cost) starts with `slot_start` `budget_exempt: true
 passes it, the server does not read labels. Such a start is allowed at `no_new_slots` and still
 refused at `gate_only`; it skips every cap, and while it runs it is
 not counted toward the total, effective or host caps (the same as a slot in an exempt repo). One
-budget-exempt slot runs at a time: a second start is refused until the first closes. The slot row
+budget-exempt slot runs at a time, shared with the listed issues above: a second start of either kind is refused until the first closes. The slot row
 records `budget_exempt`; `slot_list` (and every slot a write returns) shows it, and `status_read`
 `slots.budget_exempt_running` counts the running ones. Use Sonnet or Haiku for it: the server does
 not check the model, the charter does. `POST /wake/check` takes an optional `takeable_exempt`

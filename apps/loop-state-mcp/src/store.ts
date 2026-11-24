@@ -1545,11 +1545,12 @@ export function openStore(options: StoreOptions) {
    * with its own copy of this rule).
    *
    * - `exemptRepo`: the issue's repo is in the AFK tick's `budget_exempt_repos`. Outside the caps, one running per repo.
-   * - `flagged`: started with `budget_exempt` (an efficiency:orchestrator issue). Outside the caps, one running in all.
-   * - `listed`: the issue is in the directives' `budget_exempt_issues`. Outside the caps, one running in all. Read from
+   * - `flagged`: started with `budget_exempt` (an efficiency:orchestrator issue). Outside the caps.
+   * - `listed`: the issue is in the directives' `budget_exempt_issues`. Outside the caps. Read from
    *   the live directives, so dropping the issue from them ends it.
    * - `capped`: none of the three, so the slot counts toward the total, effective and host caps.
-   * - `budgetExempt`: flagged or listed, what `slot_list` and `status_read` show as budget-exempt.
+   * - `budgetExempt`: flagged or listed, what `slot_list` and `status_read` show as budget-exempt. All of them share
+   *   one running place in all: a flagged and a listed issue never run together (argus#87).
    */
   interface Standing {
     readonly repo: string
@@ -1651,11 +1652,12 @@ export function openStore(options: StoreOptions) {
    * others count. It keeps one running slot per repo and still obeys the pressure levels.
    *
    * argus#1171: a `budgetExempt` start (an efficiency:orchestrator issue) is the same outside the
-   * caps and the ladder's cut, but keeps one running exempt slot in all, passes no_new_slots and
-   * still stops at gate_only.
+   * caps and the ladder's cut, but passes no_new_slots and still stops at gate_only.
    *
-   * argus#60: an issue in the directives' `budget_exempt_issues` passes no_new_slots and gate_only, sits outside
-   * the caps and keeps one running such issue; the pressure ladders are the only gate the server holds for it.
+   * argus#60: an issue in the directives' `budget_exempt_issues` passes no_new_slots and gate_only and sits outside
+   * the caps; the pressure ladders are the only gate the server holds for it.
+   *
+   * argus#87: the flagged and listed starts share one running place: one budget-exempt slot of either kind runs at a time.
    *
    * argus#73: a live `lift_budget_rung` override lifts a budget rung of no_opus or no_new_slots (not gate_only):
    * the effective cap becomes the override's, and a start that names a model must name one the override allows.
@@ -1686,12 +1688,9 @@ export function openStore(options: StoreOptions) {
    */
   function capRefusal(status: Row, pressure: Pressure, host: Host, issue: string, standing: Standing): string | null {
     const running = placedSlots(exemptionsNow(status))
-    if (standing.listed) {
-      const other = running.find((slot) => slot.issue !== issue && slot.standing.listed)
-      return other === undefined ? null : `${other.issue} already runs a budget-exempt issue: only one runs at a time`
-    }
-    if (standing.flagged) {
-      const other = running.find((slot) => slot.standing.flagged)
+    // argus#87: flagged and listed share one running place; either kind waits while the other runs.
+    if (standing.budgetExempt) {
+      const other = running.find((slot) => slot.issue !== issue && slot.standing.budgetExempt)
       return other === undefined ? null : `${other.issue} already runs a budget-exempt slot: only one runs at a time`
     }
     if (standing.exemptRepo) {

@@ -75,8 +75,8 @@ const isCapped = (issue: Issue) => !issue.flagged && !issue.listed
 /** Whether the caps leave running room for `issue`, counting every slot that holds a place as the README says. */
 function hasRoom(model: Model, issue: Issue): boolean {
   const running = placedIn(model).filter((other) => other !== issue)
-  if (issue.listed) return !running.some((other) => other.listed)
-  if (issue.flagged) return !running.some((other) => other.flagged)
+  // argus#87: flagged and listed issues share one running place, so either kind waits for the other.
+  if (!isCapped(issue)) return !running.some((other) => !isCapped(other))
   const cappedRunning = running.filter(isCapped)
   return cappedRunning.length < TOTAL_CAP && cappedRunning.filter((other) => other.host === issue.host).length < HOST_CAPS[issue.host]
 }
@@ -215,8 +215,7 @@ function step(store: Store, model: Model, action: Action): string | null {
     const here = cappedWorking.filter((issue) => issue.host === host).length
     if (here > HOST_CAPS[host]) return `${here} capped workers are resident on ${host}, past its cap ${HOST_CAPS[host]}`
   }
-  if (working.filter((issue) => issue.listed).length > 1) return 'two budget_exempt_issues slots run work at once'
-  if (working.filter((issue) => issue.flagged).length > 1) return 'two budget_exempt slots run work at once'
+  if (working.filter((issue) => !isCapped(issue)).length > 1) return 'two budget-exempt slots (flagged or listed) run work at once'
 
   const { slots } = store.statusRead('afk')
   const count = (state: SlotState) => [...model.values()].filter((slot) => slot.state === state).length

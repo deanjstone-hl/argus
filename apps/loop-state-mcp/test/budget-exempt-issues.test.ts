@@ -82,7 +82,7 @@ describe('slot_start for a budget_exempt_issues issue', () => {
     await w.afk.ok('slot_start', { issue: LISTED, thread_id: 'w1' })
     const refused = await w.afk.call('slot_start', { issue: OTHER_LISTED, thread_id: 'w2' })
     expect(refused.isError).toBe(true)
-    expect(text(refused)).toMatch(/deanjstone\/argus#10 already runs a budget-exempt issue: only one runs at a time/)
+    expect(text(refused)).toMatch(/deanjstone\/argus#10 already runs a budget-exempt slot: only one runs at a time/)
     await w.afk.ok('slot_close', { issue: LISTED, verified: VERIFIED })
     expect((await w.afk.call('slot_start', { issue: OTHER_LISTED, thread_id: 'w2' })).isError).toBeFalsy()
   })
@@ -107,12 +107,19 @@ describe('slot_start for a budget_exempt_issues issue', () => {
     expect((await w.afk.call('slot_start', { issue: LISTED, thread_id: 'w2' })).isError).toBeFalsy()
   })
 
-  it('leaves the efficiency:orchestrator exempt slot its own one-at-a-time', async () => {
+  it('shares one running place with the efficiency:orchestrator exempt slot, in either order (argus#87)', async () => {
     const w = await ladderWorld()
     await listed(w)
     await w.afk.ok('status_tick', w.tick(1.3, { total_cap: 3 }))
     await w.afk.ok('slot_start', { issue: LISTED, thread_id: 'w1' })
-    expect((await w.afk.call('slot_start', { issue: issue(2), thread_id: 'w2', budget_exempt: true })).isError).toBeFalsy()
+    const flaggedRefused = await w.afk.call('slot_start', { issue: issue(2), thread_id: 'w2', budget_exempt: true })
+    expect(flaggedRefused.isError).toBe(true)
+    expect(text(flaggedRefused)).toMatch(/already runs a budget-exempt slot: only one runs at a time/)
+    await w.afk.ok('slot_close', { issue: LISTED, verified: VERIFIED })
+    await w.afk.ok('slot_start', { issue: issue(2), thread_id: 'w2', budget_exempt: true })
+    const listedRefused = await w.afk.call('slot_start', { issue: LISTED, thread_id: 'w1' })
+    expect(listedRefused.isError).toBe(true)
+    expect(text(listedRefused)).toMatch(/deanjstone\/argus#2 already runs a budget-exempt slot: only one runs at a time/)
   })
 
   it('stops passing once a later directives version drops the issue', async () => {
