@@ -143,6 +143,23 @@ kept; nothing edits or deletes one.
 
   A write is a `directives_set` loop event, so the AFK gate sees a change.
 
+  Send either `record` (the whole record) or `patch` (argus#75), not both. A patch names only the
+  keys that change and is applied to the version `expected_version` names, so a one-key change
+  cannot drop an unrelated entry the way copying the whole record by hand did (v91 lost
+  `deanjstone-hl/argus-config` from `trunk_repos`). Its operations are `set` (key to its whole new
+  value), `unset` (keys to remove), `add` (entries to append to a list key, created when absent;
+  one already listed is skipped) and `remove` (entries to take out of a list key). A key takes one
+  of `set`, `unset` or `add`/`remove`. A patch is refused, with every problem listed, when it
+  unsets or removes from a key that is not there, removes an entry that is not listed, names a
+  key twice, targets a value that is not a list, changes nothing, or yields a record the full-record
+  checks refuse; it is also refused when no version has been set. Entries match by value.
+  Example: `patch: {add: {budget_exempt_issues: ["deanjstone-hl/atto#16"]}}`.
+
+  Every `directives_set` answer carries `changes`: a key-by-key diff of the new record against the
+  previous version (`added`, `removed` or `changed`, with `before` and `after`; a list that changed
+  also shows `list_added` and `list_removed`, or `reordered` when only the order moved). Check it
+  against the owner's order before ending the turn.
+
   `host_gates.<host>` (`wsl2` or `homelab`) takes `max_load`, `max_io_pressure`,
   `max_memory_pressure`, `max_disk_percent` and `quiet_window` (argus#69, argus-config#1427).
   `quiet_window` is a string `HH:MM-HH:MM` in Sydney time: both times are valid 24-hour times,
