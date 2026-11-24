@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Runs a command with the real D1 database id in wrangler.jsonc, then puts the placeholder back.
 # The public tree holds no Cloudflare id (argus#1207): wrangler.jsonc carries a placeholder and
-# the id lives in Bitwarden Secrets Manager as ARGUS_D1_WATCHTOWER_DATABASE_ID. The deploy
-# workflow gets it from the Actions secret WATCHTOWER_D1_DATABASE_ID; by hand it comes from the
-# environment variable of that name or from Secrets Manager (scripts/private-value.sh).
+# the id lives in Bitwarden Secrets Manager as ARGUS_WATCHTOWER_D1_DATABASE_ID. The deploy
+# workflow reads it from the `actions` project of Secrets Manager through bitwarden/sm-action
+# into WATCHTOWER_D1_DATABASE_ID (argus#59); by hand it comes from the environment variable of
+# that name or from Secrets Manager (scripts/private-value.sh).
 #
 #   bash scripts/with-d1-id.sh pnpm exec wrangler deploy
 #
@@ -22,8 +23,8 @@ grep -q "$placeholder" "$config" || { echo "with-d1-id: $config does not hold th
 if [ -n "${WATCHTOWER_D1_DATABASE_ID:-}" ]; then
   id="$WATCHTOWER_D1_DATABASE_ID"
 else
-  id="$(bash "$here/../../scripts/private-value.sh" ARGUS_D1_WATCHTOWER_DATABASE_ID)" || {
-    echo "with-d1-id: set WATCHTOWER_D1_DATABASE_ID or the Secrets Manager secret ARGUS_D1_WATCHTOWER_DATABASE_ID" >&2
+  id="$(bash "$here/../../scripts/private-value.sh" ARGUS_WATCHTOWER_D1_DATABASE_ID)" || {
+    echo "with-d1-id: set WATCHTOWER_D1_DATABASE_ID or the Secrets Manager secret ARGUS_WATCHTOWER_D1_DATABASE_ID" >&2
     exit 1
   }
 fi

@@ -85,7 +85,10 @@ describe("scripts/owner-steps/1207.sh", () => {
       ].sort(),
     );
     const deploy = read("apps/watchtower-collector/deploy.sh");
-    for (const key of keys) expect(deploy, key).toContain(key);
+    // 1207.sh is the record of the cutover, which seeded the D1 id under its first name; scripts/owner-steps/59.sh
+    // renamed it (argus#59), and deploy.sh reads the new name.
+    const renamed: Record<string, string> = { ARGUS_D1_WATCHTOWER_DATABASE_ID: "ARGUS_WATCHTOWER_D1_DATABASE_ID" };
+    for (const key of keys) expect(deploy, key).toContain(renamed[key] ?? key);
   });
 
   it("maps every Actions secret a workflow reads to a Secrets Manager key", () => {
@@ -98,7 +101,8 @@ describe("scripts/owner-steps/1207.sh", () => {
         .split("\n")
         .filter((line) => !line.trimStart().startsWith("#"))
         .join("\n");
-      for (const match of code.matchAll(/secrets\.([A-Za-z0-9_]+)/g)) if (match[1] !== "GITHUB_TOKEN") read_.add(match[1]);
+      // BWS_ACCESS_TOKEN is the token that reads Secrets Manager (argus#59), not a value 1207.sh could store.
+      for (const match of code.matchAll(/secrets\.([A-Za-z0-9_]+)/g)) if (!["GITHUB_TOKEN", "BWS_ACCESS_TOKEN"].includes(match[1])) read_.add(match[1]);
     }
     expect(read_.size).toBeGreaterThan(0);
     for (const name of read_) expect(mapped.has(name), `${name} has no Secrets Manager key in 1207.sh`).toBe(true);

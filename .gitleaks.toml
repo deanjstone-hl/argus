@@ -95,3 +95,14 @@ regexTarget = "line"
 regexes = [
   '''^\s+[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12} > [A-Z][A-Z0-9_]+$''',
 ]
+
+# The secret ids of scripts/owner-steps/59.sh and its test (argus#59): the same ids the sm-action maps name,
+# allowed only on a table row of that shape (`"<uuid> <KEY> <KEY> <KEY|->"`, `{ id: "<uuid>", old: "<KEY>", ...`)
+# and nowhere else. Rule: cloudflare-id.
+[[allowlists]]
+description = "Secrets Manager ids in the owner step's table and its test"
+regexTarget = "line"
+regexes = [
+  '''^\s+"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12} ARGUS_[A-Z0-9_]+ ARGUS_[A-Z0-9_]+ (?:-|ARGUS_[A-Z0-9_]+)"$''',
+  '''^\s+\{ id: "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", old: "ARGUS_[A-Z0-9_]+", next: "ARGUS_[A-Z0-9_]+", host: "(?:|ARGUS_[A-Z0-9_]+)" \},$''',
+]

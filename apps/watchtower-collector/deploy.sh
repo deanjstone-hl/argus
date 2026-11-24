@@ -35,7 +35,7 @@
 # Non-secret config (project refs, unit lists) is set via the env overrides below or by editing
 # the CONFIG block. The private values (tailnet addresses, Cloudflare account, zone and D1 ids)
 # are in BWS under ARGUS_TAILSCALE_IP_HOMELAB, ARGUS_TAILSCALE_IP_WSL2, ARGUS_CLOUDFLARE_ACCOUNT_ID,
-# ARGUS_CLOUDFLARE_ZONE_ID and ARGUS_D1_WATCHTOWER_DATABASE_ID (argus#1207).
+# ARGUS_CLOUDFLARE_ZONE_ID and ARGUS_WATCHTOWER_D1_DATABASE_ID (argus#1207).
 #
 # Where the unit is installed, it also refreshes ~/.config/systemd/user/watchtower-collector.service
 # from systemd/ when the content differs, and reloads systemd before the restart (argus#53).
@@ -138,7 +138,7 @@ CLOUDFLARE_WORKER_PROJECTS="${CLOUDFLARE_WORKER_PROJECTS:-reader-api,argus-memor
 # Analytics: Read on the token; without it the cards report exceptions only).
 CLOUDFLARE_ZONE_ID="${CLOUDFLARE_ZONE_ID:-$(private_value CLOUDFLARE_ZONE_ID ARGUS_CLOUDFLARE_ZONE_ID)}"
 # D1 databases as name:id, for the capacity cards.
-D1_DATABASES="${D1_DATABASES:-argus-watchtower:$(private_value D1_DATABASES ARGUS_D1_WATCHTOWER_DATABASE_ID)}"
+D1_DATABASES="${D1_DATABASES:-argus-watchtower:$(private_value D1_DATABASES ARGUS_WATCHTOWER_D1_DATABASE_ID)}"
 SUPABASE_PROJECT_REFS="${SUPABASE_PROJECT_REFS:-iyqhnvandyalaujyqbtj,centbxttgyenxtkknepx}"
 AI_USAGE_WSL2_URL="${AI_USAGE_WSL2_URL:-http://$(private_value AI_USAGE_WSL2_URL ARGUS_TAILSCALE_IP_WSL2):8765/usage}"
 # The same shim's host report, for the lnv-lgn5 cards. Set it empty to turn

@@ -31,7 +31,7 @@
   },
 
   // The id below is a placeholder (argus#1207): the real one is the BWS secret
-  // ARGUS_D1_WATCHTOWER_DATABASE_ID, put in by scripts/with-d1-id.sh for a deploy.
+  // ARGUS_WATCHTOWER_D1_DATABASE_ID, put in by scripts/with-d1-id.sh for a deploy.
   // D1: service_checks table. Real database, created via
   // `wrangler d1 create argus-watchtower` during argus#252's live-provisioning
   // phase (2026-08-14) — migrations already applied via --remote.

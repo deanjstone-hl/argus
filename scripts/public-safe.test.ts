@@ -290,7 +290,7 @@ describe("private values", () => {
 
   it("name their Secrets Manager keys in the collector .env.example and hold no value", () => {
     const text = read("apps/watchtower-collector/.env.example");
-    for (const key of ["ARGUS_CLOUDFLARE_ACCOUNT_ID", "ARGUS_CLOUDFLARE_ZONE_ID", "ARGUS_D1_WATCHTOWER_DATABASE_ID"]) {
+    for (const key of ["ARGUS_CLOUDFLARE_ACCOUNT_ID", "ARGUS_CLOUDFLARE_ZONE_ID", "ARGUS_WATCHTOWER_D1_DATABASE_ID"]) {
       expect(text, key).toContain(`# BWS secret ${key}:`);
     }
     expect(text).toMatch(/^CLOUDFLARE_ACCOUNT_ID=$/m);
@@ -305,7 +305,7 @@ describe("private values", () => {
       "ARGUS_TAILSCALE_IP_WSL2",
       "ARGUS_CLOUDFLARE_ACCOUNT_ID",
       "ARGUS_CLOUDFLARE_ZONE_ID",
-      "ARGUS_D1_WATCHTOWER_DATABASE_ID",
+      "ARGUS_WATCHTOWER_D1_DATABASE_ID",
     ]) {
       expect(deploy, key).toContain(key);
     }

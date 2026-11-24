@@ -200,10 +200,10 @@ describe.skipIf(!hasJq)("scripts/owner-steps/59.sh", () => {
     it("stops when a workflow maps an id the script does not know", () => {
       const { run, stub } = world();
       const extra = readFileSync(join(stub, "at_sha.watchtower-deploy.yml"), "utf8");
-      writeFileSync(join(stub, "alt-workflow.yml"), `${extra}\n            11111111-2222-4333-8444-555555555555 > EXTRA\n`);
+      writeFileSync(join(stub, "alt-workflow.yml"), `${extra}\n            00000000-0000-4000-8000-0000000000e1 > EXTRA\n`);
       const result = run(["--dry-run"], { ARGUS_WORKFLOWS: join(stub, "alt-workflow.yml") });
       expect(result.status).toBe(1);
-      expect(result.stderr).toMatch(/pre-flight FAILED: .*11111111-2222-4333-8444-555555555555/);
+      expect(result.stderr).toMatch(/pre-flight FAILED: .*00000000-0000-4000-8000-0000000000e1/);
     });
 
     it("--dry-run prints every move and host copy, reads state, and writes nothing", () => {

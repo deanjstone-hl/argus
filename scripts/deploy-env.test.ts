@@ -135,7 +135,7 @@ describe.each(["watchtower-collector", "watchtower-usage-shim"])("%s deploy.sh w
       ARGUS_TAILSCALE_IP_WSL2: "100.64.0.1",
       ARGUS_CLOUDFLARE_ACCOUNT_ID: "0000000000000000000000000000a001",
       ARGUS_CLOUDFLARE_ZONE_ID: "0000000000000000000000000000a002",
-      ARGUS_D1_WATCHTOWER_DATABASE_ID: "00000000-0000-4000-8000-0000000000d1",
+      ARGUS_WATCHTOWER_D1_DATABASE_ID: "00000000-0000-4000-8000-0000000000d1",
     }).map(([name, placeholder]) => ({ key: name, value: placeholder })),
   ]);
 
@@ -184,7 +184,7 @@ describe("watchtower-collector deploy.sh writes the hub token (argus#52)", () =>
     ARGUS_TAILSCALE_IP_WSL2: "100.64.0.1",
     ARGUS_CLOUDFLARE_ACCOUNT_ID: "0000000000000000000000000000a001",
     ARGUS_CLOUDFLARE_ZONE_ID: "0000000000000000000000000000a002",
-    ARGUS_D1_WATCHTOWER_DATABASE_ID: "00000000-0000-4000-8000-0000000000d1",
+    ARGUS_WATCHTOWER_D1_DATABASE_ID: "00000000-0000-4000-8000-0000000000d1",
   }).map(([key, value]) => ({ key, value }));
   const secretsWith = (extra: { key: string; value: string }[]) => JSON.stringify([...privateValues, ...extra]);
 
