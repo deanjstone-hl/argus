@@ -1525,39 +1525,72 @@ export function openStore(options: StoreOptions) {
   const repoOf = (issue: string) => issue.slice(0, issue.lastIndexOf('#'))
 
   /**
-   * Running slots per host, 0 for a host with none. argus#1033: a slot in a budget-exempt repo is
-   * outside the slot caps, so it is left out of the count unless `countExempt` asks for every slot.
-   * argus#1171: so is a slot started with `budget_exempt`.
+   * How a slot stands against the caps, decided here and nowhere else. Every cap, refusal, count and shown flag reads
+   * it, so they cannot disagree on which slots are exempt (argus#1033, #1171, argus#60, argus#77 were each one reader
+   * with its own copy of this rule).
+   *
+   * - `exemptRepo`: the issue's repo is in the AFK tick's `budget_exempt_repos`. Outside the caps, one running per repo.
+   * - `flagged`: started with `budget_exempt` (an efficiency:orchestrator issue). Outside the caps, one running in all.
+   * - `listed`: the issue is in the directives' `budget_exempt_issues`. Outside the caps, one running in all. Read from
+   *   the live directives, so dropping the issue from them ends it.
+   * - `capped`: none of the three, so the slot counts toward the total, effective and host caps.
+   * - `budgetExempt`: flagged or listed, what `slot_list` and `status_read` show as budget-exempt.
    */
-  function runningByHost(exemptRepos: readonly string[], countExempt = false): Record<Host, number> {
+  interface Standing {
+    readonly repo: string
+    readonly exemptRepo: boolean
+    readonly flagged: boolean
+    readonly listed: boolean
+    readonly capped: boolean
+    readonly budgetExempt: boolean
+  }
+
+  /** The inputs every standing in one answer is read against: the tick's exempt repos and the directives' listed issues. */
+  interface Exemptions {
+    readonly repos: readonly string[]
+    readonly issues: readonly string[]
+  }
+
+  const exemptionsNow = (status: Row | undefined = selectStatus.get('afk') as Row | undefined): Exemptions => ({
+    repos: exemptReposOf(status),
+    issues: listedExemptIssues(),
+  })
+
+  function standingOf(issue: string, flagged: boolean, exemptions: Exemptions): Standing {
+    const repo = repoOf(issue)
+    const exemptRepo = exemptions.repos.includes(repo)
+    const listed = exemptions.issues.includes(issue.toLowerCase())
+    return { repo, exemptRepo, flagged, listed, capped: !(exemptRepo || flagged || listed), budgetExempt: flagged || listed }
+  }
+
+  const standingOfRow = (row: Row, exemptions: Exemptions): Standing => standingOf(String(row.issue), Number(row.budget_exempt) === 1, exemptions)
+
+  interface RunningSlot {
+    readonly issue: string
+    readonly host: string
+    readonly standing: Standing
+  }
+
+  /** Every running slot with its standing: the one list the caps and counts are taken from. */
+  const runningSlots = (exemptions: Exemptions): RunningSlot[] =>
+    (selectRunning.all() as Row[]).map((row) => ({ issue: String(row.issue), host: String(row.host), standing: standingOfRow(row, exemptions) }))
+
+  /** Running slots per host, 0 for a host with none: the capped ones, or every one with `countExempt`. */
+  function runningByHost(exemptions: Exemptions, countExempt = false): Record<Host, number> {
     const counts: Record<Host, number> = { wsl2: 0, homelab: 0 }
-    const exemptIssues = listedExemptIssues()
-    for (const row of selectRunning.all() as Row[]) {
-      const exempt =
-        Number(row.budget_exempt) === 1 || exemptRepos.includes(repoOf(String(row.issue))) || exemptIssues.includes(String(row.issue).toLowerCase())
-      if (!countExempt && exempt) continue
-      const host = String(row.host)
-      if (host in counts) counts[host as Host] += 1
+    for (const slot of runningSlots(exemptions)) {
+      if (!countExempt && !slot.standing.capped) continue
+      if (slot.host in counts) counts[slot.host as Host] += 1
     }
     return counts
   }
 
-  const isListedExemptIssue = (issue: string) => listedExemptIssues().includes(issue.toLowerCase())
+  const budgetExemptRunning = (exemptions: Exemptions = exemptionsNow()) => runningSlots(exemptions).filter((slot) => slot.standing.budgetExempt).length
 
-  /**
-   * argus#77: a slot counts as budget-exempt when it was started with `budget_exempt` or its issue is in the
-   * directives' `budget_exempt_issues`, the rule `slot_start` applies. The listed kind sets no column, so it is read
-   * from the live directives: dropping the issue from them ends it.
-   */
-  const isExemptRow = (row: Row, exemptIssues: readonly string[] = listedExemptIssues()) =>
-    Number(row.budget_exempt) === 1 || exemptIssues.includes(String(row.issue).toLowerCase())
-
-  const hasRunningExemptSlot = () => (selectRunning.all() as Row[]).some((row) => isExemptRow(row))
-
-  /** A slot as the tools show it: `budget_exempt` also true for a running or parked issue the directives list. */
-  const toShownSlot = (row: Row, exemptIssues: readonly string[] = listedExemptIssues()): Slot => {
+  /** A slot as the tools show it: `budget_exempt` also true for an issue the directives list. */
+  const toShownSlot = (row: Row, exemptions: Exemptions = exemptionsNow()): Slot => {
     const slot = toSlot(row)
-    return slot.budget_exempt || !isExemptRow(row, exemptIssues) ? slot : { ...slot, budget_exempt: true }
+    return slot.budget_exempt === standingOfRow(row, exemptions).budgetExempt ? slot : { ...slot, budget_exempt: true }
   }
 
   const selectSlotShape = db.prepare('SELECT issue, state, host, budget_exempt FROM slots ORDER BY issue')
@@ -1582,10 +1615,10 @@ export function openStore(options: StoreOptions) {
    */
   function slotRoom(status: Row, weekly: Weekly | null, host: Host): boolean {
     const totalCap = status.slot_cap === null ? null : Number(status.slot_cap)
-    const exemptRepos = exemptReposOf(status)
+    const exemptions = exemptionsNow(status)
     // The poll does not know which repo the takeable work is in: while any repo is exempt, count room against the uncut total.
-    const cap = exemptRepos.length > 0 ? bonusCapOf(totalCap, weekly) : effectiveCapOf(totalCap, weekly)
-    const perHost = runningByHost(exemptRepos)
+    const cap = exemptions.repos.length > 0 ? bonusCapOf(totalCap, weekly) : effectiveCapOf(totalCap, weekly)
+    const perHost = runningByHost(exemptions)
     const running = perHost.wsl2 + perHost.homelab
     if (cap !== null && running >= cap) return false
     const hostCaps = hostCapsOf(status)
@@ -1616,7 +1649,8 @@ export function openStore(options: StoreOptions) {
     const status = selectStatus.get('afk') as Row | undefined
     if (!status) return
     const pressure = pressureOf(status)
-    const listed = isListedExemptIssue(issue)
+    const standing = standingOf(issue, budgetExempt, exemptionsNow(status))
+    const { listed } = standing
     // argus#1171: an efficiency:orchestrator start goes through no_new_slots, never gate_only. argus#60: a listed issue goes through both.
     if ((pressure.level === 'gate_only' && !listed) || (pressure.level === 'no_new_slots' && !budgetExempt && !listed)) {
       throw new Refused(`pressure is ${pressure.level}: no new slot starts until it eases${liftEndedNote(pressure.weekly)}`)
@@ -1626,7 +1660,7 @@ export function openStore(options: StoreOptions) {
     if (lift !== null && model !== undefined && !budgetExempt && !listed && !lift.models.some((allowed) => model.toLowerCase().includes(allowed))) {
       throw new Refused(`the budget override allows only ${lift.models.join(', ')} workers, not ${model}`)
     }
-    const refusal = capRefusal(status, pressure, host, issue, budgetExempt)
+    const refusal = capRefusal(status, pressure, host, issue, standing)
     if (refusal !== null) throw new Refused(refusal)
   }
 
@@ -1635,28 +1669,27 @@ export function openStore(options: StoreOptions) {
    * which argus-config#1169's resume from awaiting_ci uses alone: the worker is already running
    * work, so pressure does not stop it, only the caps do.
    */
-  function capRefusal(status: Row, pressure: Pressure, host: Host, issue: string, budgetExempt: boolean): string | null {
-    if (isListedExemptIssue(issue)) {
-      const running = (selectRunning.all() as Row[]).find((row) => row.issue !== issue && isListedExemptIssue(String(row.issue)))
-      return running === undefined ? null : `${String(running.issue)} already runs a budget-exempt issue: only one runs at a time`
+  function capRefusal(status: Row, pressure: Pressure, host: Host, issue: string, standing: Standing): string | null {
+    const running = runningSlots(exemptionsNow(status))
+    if (standing.listed) {
+      const other = running.find((slot) => slot.issue !== issue && slot.standing.listed)
+      return other === undefined ? null : `${other.issue} already runs a budget-exempt issue: only one runs at a time`
     }
-    if (budgetExempt) {
-      const running = (selectRunning.all() as Row[]).find((row) => Number(row.budget_exempt) === 1)
-      return running === undefined ? null : `${String(running.issue)} already runs a budget-exempt slot: only one runs at a time`
+    if (standing.flagged) {
+      const other = running.find((slot) => slot.standing.flagged)
+      return other === undefined ? null : `${other.issue} already runs a budget-exempt slot: only one runs at a time`
     }
-    const exemptRepos = exemptReposOf(status)
-    const repo = repoOf(issue)
-    if (exemptRepos.includes(repo)) {
-      const sameRepo = (selectRunning.all() as Row[]).find((row) => repoOf(String(row.issue)) === repo)
-      return sameRepo ? `${repo} already runs a slot (${String(sameRepo.issue)}): a budget-exempt repo keeps one running slot` : null
+    if (standing.exemptRepo) {
+      const sameRepo = running.find((slot) => slot.standing.repo === standing.repo)
+      return sameRepo ? `${standing.repo} already runs a slot (${sameRepo.issue}): a budget-exempt repo keeps one running slot` : null
     }
+    const capped = running.filter((slot) => slot.standing.capped)
     const totalCap = status.slot_cap === null ? null : Number(status.slot_cap)
     const cap = effectiveCapOf(totalCap, pressure.weekly)
-    const perHost = runningByHost(exemptRepos)
-    const running = perHost.wsl2 + perHost.homelab
-    if (cap !== null && running >= cap) return `the effective slot cap ${cap} is reached (${running} running)`
+    if (cap !== null && capped.length >= cap) return `the effective slot cap ${cap} is reached (${capped.length} running)`
     const hostCap = hostCapsOf(status)?.[host]
-    if (hostCap !== undefined && perHost[host] >= hostCap) return `the ${host} slot cap ${hostCap} is reached (${perHost[host]} running there)`
+    const onHost = capped.filter((slot) => slot.host === host).length
+    if (hostCap !== undefined && onHost >= hostCap) return `the ${host} slot cap ${hostCap} is reached (${onHost} running there)`
     return null
   }
 
@@ -1898,7 +1931,7 @@ export function openStore(options: StoreOptions) {
         const status = selectStatus.get('afk') as Row | undefined
         const refusal =
           status && !reportOnly
-            ? capRefusal(status, pressureOf(status), String(row.host) as Host, issue, Number(row.budget_exempt) === 1)
+            ? capRefusal(status, pressureOf(status), String(row.host) as Host, issue, standingOfRow(row, exemptionsNow(status)))
             : null
         const state = refusal === null ? 'running' : 'ready'
         db.prepare('UPDATE slots SET state = ?, ci_ref = NULL, note = ?, updated_at = ? WHERE issue = ?').run(state, note ?? null, now(), issue)
@@ -1946,8 +1979,8 @@ export function openStore(options: StoreOptions) {
 
     slotList(role: Role, state?: SlotState): Slot[] {
       permit(role, 'slot_list')
-      const exemptIssues = listedExemptIssues()
-      const slots = (selectSlots.all() as Row[]).map((row) => toShownSlot(row, exemptIssues))
+      const exemptions = exemptionsNow()
+      const slots = (selectSlots.all() as Row[]).map((row) => toShownSlot(row, exemptions))
       return state ? slots.filter((slot) => slot.state === state) : slots
     },
 
@@ -2212,7 +2245,7 @@ export function openStore(options: StoreOptions) {
             hostAllowsStart &&
             ((startsSlots && takeable > 0 && slotRoom(previous, (pressure ?? pressureOf(previous)).weekly, input.host)) ||
               // argus#1171: at no_new_slots only an efficiency:orchestrator start is allowed, and only one runs at a time.
-              (level === 'no_new_slots' && takeableExempt > 0 && !hasRunningExemptSlot()))
+              (level === 'no_new_slots' && takeableExempt > 0 && budgetExemptRunning() === 0))
           if (wantsSlot) {
             const signature = freeSlotSignature(takeable, takeableExempt, level)
             const answered = (selectWake.get(of, input.thread_id) as Row | undefined)?.pending_since == null
@@ -2357,7 +2390,7 @@ export function openStore(options: StoreOptions) {
       const cap = row?.slot_cap === null || row?.slot_cap === undefined ? null : Number(row.slot_cap)
       const pending_approvals = Object.fromEntries((selectApprovals.all() as Row[]).map((slot) => [String(slot.issue), Number(slot.pending_approvals)]))
       const hostCaps = hostCapsOf(row)
-      const perHost = runningByHost(exemptReposOf(row), true)
+      const perHost = runningByHost(exemptionsNow(), true)
       const slots = {
         cap,
         used,
@@ -2368,7 +2401,7 @@ export function openStore(options: StoreOptions) {
         awaiting_ci: counts.awaiting_ci ?? 0,
         awaiting_ci_cap: awaitingCiCap(),
         pending_approvals,
-        budget_exempt_running: (selectRunning.all() as Row[]).filter((slot) => isExemptRow(slot)).length,
+        budget_exempt_running: budgetExemptRunning(),
       }
       const cadence_minutes = cadenceMs / 60_000
       const ticks = (since: number) => {
