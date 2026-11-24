@@ -139,6 +139,14 @@ this. See `docs/deploy-branch.md`, *Runners*, and `docs/public-cutover.md` for t
 (`scripts/owner-steps/1207.sh`) and the private values, which live in Bitwarden Secrets Manager as
 `ARGUS_<KEY>`.
 
+The Cloudflare deploys read their values (the Cloudflare token and account id, the D1 database id,
+the Supabase URL and anon key) from the `actions` project of Secrets Manager through
+`bitwarden/sm-action`. The one repository secret is `BWS_ACCESS_TOKEN`, the token of the read-only
+machine account `actions-read`. The key list and the one-time move are in
+`docs/public-cutover.md` (*Deploy values and Actions secrets*) and `scripts/owner-steps/59.sh`.
+By hand there is no Actions secret to set: copy `apps/<app>/.env.example` to `.env` (gitignored,
+mode 600) and fill each variable from the key its `# BWS secret <KEY>` comment names.
+
 - Promote: the owner approves the promotion card on the ops hub. Break-glass is
   `scripts/promote.sh --dry-run <sha>` then `scripts/promote.sh <sha>`; these are owner steps.
 - Roll back: `git revert` on `main`, then promote the revert. Never force-push `deploy`.

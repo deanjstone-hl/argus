@@ -87,14 +87,38 @@ run of 16 zeros, `git@github.com` and systemd instances (`postgres@15-main.servi
 
 Five values moved to Bitwarden Secrets Manager under the key names in
 `apps/watchtower-collector/.env.example`: `ARGUS_TAILSCALE_IP_HOMELAB`, `ARGUS_TAILSCALE_IP_WSL2`,
-`ARGUS_CLOUDFLARE_ACCOUNT_ID`, `ARGUS_CLOUDFLARE_ZONE_ID` and `ARGUS_D1_WATCHTOWER_DATABASE_ID`.
+`ARGUS_CLOUDFLARE_ACCOUNT_ID`, `ARGUS_CLOUDFLARE_ZONE_ID` and `ARGUS_WATCHTOWER_D1_DATABASE_ID`.
 `apps/watchtower-collector/deploy.sh` reads the first four, and the D1 id, by name;
 `scripts/private-value.sh <KEY>` is the same lookup for other scripts (an environment variable
 of that name wins). The Worker's `wrangler.jsonc` holds a placeholder D1 id and
 `apps/watchtower/scripts/with-d1-id.sh <command>` puts the real one in for the command and
-restores the file; the deploy workflow gets it from the Actions secret
-`WATCHTOWER_D1_DATABASE_ID`. `scripts/owner-steps/1207.sh` creates the five keys from the last
-old commit that held them (`688d5f049a4dcbd24f72b2bc5738700a99b695cb`).
+restores the file; the deploy workflow reads it from the `actions` project of Secrets Manager
+through `bitwarden/sm-action` (below). `scripts/owner-steps/1207.sh` created the five keys from
+the last old commit that held them (`688d5f049a4dcbd24f72b2bc5738700a99b695cb`); the D1 id key
+was `ARGUS_D1_WATCHTOWER_DATABASE_ID` then and `scripts/owner-steps/59.sh` renamed it.
+
+## Deploy values and Actions secrets (argus#59)
+
+No workflow holds a value in a repository secret. The one repository secret is `BWS_ACCESS_TOKEN`,
+the token of the read-only machine account `actions-read`, which `bitwarden/sm-action` (pinned by
+full commit SHA) uses to read the values of the two watchtower deploys from the `actions` project
+of Bitwarden Secrets Manager, by secret id. The id map is one `secrets:` block in each workflow
+(`watchtower-deploy.yml`, `watchtower-deploy-worker.yml`); the keys behind it:
+
+| Key in `actions` | Used as | Read by |
+|---|---|---|
+| `ARGUS_CF_API_TOKEN` | `CLOUDFLARE_API_TOKEN` | Pages and Worker deploy |
+| `ARGUS_CF_D1_TOKEN` | `CLOUDFLARE_D1_TOKEN` | D1 migration |
+| `ARGUS_CF_ACCOUNT_ID` | `CLOUDFLARE_ACCOUNT_ID` | Pages and Worker deploy |
+| `ARGUS_WATCHTOWER_D1_DATABASE_ID` | `WATCHTOWER_D1_DATABASE_ID` | Worker deploy |
+| `ARGUS_SUPABASE_URL`, `ARGUS_SUPABASE_ANON_KEY` | `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` | Pages build |
+
+The two values a host deploy also reads by name (`ARGUS_CLOUDFLARE_ACCOUNT_ID` and
+`ARGUS_WATCHTOWER_D1_DATABASE_ID`) have a second key in `personal-machine-secrets`, the one host
+project. `scripts/owner-steps/59.sh` moves and renames the keys, creates those two host keys, and,
+after both deploys have run green, deletes the six old repository secrets. `SKILLS_READ_TOKEN`
+is the one repository secret still read: it is not set (the ecosystem-skills check skips), and the
+owner issues the token before it can move.
 
 ## The cutover (owner step)
 

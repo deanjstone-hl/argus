@@ -373,7 +373,7 @@ caps are used (argus#688, argus#952):
 | `supabase-usage:<ref>` | 80% of the plan's database size limit | 95% |
 | `claude-window` | no OAuth credentials, a 401, or the usage endpoint unreachable or unreadable | — |
 
-**D1** (`D1_DATABASES`, `name:id` pairs; `deploy.sh` sets `argus-watchtower` from the BWS secret `ARGUS_D1_WATCHTOWER_DATABASE_ID`). The limit is the
+**D1** (`D1_DATABASES`, `name:id` pairs; `deploy.sh` sets `argus-watchtower` from the BWS secret `ARGUS_WATCHTOWER_D1_DATABASE_ID`). The limit is the
 Workers Free one, 500 MB per database; set `D1_LIMIT_MB` on Workers Paid (10 GB). Two sources:
 
 - **GraphQL analytics** (`d1StorageAdaptiveGroups`) gives the day's largest size with the

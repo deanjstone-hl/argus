@@ -28,11 +28,15 @@ pnpm run lint
 pnpm run test         # vitest, against simulated D1
 ```
 
-The dashboard needs a populated `.env`; see [`.env.example`](.env.example).
+The dashboard needs a populated `.env`: copy [`.env.example`](.env.example) to `.env` (gitignored)
+and fill each variable from the Secrets Manager key its `# BWS secret <KEY>` comment names.
 
 ## Deploy
 
-No `deploy.sh`. The two halves deploy separately:
+No `deploy.sh`. Both workflows read their values (the Cloudflare token, account id and D1 token, the
+D1 database id, the Supabase URL and anon key) from the `actions` project of Secrets Manager through
+`bitwarden/sm-action`; the only repository secret is `BWS_ACCESS_TOKEN`
+(`docs/public-cutover.md`, *Deploy values and Actions secrets*). The two halves deploy separately:
 
 - **Dashboard** — `.github/workflows/watchtower-deploy.yml`, on every push to `deploy` touching
   `apps/watchtower/**`, to Cloudflare Pages project `watchtower` (`watchtower.myargus.cc`).
