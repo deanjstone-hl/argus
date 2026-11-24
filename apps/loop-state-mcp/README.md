@@ -447,8 +447,11 @@ with its own value.
 - A call that names a thread other than the header's is refused, naming both, and leaves a
   `lease_conflict` event (`detail.reason: thread_header_mismatch`) for the holder's next gate. It covers
   `caller_thread_id` on `slot_start`, `slot_park`, `slot_close`, `slot_free`, `slot_rebuild`,
-  `owner_turn` and `directives_set`, and `thread_id` on `status_tick`, `tick_gate`, `slot_report` and
-  `slot_await_ci`.
+  `owner_turn`, `owner_thread_set` and `directives_set`, and `thread_id` on `status_tick`, `tick_gate`,
+  `slot_report` and `slot_await_ci`. The list is `SELF_THREAD_ARG` in `src/mcp.ts`: every tool has an entry
+  naming the argument that carries the caller's own thread, or `null`, and the registration wrapper runs the
+  check from it before any handler. A tool with no entry does not compile, and `test/self-thread.test.ts`
+  fails when an entry disagrees with the tool's input schema, so a new tool cannot skip the check.
 - With the header and no `caller_thread_id`, the header is the caller, so leaving the argument out does
   not skip the lease check.
 - With no header, the call is accepted as before and the first one per role and thread is logged

@@ -104,47 +104,86 @@ const pendingApprovals = z
     'Per running slot, the pendingRequestCount of its worker thread from t3_thread_read, keyed by issue (owner/repo#number). An issue left out keeps its last count; 0 clears it. Parking, closing or freeing a slot clears it too. Any running slot above 0 wakes the AFK thread through POST /wake/check.',
   )
 
+/** Every MCP tool. `wake_check` is the loop-wake client's HTTP route, not a tool. */
+export type McpToolName = Exclude<ToolName, 'wake_check'>
+
+/**
+ * argus#51: for every tool, the argument in which the caller names its own thread, or null when it names none. The
+ * registration wrapper checks that argument against X-T3-Thread-Id before the handler runs, so no handler can
+ * forget to: a thread id in an argument is self-asserted, and a fork inherits its parent's. The type requires an
+ * entry for every tool, and test/self-thread.test.ts fails when an entry does not match the tool's input schema.
+ *
+ * `null` is right only when the tool names no caller: a read, or a write whose thread arguments name other threads
+ * (lease_move's holder and taker, child_start's child).
+ */
+export const SELF_THREAD_ARG = {
+  slot_start: 'caller_thread_id',
+  slot_park: 'caller_thread_id',
+  slot_close: 'caller_thread_id',
+  slot_free: 'caller_thread_id',
+  slot_unpark: null,
+  slot_report: 'thread_id',
+  slot_await_ci: 'thread_id',
+  slot_resume_ci: null,
+  slot_list: null,
+  slot_rebuild: 'caller_thread_id',
+  status_tick: 'thread_id',
+  tick_gate: 'thread_id',
+  status_read: null,
+  lease_read: null,
+  lease_move: null,
+  lease_release: null,
+  lease_failover: null,
+  lease_reclaim: null,
+  child_start: null,
+  child_close: null,
+  owner_turn: 'caller_thread_id',
+  owner_thread_set: 'caller_thread_id',
+  away_note: null,
+  notify_claim: null,
+  outage_observe: null,
+  ledger_read: null,
+  directives_read: null,
+  directives_set: 'caller_thread_id',
+} as const satisfies Record<McpToolName, 'caller_thread_id' | 'thread_id' | null>
+
 /** One server per request: the transport is stateless, and the caller's role differs per request. */
 export function createMcpServer(store: Store, role: Role, threadHeader?: string): McpServer {
   const server = new McpServer({ name: 'loop-state', version: '0.1.0' }, { instructions: INSTRUCTIONS })
   const offered = (tool: ToolName) => (TOOL_ROLES[tool] as readonly Role[]).includes(role)
   /**
-   * argus#54: a registered owner thread (owner_thread_set) makes no loop-state write but owner_turn. Every
-   * write tool but that one checks the session's own thread id, and any thread the call names, against it.
+   * Every tool is registered through this wrapper, which runs the two thread checks before the handler:
+   * - argus#54: a registered owner thread (owner_thread_set) makes no loop-state write but owner_turn. Every write
+   *   tool but that one checks the session's own thread id, and any thread the call names, against it.
+   * - argus#51: the argument SELF_THREAD_ARG names is checked against the session's own thread (X-T3-Thread-Id). A
+   *   call naming another thread is refused; the handler receives the thread the call acts as, the header when the
+   *   argument was left out.
    */
   const registerTool = server.registerTool.bind(server) as unknown as (
     name: string,
     config: { annotations?: { readOnlyHint?: boolean } },
     handler: (...params: unknown[]) => unknown,
   ) => unknown
-  server.registerTool = ((name: string, config: { annotations?: { readOnlyHint?: boolean } }, handler: (...params: unknown[]) => unknown) =>
-    registerTool(
-      name,
-      config,
-      config.annotations?.readOnlyHint === false && name !== 'owner_turn'
-        ? async (...params: unknown[]) => {
-            // A tool with an input schema gets (args, extra); one without gets (extra): `extra` has no thread fields.
-            const args = (params[0] ?? {}) as Record<string, unknown>
-            const named = (field: string) => (typeof args[field] === 'string' ? (args[field] as string) : undefined)
-            try {
-              store.refuseOwnerThread(role, name, [threadHeader, named('thread_id'), named('caller_thread_id')])
-            } catch (error) {
-              if (error instanceof Refused) return failure(error.message)
-              throw error
-            }
-            return handler(...params)
-          }
-        : handler,
-    )) as typeof server.registerTool
-  /**
-   * argus#51: the thread id a call acts as. A call naming a thread other than the session's own
-   * (X-T3-Thread-Id) is refused; with the header and no named thread, the header is the caller.
-   */
-  const actingAs = (tool: ToolName, named: string | undefined) => store.checkCallerThread(role, tool, named, threadHeader)
-  const withCaller = <A extends { caller_thread_id?: string | undefined }>(tool: ToolName, args: A): A => ({
-    ...args,
-    caller_thread_id: actingAs(tool, args.caller_thread_id),
-  })
+  server.registerTool = ((name: string, config: { annotations?: { readOnlyHint?: boolean } }, handler: (...params: unknown[]) => unknown) => {
+    if (!(name in SELF_THREAD_ARG)) throw new Error(`${name} has no SELF_THREAD_ARG entry: say which argument names the caller's own thread, or null`)
+    const selfArg = SELF_THREAD_ARG[name as McpToolName]
+    const checksOwnerThread = config.annotations?.readOnlyHint === false && name !== 'owner_turn'
+    if (selfArg === null && !checksOwnerThread) return registerTool(name, config, handler)
+    return registerTool(name, config, async (...params: unknown[]) => {
+      // A tool with an input schema gets (args, extra); one without gets (extra): `extra` has no thread fields.
+      const args = (params[0] ?? {}) as Record<string, unknown>
+      const named = (field: string) => (typeof args[field] === 'string' ? (args[field] as string) : undefined)
+      try {
+        if (checksOwnerThread) store.refuseOwnerThread(role, name, [threadHeader, named('thread_id'), named('caller_thread_id')])
+        if (selfArg === null) return handler(...params)
+        const actingAs = store.checkCallerThread(role, name as McpToolName, named(selfArg), threadHeader)
+        return handler({ ...args, [selfArg]: actingAs }, ...params.slice(1))
+      } catch (error) {
+        if (error instanceof Refused) return failure(error.message)
+        throw error
+      }
+    })
+  }) as typeof server.registerTool
 
   if (offered('slot_start')) {
     server.registerTool(
@@ -169,7 +208,7 @@ export function createMcpServer(store: Store, role: Role, threadHeader?: string)
         },
         annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
       },
-      guarded((args) => store.slotStart(role, args.issue, args.thread_id, args.host, actingAs('slot_start', args.caller_thread_id), args.budget_exempt === true, args.model)),
+      guarded((args) => store.slotStart(role, args.issue, args.thread_id, args.host, args.caller_thread_id, args.budget_exempt === true, args.model)),
     )
   }
 
@@ -194,7 +233,7 @@ export function createMcpServer(store: Store, role: Role, threadHeader?: string)
         },
         annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
       },
-      guarded((args) => store.slotPark(role, args.issue, args.note, withCaller('slot_park', args), args.pending_approvals ?? 0)),
+      guarded((args) => store.slotPark(role, args.issue, args.note, args, args.pending_approvals ?? 0)),
     )
   }
 
@@ -229,7 +268,6 @@ export function createMcpServer(store: Store, role: Role, threadHeader?: string)
         annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
       },
       guarded((args) => {
-        actingAs('slot_report', args.thread_id)
         return { slot: store.slotReport(role, args) }
       }),
     )
@@ -251,7 +289,6 @@ export function createMcpServer(store: Store, role: Role, threadHeader?: string)
         annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
       },
       guarded((args) => {
-        actingAs('slot_await_ci', args.thread_id)
         return { slot: store.slotAwaitCi(role, args) }
       }),
     )
@@ -288,7 +325,7 @@ export function createMcpServer(store: Store, role: Role, threadHeader?: string)
         inputSchema: { issue, verified: z.string().describe('The "Verified: …" line.'), caller_thread_id: callerThreadId, host: drainHost },
         annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false },
       },
-      guarded((args) => store.slotClose(role, args.issue, args.verified, withCaller('slot_close', args))),
+      guarded((args) => store.slotClose(role, args.issue, args.verified, args)),
     )
   }
 
@@ -301,7 +338,7 @@ export function createMcpServer(store: Store, role: Role, threadHeader?: string)
         inputSchema: { issue, reason: z.string().describe('Why, one line.'), caller_thread_id: callerThreadId, host: drainHost },
         annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false },
       },
-      guarded((args) => store.slotFree(role, args.issue, args.reason, withCaller('slot_free', args))),
+      guarded((args) => store.slotFree(role, args.issue, args.reason, args)),
     )
   }
 
@@ -351,7 +388,7 @@ export function createMcpServer(store: Store, role: Role, threadHeader?: string)
         },
         annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
       },
-      guarded((args) => store.slotRebuild(role, { issues: args.issues, threads: args.threads }, args.apply ?? false, args.host, actingAs('slot_rebuild', args.caller_thread_id))),
+      guarded((args) => store.slotRebuild(role, { issues: args.issues, threads: args.threads }, args.apply ?? false, args.host, args.caller_thread_id)),
     )
   }
 
@@ -366,7 +403,6 @@ export function createMcpServer(store: Store, role: Role, threadHeader?: string)
         annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
       },
       guarded((args) => {
-        actingAs('status_tick', args.thread_id)
         const tick = store.statusTick(role, args)
         return tick.recorded ? { ...tick, ...store.statusRead(role, role === 'direction' ? 'direction' : 'afk') } : tick
       }),
@@ -384,7 +420,6 @@ export function createMcpServer(store: Store, role: Role, threadHeader?: string)
         annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
       },
       guarded((args) => {
-        actingAs('tick_gate', args.thread_id)
         return store.tickGate(role, args)
       }),
     )
@@ -545,7 +580,7 @@ export function createMcpServer(store: Store, role: Role, threadHeader?: string)
         },
         annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
       },
-      guarded((args) => store.ownerTurn(role, withCaller('owner_turn', args))),
+      guarded((args) => store.ownerTurn(role, args)),
     )
   }
 
@@ -564,7 +599,6 @@ export function createMcpServer(store: Store, role: Role, threadHeader?: string)
         annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
       },
       guarded((args) => {
-        actingAs('owner_thread_set', args.caller_thread_id)
         return store.ownerThreadSet(role, args)
       }),
     )
@@ -672,7 +706,6 @@ export function createMcpServer(store: Store, role: Role, threadHeader?: string)
         annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
       },
       guarded((args) => {
-        actingAs('directives_set', args.caller_thread_id)
         return store.directivesSet(role, args)
       }),
     )
