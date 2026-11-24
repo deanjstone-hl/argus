@@ -19,6 +19,10 @@ import { afterEach, describe, expect, it } from "vitest";
 //     almost never be used for public repositories"; the fork-approval policy does not stop a
 //     fork's pull request reaching one);
 //   - no `pull_request_target`, no secret in a pull-request workflow beyond the read-only token;
+//   - no value in an Actions secret (argus#59): a workflow reads GITHUB_TOKEN and the one
+//     Secrets Manager token BWS_ACCESS_TOKEN, handed only to bitwarden/sm-action pinned by a full
+//     commit SHA, which reads the values from the `actions` project of Secrets Manager. The one
+//     exception is SKILLS_READ_TOKEN (see skillsReadTokenException);
 //   - no private value in the tree (scripts/scrub-scan.sh).
 // Workflows are read as text, as in deploy-branch.test.ts, so no YAML parser is needed. Any
 // value that looks private is built at run time, so this file holds none.
@@ -26,6 +30,39 @@ import { afterEach, describe, expect, it } from "vitest";
 const root = fileURLToPath(new URL("..", import.meta.url));
 const workflows = join(root, ".github", "workflows");
 const haveGitleaks = ["gitleaks", "jq"].every((tool) => spawnSync("sh", ["-c", `command -v ${tool}`]).status === 0);
+
+// argus#59: SKILLS_READ_TOKEN is the one repository secret a workflow may still read. It is a
+// fine-grained PAT for the two private repositories the ecosystem-skills check reads; it is not
+// set (the check skips), so there is no Secrets Manager key, and no id, to map until the owner
+// issues the token. Delete this exception when ecosystem-skills.yml reads it through sm-action.
+const skillsReadTokenException = { workflow: "ecosystem-skills.yml", secret: "SKILLS_READ_TOKEN" };
+
+const smActionPin = /uses:\s*bitwarden\/sm-action@[0-9a-f]{40}(?:\s+#.*)?$/;
+
+// Every `secrets.X` a workflow reads, and whether each use of BWS_ACCESS_TOKEN is the access_token
+// input of a bitwarden/sm-action step pinned by a full SHA.
+function secretProblems(name: string, text: string): string[] {
+  const problems: string[] = [];
+  const lines = code(text).split("\n");
+  lines.forEach((line, index) => {
+    for (const match of line.matchAll(/secrets\.([A-Za-z0-9_]+)/g)) {
+      const secret = match[1];
+      if (secret === "GITHUB_TOKEN") continue;
+      if (secret === "BWS_ACCESS_TOKEN") {
+        const inputLine = /^\s+access_token:\s*\$\{\{ secrets\.BWS_ACCESS_TOKEN \}\}\s*$/.test(line);
+        // The `with:` block of the step: back to the `- ` that opens it must hold the pinned `uses:`.
+        let start = index;
+        while (start > 0 && !/^\s+- /.test(lines[start])) start -= 1;
+        const step = lines.slice(start, index + 1).join("\n");
+        const pinned = step.split("\n").some((stepLine) => smActionPin.test(stepLine.replace(/^\s+- /, "  ")));
+        if (!inputLine || !pinned) problems.push(`${name}: BWS_ACCESS_TOKEN used other than as the access_token of a bitwarden/sm-action step pinned by a full commit SHA`);
+      } else if (!(name === skillsReadTokenException.workflow && secret === skillsReadTokenException.secret)) {
+        problems.push(`${name}: reads the repository secret ${secret} (read it from Secrets Manager through sm-action)`);
+      }
+    }
+  });
+  return problems;
+}
 
 const allowedSelfHosted = ["[self-hosted, homelab, deploy]", "[self-hosted, wsl2-deploy]"];
 
@@ -84,7 +121,7 @@ function checkWorkflows(dir: string): string[] {
       problems.push(`${name}: a runner-selecting variable or runner.environment test`);
     }
     if (/uses:\s*deanjstone\//.test(body)) problems.push(`${name}: uses an action or workflow from a repository of the owner`);
-    if (/BWS_ACCESS_TOKEN/.test(body)) problems.push(`${name}: reads the Secrets Manager token`);
+    problems.push(...secretProblems(name, text));
 
     const keys = onKeys(text);
     const runners = [...body.matchAll(/^\s*runs-on:\s*(.*\S)\s*$/gm)].map((match) => match[1]);
@@ -209,11 +246,42 @@ describe("the workflow checker itself: each rule fails on a planted breach", () 
     expect(checkWorkflows(planted({ "bad.yml": noPermissions })).join("\n")).toContain("permissions");
   });
 
-  it("rejects an action from a repository of the owner and the Secrets Manager token", () => {
+  it("rejects an action from a repository of the owner", () => {
     const uses = `${header}on:\n  push:\n    branches: [main]\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: deanjstone/argus/.github/actions/x@v1\n`;
     expect(checkWorkflows(planted({ "bad.yml": uses }))).not.toEqual([]);
-    const token = `${header}on:\n  push:\n    branches: [main]\njobs:\n  a:\n    runs-on: ubuntu-latest\n    env:\n      BWS_ACCESS_TOKEN: x\n`;
-    expect(checkWorkflows(planted({ "bad.yml": token }))).not.toEqual([]);
+  });
+
+  describe("the Secrets Manager token (argus#59)", () => {
+    const pin = "bitwarden/sm-action@1238aae8fc64b212641190a9227c8a734ab1a793 # v3.0.1";
+    const smStep = (uses: string, tokenLine = "access_token: ${{ secrets.BWS_ACCESS_TOKEN }}") =>
+      `${header}on:\n  push:\n    branches: [deploy]\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - name: Read\n        uses: ${uses}\n        with:\n          ${tokenLine}\n          secrets: |\n            00000000-0000-4000-8000-000000000001 > X\n`;
+
+    it("accepts it as the access_token of a bitwarden/sm-action step pinned by a full commit SHA", () => {
+      expect(checkWorkflows(planted({ "ok.yml": smStep(pin) }))).toEqual([]);
+    });
+
+    it("rejects it in an env block, in a run step, or on an sm-action that is not pinned by a SHA", () => {
+      const env = `${header}on:\n  push:\n    branches: [main]\njobs:\n  a:\n    runs-on: ubuntu-latest\n    env:\n      T: \${{ secrets.BWS_ACCESS_TOKEN }}\n`;
+      expect(checkWorkflows(planted({ "bad.yml": env })).join("\n")).toContain("BWS_ACCESS_TOKEN");
+      const tag = smStep("bitwarden/sm-action@v3");
+      expect(checkWorkflows(planted({ "bad.yml": tag })).join("\n")).toContain("BWS_ACCESS_TOKEN");
+      const other = smStep("some/other-action@1238aae8fc64b212641190a9227c8a734ab1a793");
+      expect(checkWorkflows(planted({ "bad.yml": other })).join("\n")).toContain("BWS_ACCESS_TOKEN");
+      const renamed = smStep(pin, "other_input: ${{ secrets.BWS_ACCESS_TOKEN }}");
+      expect(checkWorkflows(planted({ "bad.yml": renamed })).join("\n")).toContain("BWS_ACCESS_TOKEN");
+    });
+
+    it("rejects it in a workflow a pull request starts", () => {
+      const pr = smStep(pin).replace("on:\n  push:\n    branches: [deploy]\n", "on:\n  pull_request:\npermissions:\n  contents: read\n");
+      expect(checkWorkflows(planted({ "bad.yml": pr })).join("\n")).toContain("reads a secret");
+    });
+
+    it("rejects any other repository secret, whatever workflow reads it", () => {
+      const other = `${header}on:\n  push:\n    branches: [main]\njobs:\n  a:\n    runs-on: ubuntu-latest\n    env:\n      T: \${{ secrets.CLOUDFLARE_API_TOKEN }}\n`;
+      expect(checkWorkflows(planted({ "bad.yml": other })).join("\n")).toContain("CLOUDFLARE_API_TOKEN");
+      const elsewhere = `${header}on:\n  push:\n    branches: [main]\njobs:\n  a:\n    runs-on: ubuntu-latest\n    env:\n      T: \${{ secrets.SKILLS_READ_TOKEN }}\n`;
+      expect(checkWorkflows(planted({ "bad.yml": elsewhere })).join("\n")).toContain("SKILLS_READ_TOKEN");
+    });
   });
 });
 
@@ -247,7 +315,7 @@ describe("private values", () => {
     const wrangler = read("apps/watchtower/wrangler.jsonc");
     expect(wrangler).toContain('"database_id": "00000000-0000-4000-8000-0000000000d1"');
     expect(read("apps/watchtower/package.json")).toContain("bash scripts/with-d1-id.sh wrangler deploy");
-    expect(read(".github/workflows/watchtower-deploy-worker.yml")).toContain("secrets.WATCHTOWER_D1_DATABASE_ID");
+    expect(read(".github/workflows/watchtower-deploy-worker.yml")).toMatch(/^\s+[0-9a-f-]{36} > WATCHTOWER_D1_DATABASE_ID$/m);
   });
 
   it(".env is ignored at the root, and the template is not", () => {

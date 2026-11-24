@@ -28,9 +28,6 @@ jobs:
     # A dispatch can name any branch or tag; only `deploy` ships.
     if: github.ref == 'refs/heads/deploy'
     runs-on: ubuntu-latest
-    env:
-      VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-      VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
     steps:
       - uses: actions/checkout@v4
 
@@ -47,13 +44,33 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # Every value this job needs is a key of the `actions` project in Secrets Manager (argus#59):
+      # the secret id on the left, the environment variable on the right. sm-action looks a secret up
+      # by id, so this block is the one place the ids live. The keys, and the owner step that keeps
+      # them (scripts/owner-steps/59.sh):
+      #   ARGUS_SUPABASE_URL        the shared myargus Supabase project URL the dashboard is built with
+      #   ARGUS_SUPABASE_ANON_KEY   its anon key (public by design, but still not in the tree)
+      #   ARGUS_CF_API_TOKEN        the Cloudflare API token for the Pages upload
+      #   ARGUS_CF_ACCOUNT_ID       the Cloudflare account id
+      # Placed just before the build so only the steps below it see the values. A key with no
+      # secret behind its id makes this step fail, before anything is built or deployed.
+      - name: Read the deploy values from Secrets Manager
+        uses: bitwarden/sm-action@1238aae8fc64b212641190a9227c8a734ab1a793 # v3.0.1
+        with:
+          access_token: ${{ secrets.BWS_ACCESS_TOKEN }}
+          secrets: |
+            a4257c90-ae72-4f91-9f75-b50401408c32 > VITE_SUPABASE_URL
+            a25daf63-934e-4bf7-9d4f-b50401408d71 > VITE_SUPABASE_ANON_KEY
+            daebfc00-1ad4-425e-8c0f-b504014123e0 > CLOUDFLARE_API_TOKEN
+            a7767558-b39c-488f-9a1f-b505006359fe > CLOUDFLARE_ACCOUNT_ID
+
       - name: Build
         run: pnpm --filter @argus/watchtower run build
 
       - name: Deploy → watchtower
         uses: cloudflare/wrangler-action@v3
         with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          apiToken: ${{ env.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: apps/watchtower
           command: pages deploy dist --project-name=watchtower --branch=main

@@ -40,9 +40,6 @@ jobs:
     # A dispatch can name any branch or tag; only `deploy` ships.
     if: github.ref == 'refs/heads/deploy'
     runs-on: ubuntu-latest
-    env:
-      # The D1 database id is not in the tree (argus#1207); scripts/with-d1-id.sh puts it in wrangler.jsonc for each command.
-      WATCHTOWER_D1_DATABASE_ID: ${{ secrets.WATCHTOWER_D1_DATABASE_ID }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -64,6 +61,26 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # Every value this job needs is a key of the `actions` project in Secrets Manager (argus#59):
+      # the secret id on the left, the environment variable on the right. sm-action looks a secret up
+      # by id, so this block is the one place the ids live. The keys, and the owner step that keeps
+      # them (scripts/owner-steps/59.sh):
+      #   ARGUS_WATCHTOWER_D1_DATABASE_ID   the D1 database id (not in the tree, argus#1207);
+      #                                     scripts/with-d1-id.sh puts it in wrangler.jsonc for each command
+      #   ARGUS_CF_D1_TOKEN                 the token for the D1 migration (the deploy token cannot touch D1)
+      #   ARGUS_CF_API_TOKEN                the deploy token (Workers Scripts: Edit and nothing else)
+      #   ARGUS_CF_ACCOUNT_ID               the Cloudflare account id
+      # A key with no secret behind its id makes this step fail, before anything changes.
+      - name: Read the deploy values from Secrets Manager
+        uses: bitwarden/sm-action@1238aae8fc64b212641190a9227c8a734ab1a793 # v3.0.1
+        with:
+          access_token: ${{ secrets.BWS_ACCESS_TOKEN }}
+          secrets: |
+            489cf0ba-dad5-4e70-9f3a-b50500635b92 > WATCHTOWER_D1_DATABASE_ID
+            5a91a3c7-4bca-464b-81a5-b50401408e70 > CLOUDFLARE_D1_TOKEN
+            daebfc00-1ad4-425e-8c0f-b504014123e0 > CLOUDFLARE_API_TOKEN
+            a7767558-b39c-488f-9a1f-b505006359fe > CLOUDFLARE_ACCOUNT_ID
+
       # Bundles the Worker and validates wrangler.jsonc without uploading anything and
       # without a token, so a config or bundling error stops the job before the schema
       # changes. Needs no build: wrangler bundles src/worker/index.ts itself.
@@ -78,14 +95,10 @@ jobs:
       - name: Apply D1 migrations
         run: bash scripts/with-d1-id.sh pnpm exec wrangler d1 migrations apply DB --remote --config wrangler.jsonc
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_D1_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ env.CLOUDFLARE_D1_TOKEN }}
 
       # Not `pnpm run worker:deploy`: that script checks a manual run's checkout against
       # origin/deploy, and this run is the promotion itself. Secrets
       # (WATCHTOWER_COLLECTOR_TOKEN) stay as set on the Worker; a deploy does not touch them.
       - name: Deploy to Cloudflare Workers
         run: bash scripts/with-d1-id.sh pnpm exec wrangler deploy
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

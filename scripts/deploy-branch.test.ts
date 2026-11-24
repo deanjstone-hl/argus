@@ -284,9 +284,12 @@ describe("the wiring", () => {
     it("keeps the schema token apart from the deploy token", () => {
       const text = workflow();
       const migrateStep = text.slice(text.indexOf("name: Apply D1 migrations"), text.indexOf("name: Deploy to Cloudflare Workers"));
-      expect(migrateStep).toContain("CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_D1_TOKEN }}");
+      expect(migrateStep).toContain("CLOUDFLARE_API_TOKEN: ${{ env.CLOUDFLARE_D1_TOKEN }}");
       const deployStep = text.slice(text.indexOf("name: Deploy to Cloudflare Workers"));
-      expect(deployStep).toContain("CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}");
+      // The deploy step sets no token of its own: wrangler reads the job's CLOUDFLARE_API_TOKEN, the
+      // key sm-action read from Secrets Manager, never the D1 token (argus#59).
+      expect(deployStep).not.toContain("CLOUDFLARE_API_TOKEN");
+      expect(deployStep).not.toContain("CLOUDFLARE_D1_TOKEN");
     });
 
     it("leaves the Pages workflow deploying the dashboard only", () => {
