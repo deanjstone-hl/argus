@@ -146,7 +146,7 @@ it; see `ecosystem/README.md`) is its own workflow, `ecosystem-skills.yml`, whic
 
 URLs come from the vendored links registry (`links.json`, `*/src/lib/links.ts`), never from a
 literal; `bash scripts/link-check.sh` enforces it in CI and `bash scripts/vendor-links.sh vX.Y.Z`
-re-vendors it from `deanjstone/frontend`. See the README's "Links come from the registry".
+re-vendors it from `deanjstone-hl/frontend`. See the README's "Links come from the registry".
 
 ## Governance
 
@@ -210,7 +210,7 @@ This repo follows the account-wide [Repo Structure Standard](docs/system-specs/c
 | Repo | Role |
 |---|---|
 | `deanjstone/argus-config` | Claude Code config — skills, hooks, settings, rules |
-| `deanjstone/sys-admin` | Machine setup — install scripts, dev stack, sysadmin skills |
+| `deanjstone-hl/sys-admin` | Machine setup — install scripts, dev stack, sysadmin skills |
 
 `deanjstone/mcp-memory` — the original standalone memory MCP server — was superseded by `argus-context`'s `packages/mcp-server` before this consolidation and is now archived ([mcp-memory#74](https://github.com/deanjstone/mcp-memory/issues/74)); no row here since its successor is the `memory-mcp` row above, not a related repo. `deanjstone/argus-context` itself (the immediate predecessor of the since-moved `memory-mcp` and `apps/wiki` and the since-deleted `packages/vault-core`) is likewise not listed, and is also archived ([#167](https://github.com/deanjstone/argus/issues/167)).
 

@@ -1,4 +1,4 @@
-// The links registry (deanjstone/frontend, ADR-0004) is vendored: one links.json at the repo root,
+// The links registry (deanjstone-hl/frontend, ADR-0004) is vendored: one links.json at the repo root,
 // and a links.ts + links-core.ts copy inside each package that builds URLs. Node services are
 // built with tsc, which cannot resolve the `@/lib/...` alias at run time, so their copies import
 // `./links-core.js`. scripts/vendor-links.sh writes all of them; this pins that they stay one

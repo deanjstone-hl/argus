@@ -62,7 +62,7 @@ jobs:
         if: steps.token.outputs.present == 'true'
         uses: actions/checkout@v4
         with:
-          repository: deanjstone/sys-admin
+          repository: deanjstone-hl/sys-admin
           token: ${{ secrets.SKILLS_READ_TOKEN }}
           path: .ecosystem-skills/sys-admin
           sparse-checkout: skills

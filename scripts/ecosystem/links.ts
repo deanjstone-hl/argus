@@ -1,6 +1,6 @@
 /**
  * The manifest's app hrefs against the links registry (`links.json`, vendored from
- * deanjstone/frontend, ADR-0004; argus#18). An href inside the registry's domain must be the
+ * deanjstone-hl/frontend, ADR-0004; argus#18). An href inside the registry's domain must be the
  * canonical root of a registered app: https, no `www`, an app root ending in `/`. A retired
  * host fails, and so does a host that only redirects. Hrefs outside the domain are not the
  * registry's to judge.

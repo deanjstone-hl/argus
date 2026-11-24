@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Vendor the myargus links registry from deanjstone/frontend (ADR-0004), at one tag:
+# Vendor the myargus links registry from deanjstone-hl/frontend (ADR-0004), at one tag:
 #
 #   bash scripts/vendor-links.sh <tag>        e.g. v3.24.1
 #
@@ -21,7 +21,7 @@ tag="${1:-}"
 [[ $tag =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "usage: vendor-links.sh vX.Y.Z" >&2; exit 2; }
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-base="https://raw.githubusercontent.com/deanjstone/frontend/$tag/registry"
+base="https://raw.githubusercontent.com/deanjstone-hl/frontend/$tag/registry"
 scratch="$(mktemp -d)"
 trap 'rm -rf "$scratch"' EXIT
 

@@ -15,7 +15,7 @@ describe('design-system v3 adoption', () => {
   it('pins the @design-system alias to v3.18.0', () => {
     const { registries } = JSON.parse(read('components.json')) as { registries: Record<string, { url: string }> }
     expect(registries['@design-system'].url).toBe(
-      'https://raw.githubusercontent.com/deanjstone/frontend/v3.18.0/r/{name}.json',
+      'https://raw.githubusercontent.com/deanjstone-hl/frontend/v3.18.0/r/{name}.json',
     )
   })
 

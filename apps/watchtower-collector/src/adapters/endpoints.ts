@@ -58,7 +58,7 @@ function baseUrl(entry: (typeof REGISTRY.entries)[number]): string | null {
   }
 }
 
-// Registry entries that are no longer probed. The registry is vendored from deanjstone/frontend
+// Registry entries that are no longer probed. The registry is vendored from deanjstone-hl/frontend
 // and still lists the watchtower dashboard as live: its Pages project is deleted by argus#44
 // and the registry entry goes with argus#45, so until then the collector skips it, and a
 // deleted project does not turn the probe and the certificate check red (argus#66).

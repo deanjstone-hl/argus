@@ -20,7 +20,7 @@ regex = '''[a-z0-9-]+\.ts\.net\b'''
 keywords = ["ts.net"]
 
 # The links registry (links.json and its generated TS copies) is vendored from the public
-# deanjstone/frontend registry, which publishes the tailnet host its tailnet entries need
+# deanjstone-hl/frontend registry, which publishes the tailnet host its tailnet entries need
 # (argus#18). Allowed in those files only; a hostname anywhere else still fails.
 [[rules.allowlists]]
 description = "The vendored links registry names the tailnet host"

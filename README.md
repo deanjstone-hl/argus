@@ -5,7 +5,7 @@ loop-state and T3-peer MCP servers, the shared libraries and the ecosystem manif
 families are splitting out of it into `deanjstone-hl` (map: [argus-config/1134](https://github.com/deanjstone/argus-config/issues/1134));
 `AGENTS.md` lists each split and where it went. Machine configuration
 lives in [`argus-config`](https://github.com/deanjstone/argus-config) and
-[`sys-admin`](https://github.com/deanjstone/sys-admin), not here.
+[`sys-admin`](https://github.com/deanjstone-hl/sys-admin), not here.
 
 Agent-facing instructions are in [`AGENTS.md`](AGENTS.md) (imported by `CLAUDE.md`). This file is
 the human orientation.
@@ -71,7 +71,7 @@ deploy scripts, systemd units) runs the scripts suite. The whole suite runs once
 ## Links come from the registry
 
 Every myargus and tailnet URL in this repo is built from `links.json`, the registry vendored from
-[`deanjstone/frontend`](https://github.com/deanjstone/frontend) (ADR-0004). Code uses the vendored
+[`deanjstone-hl/frontend`](https://github.com/deanjstone-hl/frontend) (ADR-0004). Code uses the vendored
 builders (`appUrl`, `routeUrl`, `apiUrl`, `mcpUrl`, `switcherApps`, `COOKIE_DOMAIN`) from
 `apps/watchtower/src/lib/links.ts`, `apps/watchtower-collector/src/lib/links.ts` and
 `apps/agent-engine/src/lib/links.ts`; scripts use `bash scripts/links.sh api watchtower-api`. A
