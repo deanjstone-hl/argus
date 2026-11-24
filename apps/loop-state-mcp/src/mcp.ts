@@ -647,9 +647,18 @@ export function createMcpServer(store: Store, role: Role, threadHeader?: string)
       {
         title: 'Set the AFK directives',
         description:
-          "Record a new version of the AFK directives, as the owner told you in this turn. Refused unless your thread holds the direction lease, the owner is present (owner_turn within the last 30 minutes, not stepped away) and expected_version is the version you last read. The whole record is sent every time (the file's front matter without version); the server numbers it and keeps every earlier version. An invalid record is refused with every problem listed. host_gates.<wsl2|homelab> takes max_load, max_io_pressure, max_memory_pressure, max_disk_percent and quiet_window, a string HH:MM-HH:MM in Sydney time (start and end differ, start after end spans midnight); quiet_window is a host_gates key only, never top-level or an override, and the server stores it without applying it to slot_start.",
+          "Record a new version of the AFK directives, as the owner told you in this turn. Refused unless your thread holds the direction lease, the owner is present (owner_turn within the last 30 minutes, not stepped away) and expected_version is the version you last read. Send either record (the whole record: the file's front matter without version) or patch (only the keys that change, applied to the current version, which expected_version must name); the server numbers the result and keeps every earlier version. Prefer patch for a change to one or a few keys: copying the whole record by hand is how an unrelated key gets dropped (argus#75). A patch is refused when it names a key twice, unsets or removes from a key that is not there, removes an entry that is not listed, or changes nothing. The answer carries changes, a key-by-key diff against the previous version (list keys show list_added and list_removed): check it against what the owner asked before ending the turn. An invalid record or patch is refused with every problem listed. host_gates.<wsl2|homelab> takes max_load, max_io_pressure, max_memory_pressure, max_disk_percent and quiet_window, a string HH:MM-HH:MM in Sydney time (start and end differ, start after end spans midnight); quiet_window is a host_gates key only, never top-level or an override, and the server stores it without applying it to slot_start.",
         inputSchema: {
-          record: z.record(z.string(), z.unknown()).describe('The full directives record: cadence_minutes, max_slots, repo_holds, take_next and ordering, plus any optional keys. No version.'),
+          record: z.record(z.string(), z.unknown()).optional().describe('The full directives record: cadence_minutes, max_slots, repo_holds, take_next and ordering, plus any optional keys. No version. Send this or patch, not both.'),
+          patch: z
+            .object({
+              set: z.record(z.string(), z.unknown()).optional().describe('Keys to set or replace, key to its whole new value.'),
+              unset: z.array(z.string()).optional().describe('Keys to remove from the record.'),
+              add: z.record(z.string(), z.array(z.unknown())).optional().describe('Entries to append to a list key (created when absent); an entry already listed is skipped. e.g. {"budget_exempt_issues": ["deanjstone-hl/atto#16"]}.'),
+              remove: z.record(z.string(), z.array(z.unknown())).optional().describe('Entries to remove from a list key; an entry not listed is refused.'),
+            })
+            .optional()
+            .describe('The keys that change, applied to the current version. A key takes one of set, unset or add/remove. Send this or record, not both.'),
           reason: z.string().describe("Why, one line: the owner's order in their words, with the time."),
           expected_version: z.number().int().min(0).describe('The current version you read from directives_read; 0 when none has been set.'),
           caller_thread_id: z.string().describe('Your own T3 thread id. Required: the direction lease is checked against it.'),

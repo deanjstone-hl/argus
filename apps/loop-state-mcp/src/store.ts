@@ -1,5 +1,6 @@
 import { DatabaseSync, type SQLInputValue } from 'node:sqlite'
 
+import { applyDirectivesPatch, diffDirectives, type DirectivesChange } from './directive-patch.js'
 import {
   budgetExemptIssues,
   budgetRungLift,
@@ -2669,13 +2670,19 @@ export function openStore(options: StoreOptions) {
      * Set the directives: a new version, numbered by the server. Accepted only from the thread
      * holding the direction lease, in a turn the owner is driving (owner_turn within the
      * presence window, not stepped away), against the version the caller last read.
+     *
+     * argus#75: the change is the whole `record`, or a `patch` applied to the current version, which
+     * names only the keys it changes. Either way the answer carries `changes`, a key-by-key diff
+     * against the version before, so a slip in an unrelated key shows.
      */
     directivesSet(
       role: Role,
-      input: { record: unknown; reason: string; expected_version: number; caller_thread_id?: string },
-    ): { directives: DirectivesEntry } {
+      input: { record?: unknown; patch?: unknown; reason: string; expected_version: number; caller_thread_id?: string },
+    ): { directives: DirectivesEntry; changes: DirectivesChange[] } {
       permit(role, 'directives_set')
-      const body = requireValidDirectives(input.record)
+      if (input.record !== undefined && input.patch !== undefined) throw new Refused('send a record or a patch, not both')
+      if (input.record === undefined && input.patch === undefined) throw new Refused('send a record (the whole record) or a patch (the keys that change)')
+      const fullRecord = input.record === undefined ? null : requireValidDirectives(input.record)
       requireText(input.reason, 'reason')
       if (!Number.isInteger(input.expected_version) || input.expected_version < 0) {
         throw new Refused('expected_version must be the version you last read (0 when none has been set)')
@@ -2687,14 +2694,23 @@ export function openStore(options: StoreOptions) {
           const last = presence.stepped_away ? 'the owner stepped away' : presence.last_turn_at ? `the last owner turn was ${presence.last_turn_at}` : 'no owner turn is recorded'
           throw new Refused(`the owner is not present (${last}): directives change only in a turn the owner is driving. Call owner_turn on the owner's turn, then set them.`)
         }
-        const current = currentDirectivesVersion()
+        const currentRow = selectCurrentDirectives.get() as Row | undefined
+        const current = Number(currentRow?.version ?? 0)
         if (input.expected_version !== current) {
           throw new Refused(`directives changed since you read them: the current version is ${current}, not ${input.expected_version}. Read them again and re-apply the change.`)
+        }
+        const previous = currentRow ? (JSON.parse(String(currentRow.record)) as Record<string, unknown>) : {}
+        let body = fullRecord
+        if (body === null) {
+          if (!currentRow) throw new Refused('there is no record to patch: no version has been set. Send the whole record.')
+          const patched = applyDirectivesPatch(previous, input.patch)
+          if ('problems' in patched) throw new Refused(`the directives patch is invalid:\n- ${patched.problems.join('\n- ')}`)
+          body = requireValidDirectives(patched.record)
         }
         const version = current + 1
         insertDirectives.run(version, JSON.stringify(body), now(), input.caller_thread_id as string, 'owner', input.reason)
         record('directives_set', role, null, input.caller_thread_id as string, { version, reason: input.reason })
-        return { directives: toDirectives(selectDirectives.get(version) as Row) }
+        return { directives: toDirectives(selectDirectives.get(version) as Row), changes: diffDirectives(previous, body) }
       })
     },
 

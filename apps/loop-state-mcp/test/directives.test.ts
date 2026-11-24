@@ -332,3 +332,151 @@ describe('directives_set: the record is validated as the directives file is', ()
     expect((await set(aquila, { record })).isError).toBeFalsy()
   })
 })
+
+// argus#75: a one-key change is a patch against the current version, not the whole record, and every
+// write answers with a key-by-key diff against the version before it.
+describe('directives_set: patch', () => {
+  const BASE = {
+    ...MINIMAL,
+    trunk_repos: ['deanjstone-hl/argus-config', 'deanjstone-hl/atto', 'deanjstone/budget'],
+    budget_exempt_issues: ['deanjstone-hl/atto#12'],
+    ordering: ['bugs first', 'then maps'],
+  }
+
+  const seeded = async () => {
+    const w = world()
+    const aquila = await ownerPresent(w)
+    await aquila.ok('directives_set', { record: BASE, reason: 'base', expected_version: 0, caller_thread_id: AQUILA_THREAD })
+    return aquila
+  }
+  const patchCall = (aquila: Awaited<ReturnType<typeof seeded>>, patch: unknown, args: Record<string, unknown> = {}) =>
+    aquila.call('directives_set', { patch, reason: 'test', expected_version: 1, caller_thread_id: AQUILA_THREAD, ...args })
+  const current = async (aquila: Awaited<ReturnType<typeof seeded>>) => ((await aquila.ok('directives_read')) as any).directives
+
+  it('adds one entry to a list and leaves every other key as it was', async () => {
+    const aquila = await seeded()
+    const result = (await aquila.ok('directives_set', {
+      patch: { add: { budget_exempt_issues: ['deanjstone-hl/atto#16'] } },
+      reason: 'exempt atto/16',
+      expected_version: 1,
+      caller_thread_id: AQUILA_THREAD,
+    })) as any
+    expect(result.directives).toMatchObject({ version: 2, reason: 'exempt atto/16' })
+    expect(result.directives.record).toEqual({ ...BASE, budget_exempt_issues: ['deanjstone-hl/atto#12', 'deanjstone-hl/atto#16'] })
+    expect(result.changes).toEqual([
+      {
+        key: 'budget_exempt_issues',
+        change: 'changed',
+        before: ['deanjstone-hl/atto#12'],
+        after: ['deanjstone-hl/atto#12', 'deanjstone-hl/atto#16'],
+        list_added: ['deanjstone-hl/atto#16'],
+      },
+    ])
+  })
+
+  it('removes an entry from a list, keeping the rest in order', async () => {
+    const aquila = await seeded()
+    const result = (await patchCall(aquila, { remove: { trunk_repos: ['deanjstone-hl/atto'] } }).then((r) => aquila.ok('directives_read').then(() => r))) as any
+    expect(result.isError).toBeFalsy()
+    expect((await current(aquila)).record.trunk_repos).toEqual(['deanjstone-hl/argus-config', 'deanjstone/budget'])
+  })
+
+  it('sets a scalar and creates a new key, and unsets one', async () => {
+    const aquila = await seeded()
+    const result = (await aquila.ok('directives_set', {
+      patch: { set: { max_slots: 1, reserve_percent: 15 }, unset: ['budget_exempt_issues'] },
+      reason: 'x',
+      expected_version: 1,
+      caller_thread_id: AQUILA_THREAD,
+    })) as any
+    const { budget_exempt_issues: _gone, ...rest } = BASE
+    expect(result.directives.record).toEqual({ ...rest, max_slots: 1, reserve_percent: 15 })
+    expect(result.changes.map((c: any) => [c.key, c.change])).toEqual([
+      ['budget_exempt_issues', 'removed'],
+      ['max_slots', 'changed'],
+      ['reserve_percent', 'added'],
+    ])
+  })
+
+  it('is applied to the version named by expected_version: a stale one is refused', async () => {
+    const aquila = await seeded()
+    const result = await patchCall(aquila, { set: { max_slots: 1 } }, { expected_version: 0 })
+    expect(result.isError).toBe(true)
+    expect(text(result)).toMatch(/current version is 1/)
+    expect((await current(aquila)).version).toBe(1)
+  })
+
+  it('refuses a patch when no record has been set', async () => {
+    const aquila = await ownerPresent(world())
+    const result = await patchCall(aquila, { set: { max_slots: 1 } }, { expected_version: 0 })
+    expect(result.isError).toBe(true)
+    expect(text(result)).toMatch(/no record to patch/)
+  })
+
+  it('refuses both a record and a patch, and neither', async () => {
+    const aquila = await seeded()
+    const both = await patchCall(aquila, { set: { max_slots: 1 } }, { record: BASE })
+    expect(both.isError).toBe(true)
+    expect(text(both)).toMatch(/record or a patch, not both/)
+    const neither = await aquila.call('directives_set', { reason: 'x', expected_version: 1, caller_thread_id: AQUILA_THREAD })
+    expect(neither.isError).toBe(true)
+    expect(text(neither)).toMatch(/a record .* or a patch/)
+  })
+
+  it('refuses a removal of an entry that is not listed, writing nothing', async () => {
+    const aquila = await seeded()
+    const result = await patchCall(aquila, { remove: { trunk_repos: ['deanjstone-hl/nope'] } })
+    expect(result.isError).toBe(true)
+    expect(text(result)).toMatch(/remove from trunk_repos: "deanjstone-hl\/nope" is not listed/)
+    expect((await current(aquila)).version).toBe(1)
+  })
+
+  it('refuses a patch that changes nothing', async () => {
+    const aquila = await seeded()
+    const result = await patchCall(aquila, { add: { trunk_repos: ['deanjstone-hl/atto'] } })
+    expect(result.isError).toBe(true)
+    expect(text(result)).toMatch(/changes nothing/)
+    expect((await current(aquila)).version).toBe(1)
+  })
+
+  it('validates the patched record as it does a full one', async () => {
+    const aquila = await seeded()
+    const result = await patchCall(aquila, { add: { trunk_repos: ['nonsense'] } })
+    expect(result.isError).toBe(true)
+    expect(text(result)).toMatch(/trunk_repos\[3\]/)
+    expect((await current(aquila)).version).toBe(1)
+  })
+
+  it('still needs the owner present and the direction lease', async () => {
+    const w = world()
+    const aquila = await ownerPresent(w)
+    await aquila.ok('directives_set', { record: BASE, reason: 'base', expected_version: 0, caller_thread_id: AQUILA_THREAD })
+    w.clock.advance(31 * MINUTE)
+    const absent = await patchCall(aquila, { set: { max_slots: 1 } })
+    expect(absent.isError).toBe(true)
+    expect(text(absent)).toMatch(/owner is not present/)
+    await aquila.ok('owner_turn', { caller_thread_id: AQUILA_THREAD })
+    const stray = await patchCall(aquila, { set: { max_slots: 1 } }, { caller_thread_id: STRAY })
+    expect(stray.isError).toBe(true)
+    expect(text(stray)).toMatch(/direction lease/)
+  })
+
+  it('shows a full-record write as a diff against the version before: the dropped entry shows as removed', async () => {
+    const aquila = await seeded()
+    const result = (await aquila.ok('directives_set', {
+      record: { ...BASE, trunk_repos: ['deanjstone-hl/atto', 'deanjstone/budget'] },
+      reason: 'v91-style slip',
+      expected_version: 1,
+      caller_thread_id: AQUILA_THREAD,
+    })) as any
+    expect(result.changes).toEqual([
+      expect.objectContaining({ key: 'trunk_repos', change: 'changed', list_removed: ['deanjstone-hl/argus-config'] }),
+    ])
+  })
+
+  it('shows the first write as every key added', async () => {
+    const aquila = await ownerPresent(world())
+    const result = (await aquila.ok('directives_set', { record: MINIMAL, reason: 'first', expected_version: 0, caller_thread_id: AQUILA_THREAD })) as any
+    expect(result.changes.map((c: any) => [c.key, c.change])).toEqual(Object.keys(MINIMAL).sort().map((key) => [key, 'added']))
+  })
+})
