@@ -195,7 +195,9 @@ The engine reports which deployment it is (WSL2's is **Aquila**, argus#706). It 
 identity once at startup, so restart it after editing the file.
 
 - The file is `envs/<env>/identity.json` in argus-config, the only override surface
-  (`{ schema_version, name, persona, environment }`). The engine finds it beside the composed
+  (`{ schema_version, name, persona, environment }`, plus the profile and charter paths that
+  `schema_version` 2 adds; the engine reads `name` and `environment` and accepts versions 1 and
+  2). The engine finds it beside the composed
   `CLAUDE.md` that `~/.claude/CLAUDE.md` links to, so each machine reads its own env's file.
   `ARGUS_IDENTITY_PATH` names a file explicitly. An env with no `identity.json` (homelab,
   Windows) has no identity.
@@ -203,7 +205,7 @@ identity once at startup, so restart it after editing the file.
 
 | Route | Response |
 |---|---|
-| `GET /identity` | `{ name, environment, schema_version }`; `404` with no identity; `500` with the reason when the file is invalid |
+| `GET /identity` | `{ name, environment, schema_version }` (the file's version); `404` with no identity; `500` with the reason when the file is invalid |
 | `GET /deployments?environment=<env>` | `{ deployments: [...] }`, this engine only, filtered by `environment` |
 | `GET /deployments/:name` | The deployment named `name`, or `404` |
 | `GET /health` | Also carries `deployment`: the name, or `null` |

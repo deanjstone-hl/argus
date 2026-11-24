@@ -7,15 +7,19 @@ import { z } from 'zod';
 // The deployment identity (argus#706, schema from map #95 decision 1). It lives
 // in argus-config as envs/<env>/identity.json and is the only override surface
 // (#95 decision 4): the engine reads it, never writes or defaults it.
+//
+// Version 2 (argus-config 62e8d76) added keys for the profile and charter paths.
+// The engine needs only name and environment, so both versions share one shape and
+// the extra keys are ignored.
 const IdentityFileSchema = z.object({
-  schema_version: z.literal(1),
+  schema_version: z.union([z.literal(1), z.literal(2)]),
   name: z.string().trim().min(1),
   persona: z.string().trim().min(1),
   environment: z.enum(['wsl2', 'windows', 'homelab']),
 });
 
 export interface DeploymentIdentity {
-  schemaVersion: 1;
+  schemaVersion: 1 | 2;
   name: string;
   environment: 'wsl2' | 'windows' | 'homelab';
 }
@@ -73,8 +77,8 @@ export function loadIdentity(options: LoadIdentityOptions): IdentityState {
     return { identity: null, source: path, error: `${path}: ${issues.join('; ')}` };
   }
 
-  const { name, environment } = parsed.data;
-  return { identity: { schemaVersion: 1, name, environment }, source: path, error: null };
+  const { schema_version: schemaVersion, name, environment } = parsed.data;
+  return { identity: { schemaVersion, name, environment }, source: path, error: null };
 }
 
 function wire(identity: DeploymentIdentity) {

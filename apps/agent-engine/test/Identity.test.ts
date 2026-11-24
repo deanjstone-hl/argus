@@ -29,6 +29,19 @@ function linkClaudeMd(env: string): void {
 
 const AQUILA = { schema_version: 1, name: 'Aquila', persona: 'personas/aquila.md', environment: 'wsl2' };
 
+// The shape envs/wsl2/identity.json has had since argus-config 62e8d76: the same
+// four required keys plus the profile, charter and persona paths the engine ignores.
+const AQUILA_V2 = {
+  schema_version: 2,
+  name: 'Aquila',
+  profile: 'staff-xo',
+  persona: 'personas/aquila.md',
+  session_persona: 'personas/session.md',
+  charter: 'charters/orchestrator.md',
+  owner_charter: 'charters/aquila.md',
+  environment: 'wsl2',
+};
+
 function get(app: Hono, path: string) {
   return app.fetch(new Request(`http://localhost${path}`));
 }
@@ -53,6 +66,17 @@ describe('loadIdentity', () => {
     expect(state.identity).toEqual({ schemaVersion: 1, name: 'Aquila', environment: 'wsl2' });
     expect(state.source).toBe(path);
     expect(state.error).toBeNull();
+  });
+
+  it('loads a schema_version 2 file and ignores the keys the engine does not use', () => {
+    const path = writeIdentity('wsl2', AQUILA_V2);
+    linkClaudeMd('wsl2');
+
+    const state = loadIdentity({ env: {}, homeDir: home });
+
+    expect(state.error).toBeNull();
+    expect(state.identity).toEqual({ schemaVersion: 2, name: 'Aquila', environment: 'wsl2' });
+    expect(state.source).toBe(path);
   });
 
   it('reports no identity, without error, for an env that has none (homelab)', () => {
@@ -100,7 +124,7 @@ describe('loadIdentity', () => {
   it.each([
     ['a missing name', { schema_version: 1, persona: 'p.md', environment: 'wsl2' }],
     ['an unknown environment', { ...AQUILA, environment: 'mars' }],
-    ['an unsupported schema_version', { ...AQUILA, schema_version: 2 }],
+    ['an unsupported schema_version', { ...AQUILA, schema_version: 3 }],
   ])('rejects %s', (_label, body) => {
     writeIdentity('wsl2', body);
     linkClaudeMd('wsl2');
@@ -137,6 +161,16 @@ describe('identity routes', () => {
     const res = await get(createIdentityRoutes(broken), '/identity');
     expect(res.status).toBe(500);
     expect(await res.json()).toEqual({ error: 'invalid JSON' });
+  });
+
+  it('GET /identity reports the schema_version of a v2 file', async () => {
+    const v2: IdentityState = {
+      identity: { schemaVersion: 2, name: 'Aquila', environment: 'wsl2' },
+      source: '/x/identity.json',
+      error: null,
+    };
+    const res = await get(createIdentityRoutes(v2), '/identity');
+    expect(await res.json()).toEqual({ name: 'Aquila', environment: 'wsl2', schema_version: 2 });
   });
 
   it('GET /deployments/:name addresses the deployment by name', async () => {
