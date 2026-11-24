@@ -322,6 +322,11 @@ time: a second listed start is refused until the first closes. It does not use t
 waived: the memory, load and disk gates are the tick's, not the server's, and still apply. An
 issue not listed is refused at those levels as ever, and a later directives version that drops
 it ends the exemption. `status_read` `pressure.budget_exempt_issues` returns the list.
+A running slot whose issue is listed counts as budget-exempt everywhere, with no flag and no
+column ([argus#77](https://github.com/deanjstone-hl/argus/issues/77)): `slot_list` (and every slot a
+write returns) shows `budget_exempt: true`, `status_read` `slots.budget_exempt_running` counts it,
+and `POST /wake/check` answers no `free_slot` for `takeable_exempt` while it runs, the same rule
+`slot_start` applies when it refuses a second one.
 
 **Budget-exempt slots** (argus#1171). An issue labelled `efficiency:orchestrator` (it cuts the
 orchestrator's token or tick cost) starts with `slot_start` `budget_exempt: true`; the caller

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { AQUILA_THREAD, text, world } from './helpers.js'
+import { AFK_THREAD, AQUILA_THREAD, MINUTE, TOKENS, text, world } from './helpers.js'
 import { ladderWorld } from './ladder-world.js'
 
 /**
@@ -131,5 +131,43 @@ describe('status_read and budget_exempt_issues', () => {
     expect((await w.afk.ok('status_read')).pressure.budget_exempt_issues).toEqual([])
     await listed(w, [OTHER_LISTED, LISTED])
     expect((await w.afk.ok('status_read')).pressure.budget_exempt_issues).toEqual([LISTED, OTHER_LISTED])
+  })
+})
+
+describe('a running budget_exempt_issues slot counts as budget-exempt (argus#77)', () => {
+  const wakeBody = { role: 'afk', host: 'wsl2', directives_version: 'v1', needs_owner: [] as string[], window_used_percent: 20, takeable: 3 }
+
+  it('shows budget_exempt in slot_list and counts it in status_read, with no client flag', async () => {
+    const w = await ladderWorld()
+    await listed(w)
+    await w.afk.ok('status_tick', w.tick(1.3, { total_cap: 3 }))
+    await w.afk.ok('slot_start', { issue: LISTED, thread_id: 'w1' })
+    const slot = (await w.afk.ok('slot_list')).slots.find((s: { issue: string }) => s.issue === LISTED)
+    expect(slot.budget_exempt).toBe(true)
+    expect((await w.afk.ok('status_read')).slots.budget_exempt_running).toBe(1)
+  })
+
+  it('does not count an unlisted slot, nor one the directives later drop', async () => {
+    const w = await ladderWorld()
+    const aquila = await listed(w)
+    await w.afk.ok('status_tick', w.tick(0, { total_cap: 3 }))
+    await w.afk.ok('slot_start', { issue: issue(1), thread_id: 'w1' })
+    await w.afk.ok('slot_start', { issue: LISTED, thread_id: 'w2' })
+    expect((await w.afk.ok('status_read')).slots.budget_exempt_running).toBe(1)
+    await setDirectives(aquila, { budget_exempt_issues: [] }, 1)
+    expect((await w.afk.ok('status_read')).slots.budget_exempt_running).toBe(0)
+  })
+
+  it('wakes no free_slot for another exempt issue while a listed one runs', async () => {
+    const w = await ladderWorld()
+    await listed(w)
+    await w.afk.ok('status_tick', w.tick(1.3, { total_cap: 3 }))
+    w.clock.advance(5 * MINUTE)
+    const body = { ...wakeBody, thread_id: AFK_THREAD, takeable_exempt: 1 }
+    expect((await w.post('/wake/check', body, TOKENS.afk)).body).toMatchObject({ wake: true, reason: 'free_slot' })
+    await w.afk.ok('slot_start', { issue: LISTED, thread_id: 'w1' })
+    await w.afk.ok('status_tick', w.tick(1.3, { total_cap: 3 }))
+    w.clock.advance(5 * MINUTE)
+    expect((await w.post('/wake/check', body, TOKENS.afk)).body).toMatchObject({ wake: false })
   })
 })

@@ -1544,7 +1544,21 @@ export function openStore(options: StoreOptions) {
 
   const isListedExemptIssue = (issue: string) => listedExemptIssues().includes(issue.toLowerCase())
 
-  const hasRunningExemptSlot = () => (selectRunning.all() as Row[]).some((row) => Number(row.budget_exempt) === 1)
+  /**
+   * argus#77: a slot counts as budget-exempt when it was started with `budget_exempt` or its issue is in the
+   * directives' `budget_exempt_issues`, the rule `slot_start` applies. The listed kind sets no column, so it is read
+   * from the live directives: dropping the issue from them ends it.
+   */
+  const isExemptRow = (row: Row, exemptIssues: readonly string[] = listedExemptIssues()) =>
+    Number(row.budget_exempt) === 1 || exemptIssues.includes(String(row.issue).toLowerCase())
+
+  const hasRunningExemptSlot = () => (selectRunning.all() as Row[]).some((row) => isExemptRow(row))
+
+  /** A slot as the tools show it: `budget_exempt` also true for a running or parked issue the directives list. */
+  const toShownSlot = (row: Row, exemptIssues: readonly string[] = listedExemptIssues()): Slot => {
+    const slot = toSlot(row)
+    return slot.budget_exempt || !isExemptRow(row, exemptIssues) ? slot : { ...slot, budget_exempt: true }
+  }
 
   const selectSlotShape = db.prepare('SELECT issue, state, host, budget_exempt FROM slots ORDER BY issue')
 
@@ -1786,7 +1800,7 @@ export function openStore(options: StoreOptions) {
           ).run(issue, threadId, host, at, at, budgetExempt ? 1 : 0)
         }
         record('slot_started', role, issue, threadId, budgetExempt ? { budget_exempt: true } : undefined)
-        return withWarning(toSlot(selectSlot.get(issue) as Row), warning)
+        return withWarning(toShownSlot(selectSlot.get(issue) as Row), warning)
       })
     },
 
@@ -1798,7 +1812,7 @@ export function openStore(options: StoreOptions) {
         requireState(row, 'running', 'park')
         db.prepare("UPDATE slots SET state = 'parked', note = ?, pending_approvals = 0, updated_at = ? WHERE issue = ?").run(note ?? null, now(), issue)
         record('slot_parked', role, issue, String(row.thread_id), { note: note ?? null })
-        return withWarning(toSlot(selectSlot.get(issue) as Row), warning)
+        return withWarning(toShownSlot(selectSlot.get(issue) as Row), warning)
       })
     },
 
@@ -1810,7 +1824,7 @@ export function openStore(options: StoreOptions) {
         db.prepare("UPDATE slots SET state = 'ready', note = ?, updated_at = ? WHERE issue = ?").run(note ?? null, now(), issue)
         record('slot_unparked', role, issue, String(row.thread_id), { note: note ?? null })
         touchHolder('direction', holderOf('direction'))
-        return toSlot(selectSlot.get(issue) as Row)
+        return toShownSlot(selectSlot.get(issue) as Row)
       })
     },
 
@@ -1829,7 +1843,7 @@ export function openStore(options: StoreOptions) {
           'UPDATE slots SET report_outcome = ?, report_note = ?, report_pr = ?, reported_at = ?, updated_at = ? WHERE issue = ?',
         ).run(input.outcome, input.note ?? null, input.pr ?? null, now(), now(), input.issue)
         record('slot_reported', role, input.issue, input.thread_id, { outcome: input.outcome })
-        return toSlot(selectSlot.get(input.issue) as Row)
+        return toShownSlot(selectSlot.get(input.issue) as Row)
       })
     },
 
@@ -1859,7 +1873,7 @@ export function openStore(options: StoreOptions) {
           input.issue,
         )
         record('slot_awaiting_ci', role, input.issue, input.thread_id, { ref: input.ref })
-        return toSlot(selectSlot.get(input.issue) as Row)
+        return toShownSlot(selectSlot.get(input.issue) as Row)
       })
     },
 
@@ -1894,7 +1908,7 @@ export function openStore(options: StoreOptions) {
           ...(refusal === null ? {} : { reason: refusal }),
         })
         touchHolder('direction', holderOf('direction'))
-        const slot = toSlot(selectSlot.get(issue) as Row)
+        const slot = toShownSlot(selectSlot.get(issue) as Row)
         return refusal === null ? { slot, resumed: true } : { slot, resumed: false, reason: refusal }
       })
     },
@@ -1910,7 +1924,7 @@ export function openStore(options: StoreOptions) {
         }
         deleteSlot.run(issue)
         record('slot_closed', role, issue, String(row.thread_id), { verified })
-        const { state: previous_state, ...last } = toSlot(row)
+        const { state: previous_state, ...last } = toShownSlot(row)
         const closed: ClosedSlot = { ...last, state: 'closed', previous_state, verified, closed_at: iso(now()) }
         return withEndedWarning(closed, warning)
       })
@@ -1924,7 +1938,7 @@ export function openStore(options: StoreOptions) {
         const row = slotOrRefuse(issue)
         deleteSlot.run(issue)
         record('slot_freed', role, issue, String(row.thread_id), { reason, state: row.state })
-        const { state: previous_state, ...last } = toSlot(row)
+        const { state: previous_state, ...last } = toShownSlot(row)
         const freed: FreedSlot = { ...last, state: 'freed', previous_state, reason, freed_at: iso(now()) }
         return withEndedWarning(freed, warning)
       })
@@ -1932,7 +1946,8 @@ export function openStore(options: StoreOptions) {
 
     slotList(role: Role, state?: SlotState): Slot[] {
       permit(role, 'slot_list')
-      const slots = (selectSlots.all() as Row[]).map(toSlot)
+      const exemptIssues = listedExemptIssues()
+      const slots = (selectSlots.all() as Row[]).map((row) => toShownSlot(row, exemptIssues))
       return state ? slots.filter((slot) => slot.state === state) : slots
     },
 
@@ -2353,7 +2368,7 @@ export function openStore(options: StoreOptions) {
         awaiting_ci: counts.awaiting_ci ?? 0,
         awaiting_ci_cap: awaitingCiCap(),
         pending_approvals,
-        budget_exempt_running: (selectRunning.all() as Row[]).filter((slot) => Number(slot.budget_exempt) === 1).length,
+        budget_exempt_running: (selectRunning.all() as Row[]).filter((slot) => isExemptRow(slot)).length,
       }
       const cadence_minutes = cadenceMs / 60_000
       const ticks = (since: number) => {
