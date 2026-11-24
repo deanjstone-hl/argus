@@ -61,8 +61,21 @@ went `ready` because the caps were full may report and finish there, and Aquila 
 `previous_state: "ready"`, and skips the cap check `slot_start` would make, since nothing runs. A `parked` or
 `awaiting_ci` slot stays refused.
 
-Running slots count against the cap; parked, ready and awaiting_ci ones do not. The worker only reports:
-the AFK loop reads the report on its next tick, verifies it, and closes or parks the slot.
+Running slots count against the cap; parked, ready and awaiting_ci ones do not, with one exception. The worker
+only reports: the AFK loop reads the report on its next tick, verifies it, and closes or parks the slot.
+
+**A slot parked on an approval prompt keeps its place** ([argus-config/1688](https://github.com/deanjstone-hl/argus-config/issues/1688)).
+A worker blocked on a tool-approval prompt is still resident, and it resumes the moment the owner answers the
+prompt, with no `slot_start` in between. If its parked slot gave up its place, the next start would put more
+workers on the host than its cap: on 25 Nov 2026 that put five workers on a WSL2 capped at two. So `slot_park`
+sets `holds_place: true` when a tick reported `pending_approvals` above 0 for the slot, or when the call itself
+passes `pending_approvals` above 0. A slot that holds its place counts toward the total, effective and host caps
+and the one-at-a-time exempt rules exactly as a running one, while it is `parked` and after `slot_unpark` makes it
+`ready`. `status_read` counts it in `slots.used` and `slots.hosts.<host>.used`, and reports how many there are as
+`slots.holding`. `slot_start` with the same `thread_id` returns it to `running` without a cap check, since it never
+left; a start on another thread is a new worker and is checked as usual. `slot_close`, `slot_free` and the return
+to `running` end the hold. A slot parked with no prompt pending (a `needs:owner` question, the worker's turn over)
+gives its place up as before.
 
 **Awaiting CI** (argus-config#1169). A worker whose PR is open and whose checks have started calls
 `slot_await_ci` (`issue`, `thread_id`, `ref`: the PR URL, the SHA pushed to the issue's own trunk repo's `main`, or
@@ -668,7 +681,8 @@ it to `status_tick` as `pending_approvals`, an optional map keyed by issue
 - **Read back** as `pending_approvals` on every slot (`slot_list`, `slot_start` and the rest; `0`
   by default) and as `status_read` `slots.pending_approvals`, a map of the running slots above 0.
 - **Cleared** by `slot_park`, `slot_close`, `slot_free`, a restart of a ready slot and a rebuild
-  that moves a slot out of `running`. Only a running slot counts.
+  that moves a slot out of `running`. Only a running slot counts. A `slot_park` that clears a count
+  above 0 keeps the slot's place under the caps (`holds_place`, see Slots above).
 - **Wakes the AFK thread**, not Aquila: `POST /wake/check` answers `wake: true`,
   `reason: "pending_approvals"` for the `afk` holder while any running slot is above 0, at any
   window pressure (parking costs no slot). The AFK tick parks the slot with `needs:owner` and
@@ -676,7 +690,8 @@ it to `status_tick` as `pending_approvals`, an optional map keyed by issue
   slot running keeps it waking, and the unanswered-wake rule applies as for any wake.
 - Only `status_tick` takes the field. `tick_gate` ignores it and carries the counts forward.
 
-Schema version 6 adds `slots.pending_approvals INTEGER NOT NULL DEFAULT 0`; it applies once, in
+Schema version 18 adds `slots.holds_place INTEGER NOT NULL DEFAULT 0`; existing rows read 0, so a slot
+parked before the upgrade holds no place. Schema version 6 adds `slots.pending_approvals INTEGER NOT NULL DEFAULT 0`; it applies once, in
 place, and existing rows read 0. Callers older than this change ignore the argument.
 
 ## Aquila's ledger
@@ -736,9 +751,9 @@ code it covers. `LEASE_MODEL_DEPTH` and `LEASE_MODEL_WALKS` raise the bound.
 `test/slot-model.test.ts` is the same kind of check for the slot lifecycle. It visits every slot
 state within 4 operations of an empty db, tries every slot operation from each, then walks 20,000
 seeded operations, against the real store. After each operation it checks that the store followed
-the slot diagram above, that slots running work stay within every cap, and that `slot_list` and
-`status_read` agree on what is running and what is budget-exempt. It replays argus#77, argus#1197
-and argus/37. The project skill `.claude/skills/verify-loop-state-slots` says when to run it and
+the slot diagram above, that the workers resident on a host (running work, or waiting on an approval
+prompt) stay within every cap, and that `slot_list` and `status_read` agree on what holds a place and
+what is budget-exempt. It replays argus#77, argus#1197, argus/37 and argus-config#1688. The project skill `.claude/skills/verify-loop-state-slots` says when to run it and
 how to read a failure. `SLOT_MODEL_DEPTH` and `SLOT_MODEL_WALK_STEPS` raise the bound.
 
 How a slot counts toward the caps (capped, exempt repo, flagged, listed) is decided by `standingOf`

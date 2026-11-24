@@ -23,7 +23,7 @@ describe('only standingOf decides how a slot counts toward the caps', () => {
     )
     expect(
       strays,
-      'These lines decide budget exemption themselves. Read the slot\'s Standing instead: standingOf(issue, flagged, exemptionsNow()) for a start, runningSlots(exemptionsNow()) for running slots, and use its capped, listed, flagged, exemptRepo or budgetExempt field.',
+      'These lines decide budget exemption themselves. Read the slot\'s Standing instead: standingOf(issue, flagged, exemptionsNow()) for a start, placedSlots(exemptionsNow()) for the slots holding a place, and use its capped, listed, flagged, exemptRepo or budgetExempt field.',
     ).toEqual([])
   })
 })

@@ -179,16 +179,22 @@ export function createMcpServer(store: Store, role: Role, threadHeader?: string)
       {
         title: 'Park a slot',
         description:
-          'Park a running slot whose question is now on its issue with needs:owner. The slot stops counting as used; it resumes only after Aquila un-parks it.',
+          'Park a running slot whose question is now on its issue with needs:owner. The slot stops counting as used; it resumes only after Aquila un-parks it. A slot parked while its worker waits on a tool-approval prompt is the exception (argus-config#1688): the worker is still resident and resumes the moment the owner answers, so the slot keeps its place under the total and host caps (holds_place: true, counted in status_read slots.used and slots.holding) until it runs again, is closed or is freed. The server holds the place when a tick reported pending_approvals above 0 for the slot, or when this call passes pending_approvals above 0. Once un-parked, slot_start with the same thread_id returns it to running without a cap check.',
         inputSchema: {
           issue,
           note: z.string().optional().describe('What it is waiting on, one line.'),
+          pending_approvals: z
+            .number()
+            .int()
+            .min(0)
+            .optional()
+            .describe('The pendingRequestCount of the worker thread as you read it. Above 0, the worker still waits on an approval prompt and the slot keeps its place under the caps.'),
           caller_thread_id: callerThreadId,
           host: drainHost,
         },
         annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
       },
-      guarded((args) => store.slotPark(role, args.issue, args.note, withCaller('slot_park', args))),
+      guarded((args) => store.slotPark(role, args.issue, args.note, withCaller('slot_park', args), args.pending_approvals ?? 0)),
     )
   }
 

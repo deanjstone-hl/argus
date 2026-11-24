@@ -41,7 +41,7 @@ const ISSUES: readonly Issue[] = [
   { name: 'flagged-b', issue: 'o/flagged#21', host: 'wsl2', flagged: true, listed: false },
 ]
 
-const OPS = ['start', 'park', 'unpark', 'await_ci', 'resume_ci', 'resume_report_only', 'close', 'free'] as const
+const OPS = ['start', 'prompt', 'park', 'unpark', 'await_ci', 'resume_ci', 'resume_report_only', 'close', 'free'] as const
 type Op = (typeof OPS)[number]
 
 interface Action {
@@ -52,19 +52,29 @@ interface Action {
 const ACTIONS: readonly Action[] = ISSUES.flatMap((issue) => OPS.map((op) => ({ op, issue })))
 const say = (action: Action) => `${action.op} ${action.issue.name}`
 
-/** What the model holds for a slot. `reportOnly`: resumed past the caps to post its Resolution (argus/37). */
+/**
+ * What the model holds for a slot.
+ * - `reportOnly`: resumed past the caps to post its Resolution (argus/37).
+ * - `prompted`: its worker waits on a tool-approval prompt, and the tick has reported that (`pending_approvals`).
+ * - `held`: parked while prompted. The worker is still resident and resumes the moment the owner answers, so the
+ *   slot keeps its place under the caps until it runs again or is freed (argus-config#1688).
+ */
 interface ModelSlot {
   state: SlotState
   reportOnly: boolean
+  prompted: boolean
+  held: boolean
 }
 type Model = Map<Issue, ModelSlot>
 
 const runningIn = (model: Model) => [...model].filter(([, slot]) => slot.state === 'running').map(([issue]) => issue)
+/** The slots holding a place under the caps: the running ones, and the ones parked on an approval prompt. */
+const placedIn = (model: Model) => [...model].filter(([, slot]) => slot.state === 'running' || slot.held).map(([issue]) => issue)
 const isCapped = (issue: Issue) => !issue.flagged && !issue.listed
 
-/** Whether the caps leave running room for `issue`, counting every running slot as the README says. */
+/** Whether the caps leave running room for `issue`, counting every slot that holds a place as the README says. */
 function hasRoom(model: Model, issue: Issue): boolean {
-  const running = runningIn(model).filter((other) => other !== issue)
+  const running = placedIn(model).filter((other) => other !== issue)
   if (issue.listed) return !running.some((other) => other.listed)
   if (issue.flagged) return !running.some((other) => other.flagged)
   const cappedRunning = running.filter(isCapped)
@@ -72,25 +82,31 @@ function hasRoom(model: Model, issue: Issue): boolean {
 }
 
 /** What the README says `action` does to the model: the slot's next state (null: gone), or `refused`. */
-function expected(model: Model, { op, issue }: Action): ModelSlot | null | 'refused' {
-  const state = model.get(issue)?.state
-  const running: ModelSlot = { state: 'running', reportOnly: false }
+function expected(model: Model, { op, issue }: Action): ModelSlot | null | 'refused' | 'unchanged' {
+  const slot = model.get(issue)
+  const state = slot?.state
+  const plain = { reportOnly: false, prompted: false, held: false }
+  const running: ModelSlot = { state: 'running', ...plain }
   switch (op) {
     case 'start':
+      // A held slot never gave up its place, so the same worker goes back to running without a cap check.
+      if (state === 'ready' && slot?.held) return running
       return (state === undefined || state === 'ready') && hasRoom(model, issue) ? running : 'refused'
+    case 'prompt':
+      return slot !== undefined && state === 'running' ? { ...slot, prompted: true } : 'unchanged'
     case 'park':
-      return state === 'running' ? { state: 'parked', reportOnly: false } : 'refused'
+      return slot !== undefined && state === 'running' ? { state: 'parked', ...plain, held: slot.prompted } : 'refused'
     case 'unpark':
-      return state === 'parked' ? { state: 'ready', reportOnly: false } : 'refused'
+      return slot !== undefined && state === 'parked' ? { state: 'ready', ...plain, held: slot.held } : 'refused'
     case 'await_ci': {
-      const awaiting = [...model.values()].filter((slot) => slot.state === 'awaiting_ci').length
-      return state === 'running' && awaiting < AWAITING_CAP ? { state: 'awaiting_ci', reportOnly: false } : 'refused'
+      const awaiting = [...model.values()].filter((other) => other.state === 'awaiting_ci').length
+      return state === 'running' && awaiting < AWAITING_CAP ? { state: 'awaiting_ci', ...plain } : 'refused'
     }
     case 'resume_ci':
       if (state !== 'awaiting_ci') return 'refused'
-      return hasRoom(model, issue) ? running : { state: 'ready', reportOnly: false }
+      return hasRoom(model, issue) ? running : { state: 'ready', ...plain }
     case 'resume_report_only':
-      return state === 'awaiting_ci' ? { state: 'running', reportOnly: true } : 'refused'
+      return state === 'awaiting_ci' ? { state: 'running', ...plain, reportOnly: true } : 'refused'
     case 'close':
       return state === 'running' || state === 'ready' ? null : 'refused'
     case 'free':
@@ -99,12 +115,16 @@ function expected(model: Model, { op, issue }: Action): ModelSlot | null | 'refu
 }
 
 const AFK = { caller_thread_id: AFK_THREAD }
+const TICK = { thread_id: AFK_THREAD, directives_version: 'v1', needs_owner: [] as string[], total_cap: TOTAL_CAP, host_caps: { ...HOST_CAPS } }
 const WORKER = (issue: Issue) => `worker-${issue.name}`
 
 function perform(store: Store, { op, issue }: Action): void {
   switch (op) {
     case 'start':
       store.slotStart('afk', issue.issue, WORKER(issue), issue.host, AFK_THREAD, issue.flagged)
+      return
+    case 'prompt':
+      store.statusTick('afk', { ...TICK, pending_approvals: { [issue.issue]: 1 } })
       return
     case 'park':
       store.slotPark('afk', issue.issue, 'question on the issue', AFK)
@@ -160,7 +180,7 @@ function boot(): Store {
     expected_version: 0,
     caller_thread_id: AQUILA_THREAD,
   })
-  store.statusTick('afk', { thread_id: AFK_THREAD, directives_version: 'v1', needs_owner: [], total_cap: TOTAL_CAP, host_caps: { ...HOST_CAPS } })
+  store.statusTick('afk', TICK)
   return store
 }
 
@@ -172,7 +192,7 @@ function step(store: Store, model: Model, action: Action): string | null {
     return want === 'refused' ? `${say(action)} is refused by the slot diagram and the caps, but the store accepted it` : `${say(action)} is allowed by the slot diagram and the caps, but the store refused it`
   }
   if (want === null) model.delete(action.issue)
-  else if (want !== 'refused') model.set(action.issue, want)
+  else if (want !== 'refused' && want !== 'unchanged') model.set(action.issue, want)
 
   const shown = new Map(store.slotList('afk').map((slot) => [slot.issue, slot]))
   for (const issue of ISSUES) {
@@ -186,25 +206,31 @@ function step(store: Store, model: Model, action: Action): string | null {
   }
 
   const running = runningIn(model)
-  const working = running.filter((issue) => model.get(issue)?.reportOnly !== true)
+  const placed = placedIn(model)
+  // The workers resident on a host: the ones running work, and the ones waiting on an approval prompt.
+  const working = placed.filter((issue) => model.get(issue)?.reportOnly !== true)
   const cappedWorking = working.filter(isCapped)
-  if (cappedWorking.length > TOTAL_CAP) return `${cappedWorking.length} capped slots run work, past the total cap ${TOTAL_CAP}`
+  if (cappedWorking.length > TOTAL_CAP) return `${cappedWorking.length} capped workers are resident, past the total cap ${TOTAL_CAP}`
   for (const host of Object.keys(HOST_CAPS) as Host[]) {
     const here = cappedWorking.filter((issue) => issue.host === host).length
-    if (here > HOST_CAPS[host]) return `${here} capped slots run work on ${host}, past its cap ${HOST_CAPS[host]}`
+    if (here > HOST_CAPS[host]) return `${here} capped workers are resident on ${host}, past its cap ${HOST_CAPS[host]}`
   }
   if (working.filter((issue) => issue.listed).length > 1) return 'two budget_exempt_issues slots run work at once'
   if (working.filter((issue) => issue.flagged).length > 1) return 'two budget_exempt slots run work at once'
 
   const { slots } = store.statusRead('afk')
   const count = (state: SlotState) => [...model.values()].filter((slot) => slot.state === state).length
-  if (slots.used !== running.length) return `status_read counts ${slots.used} running slots, the slot diagram ${running.length}: a slot that is not running is counted as used`
+  if (slots.used !== placed.length) {
+    return `status_read counts ${slots.used} slots used, the slot diagram ${placed.length}: a running slot and a slot parked on an approval prompt hold a place, nothing else does`
+  }
+  const held = [...model.values()].filter((slot) => slot.held).length
+  if (slots.holding !== held) return `status_read counts ${slots.holding} parked or ready slots holding their place, the slot diagram ${held}`
   if (slots.parked !== count('parked') || slots.ready !== count('ready') || slots.awaiting_ci !== count('awaiting_ci')) {
     return 'status_read parked, ready and awaiting_ci counts differ from the slot diagram'
   }
-  const exemptRunning = running.filter((issue) => issue.flagged || issue.listed).length
+  const exemptRunning = placed.filter((issue) => issue.flagged || issue.listed).length
   if (slots.budget_exempt_running !== exemptRunning) {
-    return `status_read budget_exempt_running is ${slots.budget_exempt_running}, but ${exemptRunning} budget-exempt slots run: the tick would launch a worker that slot_start refuses`
+    return `status_read budget_exempt_running is ${slots.budget_exempt_running}, but ${exemptRunning} budget-exempt slots hold a place: the tick would launch a worker that slot_start refuses`
   }
   return null
 }
@@ -233,7 +259,11 @@ function play(actions: readonly Action[]): Violation | null {
   }
 }
 
-const signature = (model: Model) => ISSUES.map((issue) => `${model.get(issue)?.state ?? '-'}${model.get(issue)?.reportOnly ? '!' : ''}`).join(',')
+const signature = (model: Model) =>
+  ISSUES.map((issue) => {
+    const slot = model.get(issue)
+    return `${slot?.state ?? '-'}${slot?.reportOnly ? '!' : ''}${slot?.prompted ? '?' : ''}${slot?.held ? '+' : ''}`
+  }).join(',')
 
 /**
  * Breadth-first over the slot states reachable within `depth` operations. One store serves the whole search: to
@@ -257,13 +287,16 @@ function search(depth: number): { violation: Violation | null; states: number } 
     for (let level = 0; level < depth; level += 1) {
       const next: Action[][] = []
       for (const path of frontier) {
+        // An action that changed no slot left the store standing in the same state, so the next one needs no replay.
+        let standing: Model | null = null
         for (const action of ACTIONS) {
-          const model = goTo(path)
+          const model: Model | Violation = standing ?? goTo(path)
           if (!(model instanceof Map)) return { violation: model, states: paths.size }
           const before = signature(model)
           const broken = step(store, model, action)
           if (broken !== null) return { violation: { property: broken, trace: [...path, action].map(say) }, states: paths.size }
           const after = signature(model)
+          standing = after === before ? model : null
           if (after !== before && !paths.has(after)) {
             paths.set(after, [...path, action])
             next.push([...path, action])
@@ -322,6 +355,16 @@ describe('slot lifecycle model', () => {
     const fill = [act('start', 'homelab-a'), act('await_ci', 'homelab-a'), act('start', 'wsl2-a'), act('start', 'homelab-b')]
     expect(explain(play([...fill, act('resume_report_only', 'homelab-a'), act('start', 'wsl2-b')]))).toBe('none')
     expect(explain(play([...fill, act('resume_ci', 'homelab-a'), act('start', 'homelab-a')]))).toBe('none')
+  })
+
+  it('replays argus-config#1688: a slot parked on an approval prompt keeps its place, so no start overcommits the host', () => {
+    const parkedOnPrompt = [act('start', 'wsl2-a'), act('prompt', 'wsl2-a'), act('park', 'wsl2-a')]
+    // wsl2 has one place and its worker still sits on the prompt: a second wsl2 start must be refused.
+    expect(explain(play([...parkedOnPrompt, act('start', 'wsl2-b')]))).toBe('none')
+    // The owner answers, Aquila un-parks, and the same worker runs again without waiting for a free slot.
+    expect(explain(play([...parkedOnPrompt, act('start', 'homelab-a'), act('unpark', 'wsl2-a'), act('start', 'wsl2-a'), act('start', 'homelab-b')]))).toBe('none')
+    // A slot parked on a question, its worker's turn over, gives its place up as before.
+    expect(explain(play([act('start', 'wsl2-a'), act('park', 'wsl2-a'), act('start', 'wsl2-b')]))).toBe('none')
   })
 
   it(`holds every property in every slot state within ${DEPTH} operations of an empty db`, () => {

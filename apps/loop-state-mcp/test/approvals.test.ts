@@ -3,7 +3,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { describe, expect, it } from 'vitest'
 
 import { MIGRATIONS } from '../src/store.js'
-import { AFK_THREAD, MIGRATION_TEST_TIMEOUT_MS, MINUTE, TOKENS, tempDbPath, world } from './helpers.js'
+import { AFK_THREAD, MIGRATION_TEST_TIMEOUT_MS, MINUTE, TOKENS, tempDbPath, text, world } from './helpers.js'
 
 /**
  * argus#836: the AFK tick reports each running worker's pendingRequestCount through
@@ -100,6 +100,73 @@ describe('status_tick pending_approvals', () => {
     await afk.ok('status_tick', tickBody({ pending_approvals: { [ISSUE]: 1 } }))
     expect((await afk.call('status_tick', tickBody({ pending_approvals: { [OTHER]: 1, 'not an issue': 1 } }))).isError).toBe(true)
     expect((await afk.ok('status_read')).slots.pending_approvals).toEqual({ [ISSUE]: 1 })
+  })
+})
+
+/**
+ * argus-config#1688: a worker parked on an approval prompt is still resident and resumes the moment the owner answers.
+ * On 25 Nov 2026 three such slots were parked on WSL2 (cap 2), the tick filled the two "free" slots, and clearing the
+ * prompts put five workers live on a 5 GB host.
+ */
+describe('a slot parked on an approval prompt keeps its place under the caps', () => {
+  const THIRD = 'deanjstone/argus#7'
+  const capTwo = { slot_cap: 2, host_caps: { wsl2: 2 } }
+
+  it('holds the place when a tick reported the prompt, and refuses the start that would overcommit the host', async () => {
+    const { afk } = await running()
+    await afk.ok('status_tick', tickBody({ ...capTwo, pending_approvals: { [ISSUE]: 1 } }))
+    const parked = await afk.ok('slot_park', { issue: ISSUE, note: 'approval waiting in T3 thread worker-1' })
+    expect(parked.slot).toMatchObject({ state: 'parked', holds_place: true, pending_approvals: 0 })
+
+    const refused = await afk.call('slot_start', { issue: THIRD, thread_id: 'worker-3' })
+    expect(refused.isError).toBe(true)
+    expect(text(refused)).toMatch(/the effective slot cap 2 is reached \(2 running\)/)
+    expect((await afk.ok('status_read')).slots).toMatchObject({ used: 2, free: 0, parked: 1, holding: 1, hosts: { wsl2: { used: 2 } } })
+  })
+
+  it('holds the place when the parking tick passes the count it read itself', async () => {
+    const { afk } = await running()
+    await afk.ok('status_tick', tickBody(capTwo))
+    const parked = await afk.ok('slot_park', { issue: ISSUE, pending_approvals: 1 })
+    expect(parked.slot).toMatchObject({ state: 'parked', holds_place: true })
+    expect((await afk.call('slot_start', { issue: THIRD, thread_id: 'worker-3' })).isError).toBe(true)
+  })
+
+  it('gives the place up when the worker waits on no prompt, as before', async () => {
+    const { afk } = await running()
+    await afk.ok('status_tick', tickBody(capTwo))
+    expect((await afk.ok('slot_park', { issue: ISSUE, note: 'needs:owner' })).slot).toMatchObject({ holds_place: false })
+    expect((await afk.ok('slot_start', { issue: THIRD, thread_id: 'worker-3' })).slot).toMatchObject({ state: 'running' })
+    expect((await afk.ok('status_read')).slots).toMatchObject({ used: 2, parked: 1, holding: 0 })
+  })
+
+  it('returns the same worker to running after the un-park without a cap check, and frees the place when it ends', async () => {
+    const { afk, as } = await running()
+    await afk.ok('status_tick', tickBody({ ...capTwo, pending_approvals: { [ISSUE]: 1 } }))
+    await afk.ok('slot_park', { issue: ISSUE })
+    const aquila = await as('direction')
+    expect((await aquila.ok('slot_unpark', { issue: ISSUE })).slot).toMatchObject({ state: 'ready', holds_place: true })
+    expect((await afk.call('slot_start', { issue: THIRD, thread_id: 'worker-3' })).isError).toBe(true)
+
+    expect((await afk.ok('slot_start', { issue: ISSUE, thread_id: 'worker-1' })).slot).toMatchObject({ state: 'running', holds_place: false })
+    await afk.ok('slot_close', { issue: ISSUE, verified: 'Verified: merged' })
+    expect((await afk.ok('slot_start', { issue: THIRD, thread_id: 'worker-3' })).slot).toMatchObject({ state: 'running' })
+  })
+
+  it('checks the caps when a ready slot that held its place restarts on another worker thread', async () => {
+    const { afk, as } = await running()
+    await afk.ok('status_tick', tickBody({ ...capTwo, pending_approvals: { [ISSUE]: 1 } }))
+    await afk.ok('slot_park', { issue: ISSUE })
+    await (await as('direction')).ok('slot_unpark', { issue: ISSUE })
+    const refused = await afk.call('slot_start', { issue: ISSUE, thread_id: 'worker-9' })
+    expect(refused.isError).toBe(true)
+    expect(text(refused)).toMatch(/slot cap 2 is reached/)
+  })
+
+  it('refuses a negative or fractional pending_approvals on slot_park', async () => {
+    const { afk } = await running()
+    expect((await afk.call('slot_park', { issue: ISSUE, pending_approvals: -1 })).isError).toBe(true)
+    expect((await afk.call('slot_park', { issue: ISSUE, pending_approvals: 0.5 })).isError).toBe(true)
   })
 })
 

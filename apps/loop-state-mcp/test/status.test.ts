@@ -78,6 +78,7 @@ describe('loop status', () => {
       free: 3,
       parked: 0,
       ready: 1,
+      holding: 0,
       awaiting_ci: 0,
       awaiting_ci_cap: 3,
       pending_approvals: {},

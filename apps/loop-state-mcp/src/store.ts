@@ -197,6 +197,11 @@ export interface Slot {
   pending_approvals: number
   /** argus#1171: started for an efficiency:orchestrator issue, outside the budget ladder and the slot caps. */
   budget_exempt: boolean
+  /**
+   * argus-config#1688: parked while its worker waited on a tool-approval prompt. The worker is still resident and
+   * resumes the moment the owner answers, so the slot keeps its place under the caps while parked or ready.
+   */
+  holds_place: boolean
   /** argus-config#1169: the PR URL or trunk SHA an awaiting_ci slot waits on; null in every other state. */
   ci_ref: string | null
   report: { outcome: ReportOutcome; note: string | null; pr: string | null; at: string } | null
@@ -616,6 +621,10 @@ export const MIGRATIONS = [
   `
   ALTER TABLE loop_status ADD COLUMN budget_ladder INTEGER;
   `,
+  // argus-config#1688: a slot parked while its worker waits on a tool-approval prompt keeps its place under the caps.
+  `
+  ALTER TABLE slots ADD COLUMN holds_place INTEGER NOT NULL DEFAULT 0 CHECK (holds_place IN (0, 1));
+  `,
 ]
 
 const GREEN_NOTE_PATTERN = /^\s*checks green\b/i
@@ -801,6 +810,7 @@ function toSlot(row: Row): Slot {
     note: optionalText(row.note),
     pending_approvals: Number(row.pending_approvals),
     budget_exempt: Number(row.budget_exempt) === 1,
+    holds_place: Number(row.holds_place) === 1,
     ci_ref: optionalText(row.ci_ref),
     report: outcome
       ? { outcome, note: optionalText(row.report_note), pr: optionalText(row.report_pr), at: iso(Number(row.reported_at)) }
@@ -918,6 +928,7 @@ export function openStore(options: StoreOptions) {
     ON CONFLICT (host) DO UPDATE SET thread_id = excluded.thread_id, set_at = excluded.set_at`)
   const selectLastEvent = db.prepare('SELECT COALESCE(MAX(id), 0) AS id FROM events')
   const countSlots = db.prepare('SELECT state, COUNT(*) AS n FROM slots GROUP BY state')
+  const countHolding = db.prepare("SELECT COUNT(*) AS n FROM slots WHERE holds_place = 1 AND state != 'running'")
 
   function slotOrRefuse(issue: string): Row {
     const row = selectSlot.get(requireIssue(issue)) as Row | undefined
@@ -1519,7 +1530,11 @@ export function openStore(options: StoreOptions) {
     }
   }
 
-  const selectRunning = db.prepare("SELECT issue, host, budget_exempt FROM slots WHERE state = 'running'")
+  /**
+   * The slots that hold a place under the caps: every running one, and a parked or ready one whose worker still
+   * waits on an approval prompt (argus-config#1688). Only this list is counted against a cap.
+   */
+  const selectPlaced = db.prepare("SELECT issue, host, budget_exempt FROM slots WHERE state = 'running' OR holds_place = 1")
 
   /** The repo (owner/repo) an issue name (owner/repo#n) belongs to. */
   const repoOf = (issue: string) => issue.slice(0, issue.lastIndexOf('#'))
@@ -1565,27 +1580,27 @@ export function openStore(options: StoreOptions) {
 
   const standingOfRow = (row: Row, exemptions: Exemptions): Standing => standingOf(String(row.issue), Number(row.budget_exempt) === 1, exemptions)
 
-  interface RunningSlot {
+  interface PlacedSlot {
     readonly issue: string
     readonly host: string
     readonly standing: Standing
   }
 
-  /** Every running slot with its standing: the one list the caps and counts are taken from. */
-  const runningSlots = (exemptions: Exemptions): RunningSlot[] =>
-    (selectRunning.all() as Row[]).map((row) => ({ issue: String(row.issue), host: String(row.host), standing: standingOfRow(row, exemptions) }))
+  /** Every slot that holds a place, with its standing: the one list the caps and counts are taken from. */
+  const placedSlots = (exemptions: Exemptions): PlacedSlot[] =>
+    (selectPlaced.all() as Row[]).map((row) => ({ issue: String(row.issue), host: String(row.host), standing: standingOfRow(row, exemptions) }))
 
-  /** Running slots per host, 0 for a host with none: the capped ones, or every one with `countExempt`. */
-  function runningByHost(exemptions: Exemptions, countExempt = false): Record<Host, number> {
+  /** Slots holding a place per host, 0 for a host with none: the capped ones, or every one with `countExempt`. */
+  function placedByHost(exemptions: Exemptions, countExempt = false): Record<Host, number> {
     const counts: Record<Host, number> = { wsl2: 0, homelab: 0 }
-    for (const slot of runningSlots(exemptions)) {
+    for (const slot of placedSlots(exemptions)) {
       if (!countExempt && !slot.standing.capped) continue
       if (slot.host in counts) counts[slot.host as Host] += 1
     }
     return counts
   }
 
-  const budgetExemptRunning = (exemptions: Exemptions = exemptionsNow()) => runningSlots(exemptions).filter((slot) => slot.standing.budgetExempt).length
+  const budgetExemptRunning = (exemptions: Exemptions = exemptionsNow()) => placedSlots(exemptions).filter((slot) => slot.standing.budgetExempt).length
 
   /** A slot as the tools show it: `budget_exempt` also true for an issue the directives list. */
   const toShownSlot = (row: Row, exemptions: Exemptions = exemptionsNow()): Slot => {
@@ -1618,7 +1633,7 @@ export function openStore(options: StoreOptions) {
     const exemptions = exemptionsNow(status)
     // The poll does not know which repo the takeable work is in: while any repo is exempt, count room against the uncut total.
     const cap = exemptions.repos.length > 0 ? bonusCapOf(totalCap, weekly) : effectiveCapOf(totalCap, weekly)
-    const perHost = runningByHost(exemptions)
+    const perHost = placedByHost(exemptions)
     const running = perHost.wsl2 + perHost.homelab
     if (cap !== null && running >= cap) return false
     const hostCaps = hostCapsOf(status)
@@ -1670,7 +1685,7 @@ export function openStore(options: StoreOptions) {
    * work, so pressure does not stop it, only the caps do.
    */
   function capRefusal(status: Row, pressure: Pressure, host: Host, issue: string, standing: Standing): string | null {
-    const running = runningSlots(exemptionsNow(status))
+    const running = placedSlots(exemptionsNow(status))
     if (standing.listed) {
       const other = running.find((slot) => slot.issue !== issue && slot.standing.listed)
       return other === undefined ? null : `${other.issue} already runs a budget-exempt issue: only one runs at a time`
@@ -1816,7 +1831,9 @@ export function openStore(options: StoreOptions) {
         const existing = selectSlot.get(issue) as Row | undefined
         const at = now()
         if (existing?.state === 'awaiting_ci') throw new Refused(`${issue} awaits CI: it resumes only after Aquila resumes it (slot_resume_ci)`)
-        if (existing?.state !== 'running') requireRoomForSlot(host, issue, budgetExempt, model)
+        // argus-config#1688: a ready slot that kept its place goes back to running with the same worker, no cap check.
+        const keepsPlace = existing?.state === 'ready' && Number(existing.holds_place) === 1 && existing.thread_id === threadId
+        if (existing?.state !== 'running' && !keepsPlace) requireRoomForSlot(host, issue, budgetExempt, model)
         if (existing) {
           if (existing.state === 'parked') throw new Refused(`${issue} is parked: it resumes only after Aquila un-parks it`)
           if (existing.state === 'running') {
@@ -1824,7 +1841,7 @@ export function openStore(options: StoreOptions) {
           }
           db.prepare(
             `UPDATE slots SET thread_id = ?, state = 'running', host = ?, started_at = ?, updated_at = ?, note = NULL,
-                    budget_exempt = ?, pending_approvals = 0, report_outcome = NULL, report_note = NULL, report_pr = NULL, reported_at = NULL
+                    budget_exempt = ?, pending_approvals = 0, holds_place = 0, report_outcome = NULL, report_note = NULL, report_pr = NULL, reported_at = NULL
               WHERE issue = ?`,
           ).run(threadId, host, at, at, budgetExempt ? 1 : 0, issue)
         } else {
@@ -1837,14 +1854,27 @@ export function openStore(options: StoreOptions) {
       })
     },
 
-    slotPark(role: Role, issue: string, note?: string, caller: SlotCaller = {}): SlotWrite {
+    /**
+     * argus-config#1688: a slot parked while its worker waits on a tool-approval prompt keeps its place under the
+     * caps (`holds_place`). The worker is still resident and resumes the moment the owner answers the prompt, so
+     * giving its place to another start put more workers on the host than its cap. The server knows from the
+     * `pending_approvals` a tick reported for the slot; `pendingApprovals` is the count the parking tick read itself.
+     */
+    slotPark(role: Role, issue: string, note?: string, caller: SlotCaller = {}, pendingApprovals = 0): SlotWrite {
       permit(role, 'slot_park')
+      if (!Number.isInteger(pendingApprovals) || pendingApprovals < 0) throw new Refused('pending_approvals must be a whole number, 0 or more')
       return write(() => {
         const warning = requireAfkLease(role, 'slot_park', caller, issue, slotHostOf(issue))
         const row = slotOrRefuse(issue)
         requireState(row, 'running', 'park')
-        db.prepare("UPDATE slots SET state = 'parked', note = ?, pending_approvals = 0, updated_at = ? WHERE issue = ?").run(note ?? null, now(), issue)
-        record('slot_parked', role, issue, String(row.thread_id), { note: note ?? null })
+        const holdsPlace = Number(row.pending_approvals) > 0 || pendingApprovals > 0
+        db.prepare("UPDATE slots SET state = 'parked', note = ?, pending_approvals = 0, holds_place = ?, updated_at = ? WHERE issue = ?").run(
+          note ?? null,
+          holdsPlace ? 1 : 0,
+          now(),
+          issue,
+        )
+        record('slot_parked', role, issue, String(row.thread_id), { note: note ?? null, ...(holdsPlace ? { holds_place: true } : {}) })
         return withWarning(toShownSlot(selectSlot.get(issue) as Row), warning)
       })
     },
@@ -2039,14 +2069,16 @@ export function openStore(options: StoreOptions) {
           } else if (change.to && change.from?.thread_id !== change.to.thread_id) {
             // A different worker: a fresh start, and the old worker's report no longer applies.
             db.prepare(
-              `UPDATE slots SET thread_id = ?, state = ?, started_at = ?, updated_at = ?, pending_approvals = 0,
+              `UPDATE slots SET thread_id = ?, state = ?, started_at = ?, updated_at = ?, pending_approvals = 0, holds_place = 0,
                       report_outcome = NULL, report_note = NULL, report_pr = NULL, reported_at = NULL
                 WHERE issue = ?`,
             ).run(change.to.thread_id, change.to.state, at, at, change.issue)
           } else if (change.to) {
             db.prepare(
-              "UPDATE slots SET state = ?, updated_at = ?, pending_approvals = CASE WHEN ? = 'running' THEN pending_approvals ELSE 0 END WHERE issue = ?",
-            ).run(change.to.state, at, change.to.state, change.issue)
+              `UPDATE slots SET state = ?, updated_at = ?, pending_approvals = CASE WHEN ? = 'running' THEN pending_approvals ELSE 0 END,
+                      holds_place = CASE WHEN ? IN ('parked', 'ready') THEN holds_place ELSE 0 END
+                WHERE issue = ?`,
+            ).run(change.to.state, at, change.to.state, change.to.state, change.issue)
           }
           record('slot_rebuilt', role, change.issue, (change.to ?? change.from)?.thread_id ?? null, {
             action: change.action,
@@ -2386,11 +2418,12 @@ export function openStore(options: StoreOptions) {
       permit(role, 'status_read')
       const row = selectStatus.get(of) as Row | undefined
       const counts = Object.fromEntries((countSlots.all() as Row[]).map((count) => [String(count.state), Number(count.n)]))
-      const used = counts.running ?? 0
+      const perHost = placedByHost(exemptionsNow(), true)
+      // argus-config#1688: a slot parked on an approval prompt still holds its place, so it counts as used.
+      const used = perHost.wsl2 + perHost.homelab
       const cap = row?.slot_cap === null || row?.slot_cap === undefined ? null : Number(row.slot_cap)
       const pending_approvals = Object.fromEntries((selectApprovals.all() as Row[]).map((slot) => [String(slot.issue), Number(slot.pending_approvals)]))
       const hostCaps = hostCapsOf(row)
-      const perHost = runningByHost(exemptionsNow(), true)
       const slots = {
         cap,
         used,
@@ -2398,6 +2431,7 @@ export function openStore(options: StoreOptions) {
         hosts: Object.fromEntries(HOSTS.map((host) => [host, { used: perHost[host], cap: hostCaps?.[host] ?? null }])),
         parked: counts.parked ?? 0,
         ready: counts.ready ?? 0,
+        holding: Number((countHolding.get() as Row).n),
         awaiting_ci: counts.awaiting_ci ?? 0,
         awaiting_ci_cap: awaitingCiCap(),
         pending_approvals,
