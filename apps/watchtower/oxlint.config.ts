@@ -24,7 +24,7 @@ export default defineConfig({
       rules: { "anti-slop/no-module-mocking": "warn" },
     },
     {
-      // Vendored from the design-system registry: `button` and `badge` export their
+      // Vendored from the frontend registry: `button` and `badge` export their
       // `*Variants` helpers next to the component, and the next `shadcn add` would
       // overwrite any edit made here.
       files: ["src/components/ui/**/*.{ts,tsx}"],

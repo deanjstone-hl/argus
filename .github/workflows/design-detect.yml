@@ -2,7 +2,7 @@ name: Design check
 
 # Impeccable's design detector. It runs no AI model: it flags low contrast, AI-slop
 # patterns and drift from DESIGN.md in the UI files a PR changes. Findings are written
-# to the job summary and never block a merge. Shipped by the design-system
+# to the job summary and never block a merge. Shipped by the frontend
 # `design-check` registry item.
 
 on:

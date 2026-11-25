@@ -36,7 +36,7 @@ Multi-feature apps with real ongoing development — `argus`, `myargus`, `budget
 
 ### Standard
 Config/tooling repos with real structure but no app-feature surface — `argus-config`,
-`sys-admin`, `cmdpal-argus`, `design-system`.
+`sys-admin`, `cmdpal-argus`, `frontend`.
 
 - `AGENTS.md` + PR template
 - `architecture/` and `reference/` only, created as-needed
@@ -166,7 +166,7 @@ judgment-based, mirroring how the semantic-release rollout was actually executed
 `atto1` (Trimmed). **Wider rollout:** once the pilots landed, the AGENTS.md adoption went to
 the remaining active repos through the skill in
 [#448](https://github.com/deanjstone/argus/issues/448) — `budget`, `myargus` (Full),
-`homelab`, `sys-admin`, `design-system` (Standard), `scriptable-private` (Trimmed). Archived
+`homelab`, `sys-admin`, `frontend` (Standard), `scriptable-private` (Trimmed). Archived
 or parked repos were skipped. The skill is now approved for any active repo. Wiring it into
 the `new-project`/`github-setup`/`project-init-extended` chain is still deferred.
 
