@@ -102,6 +102,15 @@ native sub-issues (the `Parent issue` field), which wayfinder maps already use.
   describing how issues were actually handled, and the board as it stood was the intended
   way of working. The `close-wave` mode became `cut-next`, which keeps only the last two
   steps.
+- **W1 is capped at N actionable issues** (amended 2026-11-25, argus-config#1398; N starts at
+  20, the `w1_cap` directives key). This supersedes "waves have no size cap" (2026-10-16) for
+  W1 only: W2 and later stay uncapped. An issue is actionable when it is unblocked, not a child
+  of a wayfinder map (a map counts once) and not behind a `Not before:` date. When W1 is at the
+  cap, the orchestrator's wave check moves a new `wave:w1` filing to `wave:w2` with a one-line
+  comment, except a `type:bug`, an incident or an issue the owner steered (`steer:next`). When
+  W1 drops below the cap, the same check promotes the oldest actionable W2 issues to fill it, at
+  most 5 per pass, paced at 1 write a second. Only the wave check enforces it: the daily sweep
+  and a hand placement are not capped. The cap keeps W1 a short **Now** list.
 - **`Triage` is always emptied.** Every triaged issue is placed in the Current wave, the Next
   wave or `Later`, or it is closed.
 
