@@ -51,11 +51,11 @@ function adapter(name: string, options: ReturnType<typeof replay>) {
 describe('PUBLIC_ENDPOINTS', () => {
   it('is every live registry entry that carries a probe, at the status the registry expects', () => {
     expect(PUBLIC_ENDPOINTS.map((endpoint) => [endpoint.url, endpoint.expected])).toEqual([
-      ['https://myargus.cc/', 200],
-      ['https://myargus.cc/reader/', 200],
-      ['https://myargus.cc/knowledge/', 200],
+      ['https://myargus.cc/', 302],
+      ['https://myargus.cc/reader/', 302],
+      ['https://myargus.cc/knowledge/', 302],
       ['https://myargus.cc/briefings/', 302],
-      ['https://myargus.cc/jobs/', 200],
+      ['https://myargus.cc/jobs/', 302],
       ['https://budget.myargus.cc/', 200],
       ['https://stockade.myargus.cc/', 200],
       ['https://ops.myargus.cc/', 302],
