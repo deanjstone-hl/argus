@@ -5,3 +5,5 @@
 ecosystem/manifest.json
 # Generated architecture page: a static diagram of the data flow, not code that builds a link.
 docs/architecture/*.html
+# The vault-agent relay teardown names the retired relay hostname and its zone to act on them (argus/1126).
+scripts/owner-steps/1126.sh
