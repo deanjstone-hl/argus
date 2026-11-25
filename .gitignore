@@ -29,3 +29,6 @@ apps/*/.wrangler/
 apps/*/.env
 packages/*/.env
 
+
+# cf (the Cloudflare CLI) caches the logged-in account id in the current directory
+.cloudflare/
