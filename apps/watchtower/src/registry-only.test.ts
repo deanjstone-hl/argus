@@ -35,7 +35,7 @@ const appFiles = filesUnder(SRC).filter(
 )
 
 describe('registry-only UI', () => {
-  it('every ui primitive is a design-system registry item', () => {
+  it('every ui primitive is a frontend registry item', () => {
     const vendored = [...filesUnder(join(SRC, 'components/ui')), join(SRC, 'lib/utils.ts')]
     expect(vendored.length).toBeGreaterThan(5)
     expect(vendored.map(itemName).filter((name) => !REGISTRY_ITEMS.has(name))).toEqual([])

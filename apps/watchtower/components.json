@@ -22,7 +22,7 @@
   "menuColor": "default",
   "menuAccent": "subtle",
   "registries": {
-    "@design-system": {
+    "@frontend": {
       "url": "https://raw.githubusercontent.com/deanjstone-hl/frontend/v3.18.0/r/{name}.json"
     }
   }
