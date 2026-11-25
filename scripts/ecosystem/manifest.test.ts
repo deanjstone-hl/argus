@@ -69,6 +69,6 @@ describe('ecosystem/manifest.json', () => {
     expect(names).not.toContain('mcp-memory')
     expect(names).not.toContain('context-ingest / context-search')
     expect(JSON.stringify(file)).not.toContain('knowledge.myargus.cc')
-    for (const current of ['Ops hub', 'Watchtower', 'Email inbox', 'wiki', 'design-system', 'slate-reader', 'Briefings', 'memory-mcp']) expect(names).toContain(current)
+    for (const current of ['Ops hub', 'Watchtower', 'Email inbox', 'wiki', 'frontend', 'slate-reader', 'Briefings', 'memory-mcp']) expect(names).toContain(current)
   })
 })
