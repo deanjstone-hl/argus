@@ -15,7 +15,7 @@ const runtime = scripts.find((script) => script.includes('meta[name="theme-color
 describe('index.html head (design-system/167)', () => {
   it('pins the registry at v3.14.1 or later, where the runtime script ships', () => {
     const config = JSON.parse(read('../components.json'))
-    const [major = 0, minor = 0, patch = 0] = /\/frontend\/v(\d+)\.(\d+)\.(\d+)\//.exec(config.registries['@frontend'].url)!.slice(1).map(Number)
+    const [major = 0, minor = 0, patch = 0] = /\/frontend\/v(\d+)\.(\d+)\.(\d+)\//.exec(config.registries['@design-system'].url)!.slice(1).map(Number)
     expect(major > 3 || (major === 3 && (minor > 14 || (minor === 14 && patch >= 1)))).toBe(true)
   })
 

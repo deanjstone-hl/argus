@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 
 // The design-system `design-check` registry item, pinned at v3.0.2: a non-blocking
-// Impeccable detector. The item's own behaviour is tested in frontend; these
+// Impeccable detector. The item's own behaviour is tested in design-system; these
 // cases pin how it is wired into this monorepo — the workflow sits at the repo root
 // (a workflow under apps/ would never run) and the script skips the `aliases.ui`
 // directory of every components.json here. The local edits to the item are its
