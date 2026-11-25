@@ -110,7 +110,10 @@ GITHUB_RUNNERS="${GITHUB_RUNNERS:-argus/homelab,argus/homelab-2,argus-config/hom
 # backlog-labels.py lists them when it can run here, else this snapshot of
 # its 2026-10-16 output.
 CI_REPOS_SNAPSHOT="argus,argus-config,argusde,atto1,budget,context,frontend,homelab,ledger-spa,myargus,obsidian-book-reader,obsidian-cadence,oracle-arm-setup,pallas-codex,pkm-vault,pocketfm_downloader,scriptable-private,slate-reader,supa-solid-user,sys-admin,wedding-new-name"
-if [[ -z "${CI_REPOS:-}" ]] && LISTED_REPOS="$(python3 "${HOME}/repos/argus-config/hooks/backlog-labels.py" repos 2>/dev/null)" && [[ -n "$LISTED_REPOS" ]]; then
+# The config repo is being renamed argus-config -> config: prefer ~/repos/config, fall back to the old path.
+BACKLOG_LABELS="${HOME}/repos/config/hooks/backlog-labels.py"
+[[ -f "$BACKLOG_LABELS" ]] || BACKLOG_LABELS="${HOME}/repos/argus-config/hooks/backlog-labels.py"
+if [[ -z "${CI_REPOS:-}" ]] && LISTED_REPOS="$(python3 "$BACKLOG_LABELS" repos 2>/dev/null)" && [[ -n "$LISTED_REPOS" ]]; then
   CI_REPOS="$(paste -sd, - <<<"$LISTED_REPOS")"
 fi
 CI_REPOS="${CI_REPOS:-$CI_REPOS_SNAPSHOT}"

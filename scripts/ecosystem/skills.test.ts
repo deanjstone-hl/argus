@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { Manifest } from './manifest.ts'
 import { parseManifest } from './manifest.ts'
-import { firstSentence, formatManifest, readSkills, reconcileSkills } from './skills.ts'
+import { defaultSkillRoots, firstSentence, formatManifest, readSkills, reconcileSkills } from './skills.ts'
 
 const skill = (name: string, description = `${name} does a thing.`) => ({ name, description })
 const entry = (name: string, extra: Record<string, unknown> = {}) => ({ name, description: `${name} (hand-written)`, category: 'skill' as const, ...extra })
@@ -122,5 +122,30 @@ describe('formatManifest', () => {
   it('round-trips the committed manifest byte for byte', () => {
     const text = readFileSync(new URL('../../ecosystem/manifest.json', import.meta.url), 'utf8')
     expect(formatManifest(JSON.parse(text))).toBe(text)
+  })
+})
+
+// The config repo is being renamed argus-config -> config (argus-config#1401): the skills root is
+// ~/repos/config/envs/wsl2/skills once it exists there, else ~/repos/argus-config/envs/wsl2/skills.
+describe('defaultSkillRoots', () => {
+  const home = '/home/someone'
+  const renamed = join(home, 'repos/config/envs/wsl2/skills')
+  const old = join(home, 'repos/argus-config/envs/wsl2/skills')
+  const sysAdmin = join(home, 'repos/sys-admin/skills')
+
+  it('uses ~/repos/config when it has the skills', () => {
+    expect(defaultSkillRoots(home, (path) => path === renamed)).toEqual([renamed, sysAdmin])
+  })
+
+  it('falls back to ~/repos/argus-config', () => {
+    expect(defaultSkillRoots(home, (path) => path === old)).toEqual([old, sysAdmin])
+  })
+
+  it('prefers ~/repos/config when both exist', () => {
+    expect(defaultSkillRoots(home, () => true)).toEqual([renamed, sysAdmin])
+  })
+
+  it('names the old path when neither exists, so the report still says where it looked', () => {
+    expect(defaultSkillRoots(home, () => false)).toEqual([old, sysAdmin])
   })
 })

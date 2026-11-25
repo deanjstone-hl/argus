@@ -64,8 +64,10 @@ if [ ! -f "$lock" ]; then
   exit 1
 fi
 
-named_commit=$(sed -n 's/^source deanjstone\/argus-config \([0-9a-f]\{7,40\}\)$/\1/p' "$lock" | head -n 1)
-[ -n "$named_commit" ] || fail "$lock names no source commit (a 'source deanjstone/argus-config <sha>' line)"
+# The config repo is being renamed argus-config -> config and moved between owners
+# (argus-config#1401), so a lock may name either owner and either name.
+named_commit=$(sed -n -E 's#^source deanjstone(-hl)?/(argus-config|config) ([0-9a-f]{7,40})$#\3#p' "$lock" | head -n 1)
+[ -n "$named_commit" ] || fail "$lock names no source commit (a 'source deanjstone/argus-config <sha>' line, or deanjstone-hl/ or /config)"
 
 for name in "${files[@]}"; do
   locked=$(sed -n "s/^\([0-9a-f]\{64\}\)  $name\$/\1/p" "$lock" | head -n 1)

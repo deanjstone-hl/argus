@@ -110,3 +110,14 @@ export function formatManifest(manifest: Manifest): string {
   const lines = manifest.entries.map((entry) => `    ${JSON.stringify(entry)}`)
   return `{\n  "version": ${manifest.version},\n  "entries": [\n${lines.join(',\n')}\n  ]\n}\n`
 }
+
+/**
+ * The skill roots the sync reads when none is given. The config repo is being renamed
+ * argus-config -> config (argus-config#1401): its skills are under ~/repos/config once that copy
+ * has them, else under ~/repos/argus-config (also the answer when neither exists).
+ */
+export function defaultSkillRoots(home: string, exists: (path: string) => boolean): string[] {
+  const renamed = join(home, 'repos/config/envs/wsl2/skills')
+  const configRoot = exists(renamed) ? renamed : join(home, 'repos/argus-config/envs/wsl2/skills')
+  return [configRoot, join(home, 'repos/sys-admin/skills')]
+}

@@ -1,18 +1,17 @@
 // Reconcile ecosystem/manifest.json's skill entries with the installed skills (argus#928).
 //   node scripts/ecosystem/sync-skills.ts [--check] [--skills <dir>]...
-// Reads ~/repos/argus-config/envs/wsl2/skills and ~/repos/sys-admin/skills unless --skills is
+// Reads ~/repos/config/envs/wsl2/skills (else ~/repos/argus-config/..., until the rename) and ~/repos/sys-admin/skills unless --skills is
 // given. Without --check it rewrites the manifest; with it, it only reports and exits 1 on drift.
-import { readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { join } from 'node:path'
 
 import { parseManifest } from './manifest.ts'
-import { formatManifest, readSkills, reconcileSkills } from './skills.ts'
+import { defaultSkillRoots, formatManifest, readSkills, reconcileSkills } from './skills.ts'
 
 const args = process.argv.slice(2)
 const check = args.includes('--check')
 const given = args.flatMap((arg, index) => (arg === '--skills' && args[index + 1] ? [args[index + 1] as string] : []))
-const roots = given.length > 0 ? given : [join(homedir(), 'repos/argus-config/envs/wsl2/skills'), join(homedir(), 'repos/sys-admin/skills')]
+const roots = given.length > 0 ? given : defaultSkillRoots(homedir(), existsSync)
 const manifestPath = new URL('../../ecosystem/manifest.json', import.meta.url)
 
 const parsed = parseManifest(JSON.parse(readFileSync(manifestPath, 'utf8')))
