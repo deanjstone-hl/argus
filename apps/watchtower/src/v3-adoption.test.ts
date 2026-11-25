@@ -1,4 +1,4 @@
-// Guards the move to design-system v3 (argus#908): the pin, the theme preference
+// Guards the move to frontend v3 (argus#908): the pin, the theme preference
 // wiring, and the overrides v3's theme replaces.
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -11,10 +11,10 @@ import { themeInitScript } from './lib/theme-preference'
 const ROOT = fileURLToPath(new URL('../', import.meta.url))
 const read = (file: string) => readFileSync(`${ROOT}${file}`, 'utf8')
 
-describe('design-system v3 adoption', () => {
-  it('pins the @design-system alias to v3.18.0', () => {
+describe('frontend v3 adoption', () => {
+  it('pins the @frontend alias to v3.18.0', () => {
     const { registries } = JSON.parse(read('components.json')) as { registries: Record<string, { url: string }> }
-    expect(registries['@design-system'].url).toBe(
+    expect(registries['@frontend'].url).toBe(
       'https://raw.githubusercontent.com/deanjstone-hl/frontend/v3.18.0/r/{name}.json',
     )
   })
