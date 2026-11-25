@@ -13,6 +13,12 @@ export default defineConfig({
     "anti-slop/no-chained-type-assertions": "warn",
     "anti-slop/no-widen-then-assert": "warn",
     "anti-slop/no-conditional-empty-object-spread": "warn",
+    // Added after the code was clean under them (argus-config#1450): errors from the start.
+    "anti-slop/no-reflect-apply": "error",
+    "anti-slop/no-reflect-get": "error",
+    "anti-slop/no-unknown-type-aliases": "error",
+    "anti-slop/no-reduce-accumulator-copy": "error",
+    "anti-slop/no-object-parameters": "warn",
     // Carried over from the ESLint config: react-hooks (recommended) and react-refresh.
     "react/rules-of-hooks": "error",
     "react/exhaustive-deps": "warn",
