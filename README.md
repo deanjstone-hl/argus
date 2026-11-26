@@ -57,6 +57,13 @@ scripts/ci.sh --changed               # only what differs from origin/main, plus
 scripts/ci.sh                         # everything: root workspace, then any nested package
 ```
 
+Serial mode ([argus#36](https://github.com/deanjstone-hl/argus/issues/36)): on a host with under 12 GiB of RAM
+(WSL2, homelab) `pnpm check` and the pre-push hook run one package at a time, with `VITEST_MAX_WORKERS=1`
+and a 1536 MB heap cap, so a full gate stays under the memory-pressure gate instead of starting about 20 node
+and vitest processes at once. `CI_SERIAL=1` forces it, `CI_SERIAL=0` forces the parallel run, and
+`CI_SERIAL_MAX_MEM_MB` moves the 12288 threshold. GitHub Actions keeps its parallelism unless `CI_SERIAL=1`.
+With the hook serial there is no reason to push with `--no-verify`.
+
 Run `pnpm check` before every push (a PR branch, or `main` once the repo is trunk) and quote its
 result in the PR's test plan or the ticket's Resolution. Every push to `main` runs CI: no commit
 subject or committer skips it. A push (and a pull request) runs only the tests its change touches:

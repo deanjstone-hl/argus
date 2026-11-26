@@ -2,6 +2,8 @@
 # Local CI gate: runs the same checks as .github/workflows/ci.yml, scoped to what
 # differs from origin/main. Enable once per clone with
 #   git config core.hooksPath .githooks
+# On a host with little memory (WSL2, homelab) the gate runs serially, one package at a
+# time (argus#36); `CI_SERIAL=0 git push` forces the parallel run.
 # Bypass with `git push --no-verify`; GitHub CI still runs the full suite.
 set -euo pipefail
 
