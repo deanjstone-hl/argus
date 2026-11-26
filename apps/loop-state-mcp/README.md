@@ -31,7 +31,7 @@ token. A caller sees only the tools its role may call, and the store refuses the
 | `slot_rebuild` | ✓ | ✓ (applies only while no `afk` lease is held) | |
 | `lease_read` | ✓ | ✓ | |
 | `directives_read` | ✓ | ✓ | |
-| `directives_set` | | ✓ | |
+| `directives_set` | | ✓ (the `direction` lease holder, or the registered owner chat within 30 minutes of its own `owner_turn`) | |
 | `lease_move`, `lease_release` | | ✓ | |
 | `owner_thread_set` | | ✓ (the `direction` lease holder, owner present) | |
 | `child_start`, `child_close`, `owner_turn`, `away_note`, `notify_claim`, `outage_observe`, `ledger_read` | | ✓ | |
@@ -153,6 +153,10 @@ kept; nothing edits or deletes one.
      calls `owner_turn` at the start of each owner turn, so a write rides on an owner turn;
   3. `expected_version` is the version the caller last read (0 when none), so two writers cannot
      overwrite each other.
+
+  argus#70: the host's registered owner chat (`owner_thread_set`) may call it in place of 1 and 2,
+  within 30 minutes of its own `owner_turn`; see "The owner chat of a split tick". Checks 3, the
+  reason and the schema apply to it unchanged.
 
   A write is a `directives_set` loop event, so the AFK gate sees a change.
 
@@ -424,12 +428,20 @@ non-holder, including the registered owner thread itself, is refused with the ho
 - `owner_turn` accepts the holder or either host's registered owner thread. A turn from the owner thread sets
   presence and hands over the "since you left" lines; it is not activity of the holder, so a stalled tick thread
   still reads stalled.
+- `directives_set` is accepted from the registered owner thread too (argus#70, [argus-config/1622](https://github.com/deanjstone-hl/argus-config/issues/1622)
+  decision 8), so the owner's directives change needs no relay through the tick thread. The window is the chat's
+  own `owner_turn` (stored as `last_turn_at` on its `owner_threads` row, cleared when another thread replaces it):
+  a write more than 30 minutes after it, with no turn of its own, or after the owner stepped away is refused with
+  the reason and "call owner_turn". Every other check applies unchanged: `expected_version`, a non-blank `reason`
+  (the owner chat quotes the owner in it), and schema validation, whose error goes back to the chat listing every
+  problem. The write is the chat's, not activity of the holder, and its `set_by` is the chat's thread. The tick
+  thread's path is as it was.
 - Every other write from the owner thread is refused, naming the holder, with a `lease_conflict` event
   (`detail.reason: owner_thread_write`) for the holder's next gate: `tick_gate`, `status_tick`, `slot_*`,
-  `lease_*`, `directives_set`, `child_*`, `away_note`, `notify_claim` and `outage_observe`. The server tells the
+  `lease_*`, `child_*`, `away_note`, `notify_claim` and `outage_observe`. The server tells the
   owner thread by the `X-T3-Thread-Id` header and by any `thread_id` or `caller_thread_id` the call names, so a
   session with no header is caught only by a name. Reads stay open.
-- The registration lives in its own table (a new schema version adds the `owner_threads` table), not on the lease row, so
+- The registration lives in its own table (a schema version adds the `owner_threads` table; argus#70 adds its `last_turn_at` column), not on the lease row, so
   `lease_move`, `lease_release`, `lease_failover` and `lease_reclaim` leave it alone. `lease_read` shows it as
   `owner_threads: { wsl2, homelab }` once one is set; until then the key is absent and nothing else changes: with
   no registration every call behaves as before.
