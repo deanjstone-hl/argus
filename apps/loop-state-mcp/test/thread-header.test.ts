@@ -147,6 +147,29 @@ describe('a worker reporting for a slot', () => {
     expect((await impostor.ok('slot_list')).slots[0]).toMatchObject({ state: 'running', report: null })
   })
 
+  it('leaves no lease_conflict for the gate when it names a thread other than its own', async () => {
+    // A worker holds no lease, so naming the wrong thread (the orchestrator's, say) before slot_await_ci
+    // is a refused call, not a lease conflict: it must not wake Aquila's tick or open an outage.
+    const notices: string[] = []
+    const { as } = world({ warn: (message) => notices.push(message) })
+    const afk = await as('afk', AFK_THREAD)
+    await afk.ok('slot_start', { issue: A, thread_id: WORKER, caller_thread_id: AFK_THREAD })
+    const aquila = await as('direction', AQUILA_THREAD)
+    await aquila.ok('status_tick', tick(AQUILA_THREAD))
+    expect(await aquila.ok('tick_gate', tick(AQUILA_THREAD))).toMatchObject({ changed: false })
+    const worker = await as('worker', WORKER)
+
+    const wrong = await worker.call('slot_await_ci', { issue: A, thread_id: AQUILA_THREAD, ref: PR })
+    const retry = await worker.call('slot_await_ci', { issue: A, thread_id: WORKER, ref: PR })
+
+    expect(wrong.isError).toBe(true)
+    expect(text(wrong)).toContain(WORKER)
+    expect(retry.isError).toBeFalsy()
+    const gate = await aquila.ok('tick_gate', tick(AQUILA_THREAD))
+    expect(gate.reasons).not.toContain('lease_conflict')
+    expect(notices.some((notice) => notice.includes('slot_await_ci') && notice.includes(AQUILA_THREAD))).toBe(true)
+  })
+
   it('reports for its own slot when the header matches', async () => {
     const { as } = world()
     const afk = await as('afk', AFK_THREAD)

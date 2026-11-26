@@ -445,7 +445,10 @@ in every Claude process's environment, and the loop-state `headersHelper`
 with its own value.
 
 - A call that names a thread other than the header's is refused, naming both, and leaves a
-  `lease_conflict` event (`detail.reason: thread_header_mismatch`) for the holder's next gate. It covers
+  `lease_conflict` event (`detail.reason: thread_header_mismatch`) for the holder's next gate, except from the
+  `worker` role: a worker holds no lease, so its mismatch (a worker that names the orchestrator's thread, or a
+  T3 id in place of the session's, before `slot_await_ci`) is refused with the right id in the message and a
+  journal line, but records no event and so wakes no gate (argus-config#1754). It covers
   `caller_thread_id` on `slot_start`, `slot_park`, `slot_close`, `slot_free`, `slot_rebuild`,
   `owner_turn`, `owner_thread_set` and `directives_set`, and `thread_id` on `status_tick`, `tick_gate`,
   `slot_report` and `slot_await_ci`. The list is `SELF_THREAD_ARG` in `src/mcp.ts`: every tool has an entry

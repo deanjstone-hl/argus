@@ -2572,7 +2572,7 @@ export function openStore(options: StoreOptions) {
      * a worker's slot call) is checked against X-T3-Thread-Id, the thread id the harness's
      * headersHelper sends from the session's own environment. The argument is self-asserted and a
      * fork inherits its parent's id; the header is not, so a fork naming its parent is refused and
-     * leaves a lease_conflict event for the holder's next gate. Returns the thread id the call acts
+     * leaves a lease_conflict event for the holder's next gate (not for a worker, which holds no lease). Returns the thread id the call acts
      * as: the header when sent (so omitting `caller_thread_id` does not skip the lease check),
      * else what the call named. With no header the call is accepted until `requireThreadHeader`
      * is on, once every caller sends it; the first such call per thread is logged.
@@ -2590,6 +2590,12 @@ export function openStore(options: StoreOptions) {
         return named
       }
       if (named === undefined || named === '' || named === header) return header
+      if (role === 'worker') {
+        // A worker holds no lease, so its wrong thread id (the orchestrator's, a T3 id in place of the session's)
+        // is a bad argument, not a lease conflict: refuse it with no event, so it wakes no gate and opens no outage.
+        warn(`loop-state-mcp: worker call ${tool} named thread ${named}, but the session is ${header}: refused`)
+        throw new Refused(`${tool} names thread ${named}, but this session is ${header} (X-T3-Thread-Id): refused. Pass ${header} as your own thread id.`)
+      }
       write(() => {
         record('lease_conflict', role, null, header, { role, tool, named, header, reason: 'thread_header_mismatch' }, 'direction')
         throw new LeaseRefused(
