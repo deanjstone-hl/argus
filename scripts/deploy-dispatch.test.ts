@@ -22,7 +22,8 @@ const DEPLOY_REF = "github.ref == 'refs/heads/deploy'";
 
 // How many workflows had a push-to-deploy trigger when this guard was written. A parse
 // that finds fewer has stopped seeing them, which would pass every case below vacuously.
-const KNOWN_DEPLOY_WORKFLOWS = 11;
+// 10 since argus#78 took the push trigger off watchtower-deploy.yml (the Pages dashboard is retired).
+const KNOWN_DEPLOY_WORKFLOWS = 10;
 
 interface Job {
   name: string;
