@@ -3,14 +3,12 @@ name: Watchtower Deploy
 # Production deploys only from the deploy branch (argus-config#600, docs/deploy-branch.md).
 # A merge to main builds and tests but deploys nothing; scripts/promote.sh moves deploy.
 # A dispatch is still a deploy: an owner step, never run by an agent. It redeploys this target at the head of `deploy`.
+#
+# RETIRED (argus#78): the Pages dashboard is superseded and the owner deletes the Pages project
+# `watchtower` (argus#44 step 2). There is no push trigger any more: a promotion that touched the
+# shared packages/watchtower-contract (the collector's too) would otherwise run this against a
+# missing project and go red. Dispatch only; argus#45 deletes this file with the dashboard code.
 on:
-  push:
-    branches: [deploy]
-    paths:
-      - "apps/watchtower/**"
-      # Bundled into the dashboard, so a contract change is a dashboard change.
-      - "packages/watchtower-contract/**"
-      - ".github/workflows/watchtower-deploy.yml"
   workflow_dispatch:
 
 permissions:

@@ -241,13 +241,24 @@ describe("the wiring", () => {
 
   it("runs the deploy workflows on the deploy branch only", () => {
     for (const file of [
-      "watchtower-deploy.yml",
       "watchtower-deploy-worker.yml",
     ]) {
       const trigger = read(`.github/workflows/${file}`).split("\njobs:")[0];
       expect(trigger, file).toContain("branches: [deploy]");
       expect(trigger, file).not.toContain("branches: [main]");
     }
+  });
+
+  // The Pages project `watchtower` is deleted by the owner (argus#44 step 2). A push trigger would
+  // run this workflow against a missing project on the next collector change that touches the
+  // shared contract, and a red deploy-push run counts against trunk health (argus#78).
+  it("retires the Pages dashboard deploy: dispatch only, no push trigger, still deploy-branch only", () => {
+    const pages = read(".github/workflows/watchtower-deploy.yml");
+    const trigger = pages.split("\njobs:")[0];
+    expect(trigger).toContain("workflow_dispatch:");
+    expect(trigger).not.toMatch(/^\s*push:/m);
+    expect(trigger).not.toContain("branches: [main]");
+    expect(pages).toContain("if: github.ref == 'refs/heads/deploy'");
   });
 
   describe("watchtower deploy workflow", () => {

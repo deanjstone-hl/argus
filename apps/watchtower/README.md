@@ -48,8 +48,11 @@ D1 database id, the Supabase URL and anon key) from the `actions` project of Sec
 `bitwarden/sm-action`; the only repository secret is `BWS_ACCESS_TOKEN`
 (`docs/public-cutover.md`, *Deploy values and Actions secrets*). The two halves deploy separately:
 
-- **Dashboard** — `.github/workflows/watchtower-deploy.yml`, on every push to `deploy` touching
-  `apps/watchtower/**`, to Cloudflare Pages project `watchtower` (`watchtower.myargus.cc`).
+- **Dashboard (retired)** — `.github/workflows/watchtower-deploy.yml` no longer runs on a push to
+  `deploy`: the Pages dashboard is retired and the Pages project `watchtower` is deleted by the owner
+  ([argus/44](https://github.com/deanjstone-hl/argus/issues/44) step 2). The workflow stays as a
+  dispatch-only stub until [argus/45](https://github.com/deanjstone-hl/argus/issues/45) deletes it with
+  the dashboard code ([argus/78](https://github.com/deanjstone-hl/argus/issues/78)).
 - **Worker API** — `.github/workflows/watchtower-deploy-worker.yml`, on a push to `deploy`
   touching this app, `packages/watchtower-contract/` or `packages/bearer-auth/` (or a dispatch on
   `deploy`): dry-run, D1 migrations, then `wrangler deploy`. By hand, from a checkout at
