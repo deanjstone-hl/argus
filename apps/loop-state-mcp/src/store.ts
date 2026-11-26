@@ -1793,20 +1793,22 @@ export function openStore(options: StoreOptions) {
   }
 
   /**
-   * argus#70: the registered owner chat sets the directives itself, only within the presence window of its own
-   * owner_turn and while the owner has not stepped away (the global flag, set by the latest owner_turn from any
-   * thread). It is no activity of the lease holder, so this touches nothing of the holder's.
+   * argus#70, argus#71: the registered owner chat sets the directives (#70) or registers its successor (#71)
+   * itself, only within the presence window of its own owner_turn and while the owner has not stepped away (the
+   * global flag, set by the latest owner_turn from any thread). It is no activity of the lease holder, so this
+   * touches nothing of the holder's. `change` names what only an owner-driven turn may do, for the refusal's text.
    */
-  function requireOwnerChatPresent(callerThreadId: string): void {
+  function requireOwnerChatPresent(callerThreadId: string, change: 'directives change' | 'the owner chat changes'): void {
+    const verb = change === 'directives change' ? 'sets the directives' : 'registers its successor'
     const lastTurn = (selectOwnerThreadLastTurn.get(callerThreadId) as Row | undefined)?.last_turn_at
     if (lastTurn === null || lastTurn === undefined) {
-      throw new Refused(`no owner_turn is recorded from this chat (${callerThreadId}): the owner chat sets the directives only within 30 minutes of its own owner_turn. Call owner_turn on the owner's turn, then set them.`)
+      throw new Refused(`no owner_turn is recorded from this chat (${callerThreadId}): the owner chat ${verb} only within 30 minutes of its own owner_turn. Call owner_turn on the owner's turn, then retry.`)
     }
     if (ownerPresence().stepped_away) {
-      throw new Refused('the owner stepped away: directives change only in a turn the owner is driving. Call owner_turn on the owner\'s turn, then set them.')
+      throw new Refused(`the owner stepped away: ${change} only in a turn the owner is driving. Call owner_turn on the owner's turn, then retry.`)
     }
     if (now() - Number(lastTurn) >= PRESENCE_MS) {
-      throw new Refused(`the last owner_turn from this chat was ${iso(Number(lastTurn))}, over 30 minutes ago: directives change only in a turn the owner is driving. Call owner_turn on the owner's turn, then set them.`)
+      throw new Refused(`the last owner_turn from this chat was ${iso(Number(lastTurn))}, over 30 minutes ago: ${change} only in a turn the owner is driving. Call owner_turn on the owner's turn, then retry.`)
     }
   }
 
@@ -2662,19 +2664,28 @@ export function openStore(options: StoreOptions) {
      * owner chat still counts for presence (owner_turn). Only the direction holder, in a turn the owner is
      * driving. It is kept apart from the lease row: lease_move, lease_release, lease_failover and lease_reclaim
      * leave it alone.
+     * argus#71: the host's current owner chat may call it too, to name its successor (the owner starts the new
+     * chat, which asks the old one), within 30 minutes of its own owner_turn. A chat registered for another host
+     * is no such caller and is refused as any non-holder is.
      */
     ownerThreadSet(role: Role, input: { host: string; thread_id: string; caller_thread_id?: string }): { owner_threads: Record<Host, string | null> } {
       permit(role, 'owner_thread_set')
       requireHost(input.host)
       requireText(input.thread_id, 'thread_id')
       return write(() => {
-        requireDirectionLease(role, input.caller_thread_id, 'owner_thread_set')
-        const presence = ownerPresence()
-        if (!presence.present) {
-          const last = presence.stepped_away ? 'the owner stepped away' : presence.last_turn_at ? `the last owner turn was ${presence.last_turn_at}` : 'no owner turn is recorded'
-          throw new Refused(`the owner is not present (${last}): the owner thread is registered only in a turn the owner is driving. Call owner_turn on the owner's turn, then register it.`)
+        const caller = input.caller_thread_id
+        const current = optionalText((selectOwnerThreadByHost.get(input.host) as Row | undefined)?.thread_id)
+        if (caller !== undefined && caller !== '' && caller !== holderOf('direction') && caller === current) {
+          requireOwnerChatPresent(caller, 'the owner chat changes')
+        } else {
+          requireDirectionLease(role, caller, 'owner_thread_set')
+          const presence = ownerPresence()
+          if (!presence.present) {
+            const last = presence.stepped_away ? 'the owner stepped away' : presence.last_turn_at ? `the last owner turn was ${presence.last_turn_at}` : 'no owner turn is recorded'
+            throw new Refused(`the owner is not present (${last}): the owner thread is registered only in a turn the owner is driving. Call owner_turn on the owner's turn, then register it.`)
+          }
         }
-        const previous = optionalText((selectOwnerThreadByHost.get(input.host) as Row | undefined)?.thread_id)
+        const previous = current
         upsertOwnerThread.run(input.host, input.thread_id, now())
         recordLedger('owner_thread_set', input.caller_thread_id as string, { host: input.host, thread_id: input.thread_id, previous })
         return { owner_threads: this.leaseRead(role).owner_threads as Record<Host, string | null> }
@@ -2805,7 +2816,7 @@ export function openStore(options: StoreOptions) {
       return write(() => {
         const caller = input.caller_thread_id
         if (caller !== undefined && caller !== '' && caller !== holderOf('direction') && isOwnerThread(caller)) {
-          requireOwnerChatPresent(caller)
+          requireOwnerChatPresent(caller, 'directives change')
         } else {
           requireDirectionLease(role, caller, 'directives_set')
           const presence = ownerPresence()

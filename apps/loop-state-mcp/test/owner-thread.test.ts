@@ -57,11 +57,11 @@ describe('owner_thread_set', () => {
     expect((await aquila.ok('lease_read')).owner_threads).toBeUndefined()
   })
 
-  it('is refused from the registered owner thread itself', async () => {
+  it('is refused from the registered owner thread itself until it has taken an owner_turn of its own (argus#71)', async () => {
     const { owner, aquila } = await registered()
     const result = await owner.call('owner_thread_set', { host: 'wsl2', thread_id: STRAY, caller_thread_id: OWNER })
     expect(result.isError).toBe(true)
-    expect(text(result)).toContain(AQUILA_THREAD)
+    expect(text(result)).toMatch(/owner_turn/)
     expect((await aquila.ok('lease_read')).owner_threads.wsl2).toBe(OWNER)
   })
 

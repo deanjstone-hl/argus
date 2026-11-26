@@ -147,14 +147,21 @@ export const SELF_THREAD_ARG = {
   directives_set: 'caller_thread_id',
 } as const satisfies Record<McpToolName, 'caller_thread_id' | 'thread_id' | null>
 
+/**
+ * The write tools a registered owner chat may call (argus#54 owner_turn, argus#70 directives_set, argus#71
+ * owner_thread_set). The wrapper does not refuse them as an owner thread's write; the store checks the chat's own
+ * owner_turn for the last two.
+ */
+const OWNER_CHAT_TOOLS: ReadonlySet<string> = new Set(['owner_turn', 'directives_set', 'owner_thread_set'])
+
 /** One server per request: the transport is stateless, and the caller's role differs per request. */
 export function createMcpServer(store: Store, role: Role, threadHeader?: string): McpServer {
   const server = new McpServer({ name: 'loop-state', version: '0.1.0' }, { instructions: INSTRUCTIONS })
   const offered = (tool: ToolName) => (TOOL_ROLES[tool] as readonly Role[]).includes(role)
   /**
    * Every tool is registered through this wrapper, which runs the two thread checks before the handler:
-   * - argus#54: a registered owner thread (owner_thread_set) makes no loop-state write but owner_turn and, argus#70,
-   *   directives_set (the store checks the chat's own owner_turn). Every other write tool checks the session's own
+   * - argus#54: a registered owner thread (owner_thread_set) makes no loop-state write but owner_turn and, argus#70
+   *   and argus#71, directives_set and owner_thread_set (the store checks the chat's own owner_turn). Every other write tool checks the session's own
    *   thread id, and any thread the call names, against it.
    * - argus#51: the argument SELF_THREAD_ARG names is checked against the session's own thread (X-T3-Thread-Id). A
    *   call naming another thread is refused; the handler receives the thread the call acts as, the header when the
@@ -168,7 +175,7 @@ export function createMcpServer(store: Store, role: Role, threadHeader?: string)
   server.registerTool = ((name: string, config: { annotations?: { readOnlyHint?: boolean } }, handler: (...params: unknown[]) => unknown) => {
     if (!(name in SELF_THREAD_ARG)) throw new Error(`${name} has no SELF_THREAD_ARG entry: say which argument names the caller's own thread, or null`)
     const selfArg = SELF_THREAD_ARG[name as McpToolName]
-    const checksOwnerThread = config.annotations?.readOnlyHint === false && name !== 'owner_turn' && name !== 'directives_set'
+    const checksOwnerThread = config.annotations?.readOnlyHint === false && !OWNER_CHAT_TOOLS.has(name)
     if (selfArg === null && !checksOwnerThread) return registerTool(name, config, handler)
     return registerTool(name, config, async (...params: unknown[]) => {
       // A tool with an input schema gets (args, extra); one without gets (extra): `extra` has no thread fields.
@@ -591,7 +598,7 @@ export function createMcpServer(store: Store, role: Role, threadHeader?: string)
       {
         title: 'Register the owner chat',
         description:
-          "Register the owner chat of a host (argus#54), for the split tick: the tick thread holds the direction lease and this thread is the owner's, so the owner chat can call owner_turn for presence while it holds nothing. Refused unless your thread holds the direction lease and the owner is present (owner_turn within the last 30 minutes, not stepped away). One thread per host: a new call replaces the host's. lease_move, lease_release, lease_failover and lease_reclaim leave it alone; lease_read shows it as owner_threads. A registered owner thread is refused on every other write but directives_set (argus#70), naming the lease holder.",
+          "Register the owner chat of a host (argus#54), for the split tick: the tick thread holds the direction lease and this thread is the owner's, so the owner chat can call owner_turn for presence while it holds nothing. Refused unless your thread holds the direction lease and the owner is present (owner_turn within the last 30 minutes, not stepped away), or your thread is that host's current owner chat and its own owner_turn was within the last 30 minutes (argus#71: a self-handover. The owner starts the new chat, the new chat asks the old one, and the old one calls this naming the new chat as thread_id). One thread per host: a new call replaces the host's, and a replacement starts with no owner_turn of its own. lease_move, lease_release, lease_failover and lease_reclaim leave it alone; lease_read shows it as owner_threads. A registered owner thread is refused on every other write but directives_set (argus#70) and this one for its own host, naming the lease holder.",
         inputSchema: {
           host: hostField.describe("The host whose owner chat this is: wsl2 or homelab."),
           thread_id: threadId.describe("The owner chat's T3 thread id."),
