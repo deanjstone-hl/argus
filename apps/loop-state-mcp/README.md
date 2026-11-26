@@ -33,7 +33,7 @@ token. A caller sees only the tools its role may call, and the store refuses the
 | `directives_read` | ✓ | ✓ | |
 | `directives_set` | | ✓ (the `direction` lease holder, or the registered owner chat within 30 minutes of its own `owner_turn`) | |
 | `lease_move`, `lease_release` | | ✓ | |
-| `owner_thread_set` | | ✓ (the `direction` lease holder, owner present) | |
+| `owner_thread_set` | | ✓ (the `direction` lease holder with the owner present, or the host's registered owner chat within 30 minutes of its own `owner_turn`) | |
 | `child_start`, `child_close`, `owner_turn`, `away_note`, `notify_claim`, `outage_observe`, `ledger_read` | | ✓ | |
 
 ## Slots
@@ -421,9 +421,15 @@ a `warning` in the result; `LOOP_STATE_REQUIRE_CALLER_THREAD=1` refuses it, for 
 When a tick thread holds the `direction` lease, the owner's own chat is not the holder, so `owner_turn` would
 refuse it. `owner_thread_set { host, thread_id, caller_thread_id }` registers that chat as the host's
 `owner_thread_id` (`wsl2` or `homelab`, one thread each; a new call replaces the host's). Only the `direction`
-holder may call it, and only while the owner is present (`owner_turn` within 30 minutes, not stepped away); a
-non-holder, including the registered owner thread itself, is refused with the holder named, and the call must name
-`caller_thread_id`.
+holder may call it, and only while the owner is present (`owner_turn` within 30 minutes, not stepped away); any
+other non-holder is refused with the holder named, and the call must name `caller_thread_id`. argus#71 ([argus-config/1622](https://github.com/deanjstone-hl/argus-config/issues/1622)
+decision 11): the host's current registered owner chat may call it too, for its own host, within 30 minutes of its
+own `owner_turn` and while the owner has not stepped away, so a self-handover needs no owner turn in the tick
+thread. The owner starts the new chat (no `t3_thread_launch`), the new chat asks the old one, and the old one
+calls `owner_thread_set { host, thread_id: <new chat>, caller_thread_id: <old chat> }`. A chat registered for the
+other host, a replaced chat and an unregistered thread are refused, naming the holder or the missing `owner_turn`.
+The new chat starts with no `owner_turn` of its own, so it calls `owner_turn` before it sets the directives or
+registers a successor.
 
 - `owner_turn` accepts the holder or either host's registered owner thread. A turn from the owner thread sets
   presence and hands over the "since you left" lines; it is not activity of the holder, so a stalled tick thread
@@ -436,7 +442,7 @@ non-holder, including the registered owner thread itself, is refused with the ho
   (the owner chat quotes the owner in it), and schema validation, whose error goes back to the chat listing every
   problem. The write is the chat's, not activity of the holder, and its `set_by` is the chat's thread. The tick
   thread's path is as it was.
-- Every other write from the owner thread is refused, naming the holder, with a `lease_conflict` event
+- Every other write from the owner thread (all but `owner_turn`, `directives_set` and, for its own host, `owner_thread_set`) is refused, naming the holder, with a `lease_conflict` event
   (`detail.reason: owner_thread_write`) for the holder's next gate: `tick_gate`, `status_tick`, `slot_*`,
   `lease_*`, `child_*`, `away_note`, `notify_claim` and `outage_observe`. The server tells the
   owner thread by the `X-T3-Thread-Id` header and by any `thread_id` or `caller_thread_id` the call names, so a
