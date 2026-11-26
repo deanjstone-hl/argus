@@ -43,6 +43,34 @@
         if (typeof MutationObserver === "function") new MutationObserver(apply).observe(root, { attributes: true, attributeFilter: ["class", "data-theme"] })
       })()
     </script>
+    <script>
+      // Kill-switch (ops-hub#84): the UI moved to the ops hub PWA, so drop any service worker and cache an installed copy kept.
+      (function () {
+        var report = function (error) {
+          console.error("watchtower kill-switch failed", error)
+        }
+        if (navigator.serviceWorker) {
+          navigator.serviceWorker
+            .getRegistrations()
+            .then(function (registrations) {
+              registrations.forEach(function (registration) {
+                registration.unregister()
+              })
+            })
+            .catch(report)
+        }
+        if (window.caches) {
+          window.caches
+            .keys()
+            .then(function (keys) {
+              keys.forEach(function (key) {
+                window.caches.delete(key)
+              })
+            })
+            .catch(report)
+        }
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

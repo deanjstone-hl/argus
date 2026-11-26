@@ -1,5 +1,15 @@
 # @argus/watchtower
 
+> **The dashboard UI moved.** It is the `/watchtower` module of the ops hub PWA
+> ([`deanjstone-hl/ops-hub` ops-hub#84](https://github.com/deanjstone-hl/ops-hub/issues/84), `apps/ops-hub-web`),
+> which reads the hub's own `/api/watchtower/*`. This app stays in place, UI and Worker, until the old
+> `watchtower.myargus.cc` alias is retired (the close-out ticket in myargus); do not delete it before then. The
+> collector, the Worker and its D1 database are unchanged. Before that host redirects it serves a
+> **kill-switch**: `public/sw.js` (clears every cache, unregisters itself and reloads open pages when an installed
+> copy's worker next updates) and an inline script in `index.html` doing the same for a page that opens first.
+> The host never registered a service worker, so the kill-switch only matters to a copy that did. Keep `/sw.js`
+> served, and out of the redirect, until the alias is retired (`src/kill-switch.test.ts`).
+
 Infra dashboard for the Argus stack. One package, two deployables:
 
 - **Dashboard** — React/Vite UI at `watchtower.myargus.cc`, behind passkey sign-in on the shared
