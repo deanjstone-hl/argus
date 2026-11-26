@@ -49,8 +49,8 @@ Each was already present at the new location, byte-identical unless noted.
 
 | Was here | Now lives in |
 |---|---|
-| `reference/agent-patterns.md`, `reference/skills-and-subagents.md`, `reference/token-reduction.md` | pkm-vault (CORTEX) `PROJECTS/Argus Orchestrator/reference/` |
-| `reference/cortex-ai-upgrade-scan-2026-06-14.md` | pkm-vault (CORTEX) `PROJECTS/Argus Orchestrator/` |
-| `reference/session-notes/2026-06-11-session-summary.md`, `2026-06-13-sessions.md` | pkm-vault (CORTEX) `PROJECTS/Argus Orchestrator/sessions/` (`2026-06-11 Session Summary.md`, `2026-06-13 Sessions.md`) |
+| `reference/agent-patterns.md`, `reference/skills-and-subagents.md`, `reference/token-reduction.md` | neocortex (CORTEX) `PROJECTS/Argus Orchestrator/reference/` |
+| `reference/cortex-ai-upgrade-scan-2026-06-14.md` | neocortex (CORTEX) `PROJECTS/Argus Orchestrator/` |
+| `reference/session-notes/2026-06-11-session-summary.md`, `2026-06-13-sessions.md` | neocortex (CORTEX) `PROJECTS/Argus Orchestrator/sessions/` (`2026-06-11 Session Summary.md`, `2026-06-13 Sessions.md`) |
 | `TODO.md` | GitHub Issues. Its open items were obsolete (ccgram, `spawn-claude`) or already tracked (#23). |
 | `decisions/adr-003`, `adr-004`, `adr-005` | myargus `docs/decisions/` (pointer stubs remain here) |

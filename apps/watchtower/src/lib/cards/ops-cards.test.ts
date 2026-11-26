@@ -174,7 +174,7 @@ describe('runner queue', () => {
     ])
     expect(view.sections.map((section) => [section.title, pairs(section.rows), section.empty])).toEqual([
       ['argus', [['Waiting now', '8'], ['Median wait', '28m'], ['p90 wait', '1h 3m'], ['Longest wait', '1h 13m'], ['Jobs taken (24h)', '27']], 'No jobs in the last 24h'],
-      ['pkm-vault', [], 'No jobs in the last 24h'],
+      ['neocortex', [], 'No jobs in the last 24h'],
     ])
   })
 

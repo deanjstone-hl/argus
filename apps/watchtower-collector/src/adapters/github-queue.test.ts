@@ -19,7 +19,7 @@ function serve(overrides: Record<string, unknown> = {}) {
   const bodies: Record<string, unknown> = {
     '/repos/deanjstone/argus/actions/runs?': RUNS,
     ...Object.fromEntries(Object.entries(JOBS).map(([id, body]) => [`/repos/deanjstone/argus/actions/runs/${id}/attempts/1/jobs`, body])),
-    '/repos/deanjstone/pkm-vault/actions/runs?': { total_count: 0, workflow_runs: [] },
+    '/repos/deanjstone/neocortex/actions/runs?': { total_count: 0, workflow_runs: [] },
     ...overrides,
   }
   const fetchImpl = (async (url: string | URL | Request) => {
@@ -32,7 +32,7 @@ function serve(overrides: Record<string, unknown> = {}) {
 }
 
 function adapter(api: ReturnType<typeof serve>['api'], now = NOW) {
-  return createGithubQueueAdapter(api, ['deanjstone/argus', 'deanjstone/pkm-vault'], () => now)
+  return createGithubQueueAdapter(api, ['deanjstone/argus', 'deanjstone/neocortex'], () => now)
 }
 
 describe('runner queue adapter', () => {
@@ -57,7 +57,7 @@ describe('runner queue adapter', () => {
           p90WaitSeconds: 3800,
           maxWaitSeconds: 4406,
         },
-        { repo: 'deanjstone/pkm-vault', waiting: 0, oldestWaiting: null, jobs: 0, medianWaitSeconds: null, p90WaitSeconds: null, maxWaitSeconds: null },
+        { repo: 'deanjstone/neocortex', waiting: 0, oldestWaiting: null, jobs: 0, medianWaitSeconds: null, p90WaitSeconds: null, maxWaitSeconds: null },
       ],
     })
   })

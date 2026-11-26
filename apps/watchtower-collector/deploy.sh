@@ -105,11 +105,11 @@ secret_ok NOTICE_BOARD_TOKEN         "notice-board-token-homelab"
 # trigger and how the run it triggered ended (argus#682).
 SYSTEMD_UNITS="${SYSTEMD_UNITS:-agent-engine.service,ops-hub.service,watchtower-collector.service,budget-api.service,t3code.service,taskview-web.service,taskview-api.service,taskview-migrate.service,budget-api-cron.timer,argus-context-fetch-install.timer,session-tasks.timer,inbox-ingest.timer,repo-git-sync.timer,vault-git-sync.timer,runner-watchdog.timer,system:cloudflared.service,system:tailscaled.service,system:postgresql@16-main.service,system:borgmatic.timer,paperless-webserver.service,paperless-consumer.service,paperless-task-queue.service,paperless-scheduler.service,system:valkey-server.service}"
 # Self-hosted Actions runners on homelab, as repo/runner (owner deanjstone).
-GITHUB_RUNNERS="${GITHUB_RUNNERS:-argus/homelab,argus/homelab-2,argus-config/homelab-argus-config,atto1/homelab-atto1,budget/homelab-budget,context/homelab-context,homelab/homelab-homelab,myargus/homelab-myargus,pkm-vault/homelab-pkm-vault,pocketfm_downloader/homelab-pocketfm_downloader,scriptable-private/homelab-scriptable-private,slate-reader/homelab-slate-reader,sys-admin/homelab-sys-admin}"
+GITHUB_RUNNERS="${GITHUB_RUNNERS:-argus/homelab,argus/homelab-2,argus-config/homelab-argus-config,atto1/homelab-atto1,budget/homelab-budget,context/homelab-context,homelab/homelab-homelab,myargus/homelab-myargus,neocortex/homelab-pkm-vault,pocketfm_downloader/homelab-pocketfm_downloader,scriptable-private/homelab-scriptable-private,slate-reader/homelab-slate-reader,sys-admin/homelab-sys-admin}"
 # Repos whose main CI gets a card: the backlog repos, as argus-config's
 # backlog-labels.py lists them when it can run here, else this snapshot of
 # its 2026-10-16 output.
-CI_REPOS_SNAPSHOT="argus,argus-config,argusde,atto1,budget,context,frontend,homelab,ledger-spa,myargus,obsidian-book-reader,obsidian-cadence,oracle-arm-setup,pallas-codex,pkm-vault,pocketfm_downloader,scriptable-private,slate-reader,supa-solid-user,sys-admin,wedding-new-name"
+CI_REPOS_SNAPSHOT="argus,argus-config,argusde,atto1,budget,context,frontend,homelab,ledger-spa,myargus,obsidian-book-reader,obsidian-cadence,oracle-arm-setup,pallas-codex,neocortex,pocketfm_downloader,scriptable-private,slate-reader,supa-solid-user,sys-admin,wedding-new-name"
 # The config repo is being renamed argus-config -> config: prefer ~/repos/config, fall back to the old path.
 BACKLOG_LABELS="${HOME}/repos/config/hooks/backlog-labels.py"
 [[ -f "$BACKLOG_LABELS" ]] || BACKLOG_LABELS="${HOME}/repos/argus-config/hooks/backlog-labels.py"

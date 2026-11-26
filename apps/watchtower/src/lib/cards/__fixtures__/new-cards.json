@@ -530,12 +530,12 @@
     "checked_at": "2026-10-16T11:40:00.000Z"
   },
   {
-    "service_key": "github-runner:pkm-vault/homelab-pkm-vault",
+    "service_key": "github-runner:neocortex/homelab-neocortex",
     "host": "github-runners",
     "status": "healthy",
     "detail": {
-      "repo": "pkm-vault",
-      "name": "homelab-pkm-vault",
+      "repo": "neocortex",
+      "name": "homelab-neocortex",
       "online": true,
       "busy": false,
       "version": "2.337.0",
