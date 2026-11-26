@@ -186,6 +186,23 @@ kept; nothing edits or deletes one.
   server gates slot starts exactly as before. A malformed window is refused, as
   `tests/check_directives.py` refuses it.
 
+  **Standing orders and quiet hours** ([argus#72](https://github.com/deanjstone-hl/argus/issues/72),
+  [argus-config/1622](https://github.com/deanjstone-hl/argus-config/issues/1622)). Each webhook tick
+  starts in a fresh session, so an order given through a relay lasts one tick unless it is on the record.
+  Two optional top-level keys carry the owner's side of that:
+  - `standing_orders` is a list of `{order, owner_quote, at, until?}`. `order` and `owner_quote` are
+    non-empty strings (what to do, and the owner's own words); `at` and `until` are ISO date-times with
+    an offset, and `until`, when given, is after `at`. An entry whose `until` has passed is ignored
+    (`liveStandingOrders(record, atMs)` in `src/directives.ts`); it stays on the record until a later
+    version removes it. Use `patch: {add: {standing_orders: [...]}}` to add one.
+  - `owner_quiet_hours` is a string `HH:MM-HH:MM` in Sydney time, the window the tick stays quiet in
+    overnight. Start and end differ and a start after the end spans midnight (`22:00-07:00`). When the key
+    is absent the default is `22:00-07:00` (`ownerQuietHours(record)`). A top-level key only, unlike
+    `host_gates.<host>.quiet_window` above, which is a per-host gate for maintenance.
+
+  `directives_set` refuses a malformed value of either with its reason, and `directives_read` returns both
+  as written. The server only stores them: `tick-read.sh` in argus-config prints them, filed separately.
+
   Each key and the places it may appear (the record's top level, a `host_gates.<host>` entry, an
   override's `key`) is declared once, in `KEY_RULES` in `src/directives.ts`. A numeric gate is
   declared with `gate(...)`, which allows all three places at once. `directive-keys.json` is the
