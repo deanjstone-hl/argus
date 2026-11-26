@@ -153,8 +153,9 @@ export function createMcpServer(store: Store, role: Role, threadHeader?: string)
   const offered = (tool: ToolName) => (TOOL_ROLES[tool] as readonly Role[]).includes(role)
   /**
    * Every tool is registered through this wrapper, which runs the two thread checks before the handler:
-   * - argus#54: a registered owner thread (owner_thread_set) makes no loop-state write but owner_turn. Every write
-   *   tool but that one checks the session's own thread id, and any thread the call names, against it.
+   * - argus#54: a registered owner thread (owner_thread_set) makes no loop-state write but owner_turn and, argus#70,
+   *   directives_set (the store checks the chat's own owner_turn). Every other write tool checks the session's own
+   *   thread id, and any thread the call names, against it.
    * - argus#51: the argument SELF_THREAD_ARG names is checked against the session's own thread (X-T3-Thread-Id). A
    *   call naming another thread is refused; the handler receives the thread the call acts as, the header when the
    *   argument was left out.
@@ -167,7 +168,7 @@ export function createMcpServer(store: Store, role: Role, threadHeader?: string)
   server.registerTool = ((name: string, config: { annotations?: { readOnlyHint?: boolean } }, handler: (...params: unknown[]) => unknown) => {
     if (!(name in SELF_THREAD_ARG)) throw new Error(`${name} has no SELF_THREAD_ARG entry: say which argument names the caller's own thread, or null`)
     const selfArg = SELF_THREAD_ARG[name as McpToolName]
-    const checksOwnerThread = config.annotations?.readOnlyHint === false && name !== 'owner_turn'
+    const checksOwnerThread = config.annotations?.readOnlyHint === false && name !== 'owner_turn' && name !== 'directives_set'
     if (selfArg === null && !checksOwnerThread) return registerTool(name, config, handler)
     return registerTool(name, config, async (...params: unknown[]) => {
       // A tool with an input schema gets (args, extra); one without gets (extra): `extra` has no thread fields.
@@ -590,7 +591,7 @@ export function createMcpServer(store: Store, role: Role, threadHeader?: string)
       {
         title: 'Register the owner chat',
         description:
-          "Register the owner chat of a host (argus#54), for the split tick: the tick thread holds the direction lease and this thread is the owner's, so the owner chat can call owner_turn for presence while it holds nothing. Refused unless your thread holds the direction lease and the owner is present (owner_turn within the last 30 minutes, not stepped away). One thread per host: a new call replaces the host's. lease_move, lease_release, lease_failover and lease_reclaim leave it alone; lease_read shows it as owner_threads. A registered owner thread is refused on every other write, naming the lease holder.",
+          "Register the owner chat of a host (argus#54), for the split tick: the tick thread holds the direction lease and this thread is the owner's, so the owner chat can call owner_turn for presence while it holds nothing. Refused unless your thread holds the direction lease and the owner is present (owner_turn within the last 30 minutes, not stepped away). One thread per host: a new call replaces the host's. lease_move, lease_release, lease_failover and lease_reclaim leave it alone; lease_read shows it as owner_threads. A registered owner thread is refused on every other write but directives_set (argus#70), naming the lease holder.",
         inputSchema: {
           host: hostField.describe("The host whose owner chat this is: wsl2 or homelab."),
           thread_id: threadId.describe("The owner chat's T3 thread id."),
@@ -687,7 +688,7 @@ export function createMcpServer(store: Store, role: Role, threadHeader?: string)
       {
         title: 'Set the AFK directives',
         description:
-          "Record a new version of the AFK directives, as the owner told you in this turn. Refused unless your thread holds the direction lease, the owner is present (owner_turn within the last 30 minutes, not stepped away) and expected_version is the version you last read. Send either record (the whole record: the file's front matter without version) or patch (only the keys that change, applied to the current version, which expected_version must name); the server numbers the result and keeps every earlier version. Prefer patch for a change to one or a few keys: copying the whole record by hand is how an unrelated key gets dropped (argus#75). A patch is refused when it names a key twice, unsets or removes from a key that is not there, removes an entry that is not listed, or changes nothing. The answer carries changes, a key-by-key diff against the previous version (list keys show list_added and list_removed): check it against what the owner asked before ending the turn. An invalid record or patch is refused with every problem listed. host_gates.<wsl2|homelab> takes max_load, max_io_pressure, max_memory_pressure, max_disk_percent and quiet_window, a string HH:MM-HH:MM in Sydney time (start and end differ, start after end spans midnight); quiet_window is a host_gates key only, never top-level or an override, and the server stores it without applying it to slot_start.",
+          "Record a new version of the AFK directives, as the owner told you in this turn. Refused unless expected_version is the version you last read and either your thread holds the direction lease with the owner present (owner_turn within the last 30 minutes, not stepped away), or your thread is the host's registered owner chat (owner_thread_set) and its own owner_turn was within the last 30 minutes (argus#70: the owner chat sets the directives itself, with no relay; give a reason that quotes the owner). A schema error comes back to the caller listing every problem, so correct it and call again while the owner is present. Send either record (the whole record: the file's front matter without version) or patch (only the keys that change, applied to the current version, which expected_version must name); the server numbers the result and keeps every earlier version. Prefer patch for a change to one or a few keys: copying the whole record by hand is how an unrelated key gets dropped (argus#75). A patch is refused when it names a key twice, unsets or removes from a key that is not there, removes an entry that is not listed, or changes nothing. The answer carries changes, a key-by-key diff against the previous version (list keys show list_added and list_removed): check it against what the owner asked before ending the turn. An invalid record or patch is refused with every problem listed. host_gates.<wsl2|homelab> takes max_load, max_io_pressure, max_memory_pressure, max_disk_percent and quiet_window, a string HH:MM-HH:MM in Sydney time (start and end differ, start after end spans midnight); quiet_window is a host_gates key only, never top-level or an override, and the server stores it without applying it to slot_start.",
         inputSchema: {
           record: z.record(z.string(), z.unknown()).optional().describe('The full directives record: cadence_minutes, max_slots, repo_holds, take_next and ordering, plus any optional keys. No version. Send this or patch, not both.'),
           patch: z

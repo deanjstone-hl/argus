@@ -176,7 +176,6 @@ describe('every other loop-state write from the owner thread is refused, naming 
     ['lease_release', { role: 'direction', from_thread_id: AQUILA_THREAD, old_schedule_task_deleted: true }],
     ['lease_failover', FAILOVER],
     ['lease_reclaim', FAILOVER],
-    ['directives_set', { record: {}, reason: 'x', expected_version: 0, caller_thread_id: OWNER }],
     ['child_start', { thread_id: 'child-1', purpose: 'x' }],
     ['child_close', { thread_id: 'child-1', outcome: 'done' }],
     ['away_note', { text: 'x' }],

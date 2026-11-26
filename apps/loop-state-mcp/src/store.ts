@@ -625,6 +625,11 @@ export const MIGRATIONS = [
   `
   ALTER TABLE slots ADD COLUMN holds_place INTEGER NOT NULL DEFAULT 0 CHECK (holds_place IN (0, 1));
   `,
+  // argus#70: the registered owner chat's own last owner_turn, so it may call directives_set itself within the
+  // presence window of that turn. Null until the chat takes a turn, and cleared when another thread replaces it.
+  `
+  ALTER TABLE owner_threads ADD COLUMN last_turn_at INTEGER;
+  `,
 ]
 
 const GREEN_NOTE_PATTERN = /^\s*checks green\b/i
@@ -925,7 +930,11 @@ export function openStore(options: StoreOptions) {
   const selectOwnerThreadById = db.prepare('SELECT 1 FROM owner_threads WHERE thread_id = ? LIMIT 1')
   const upsertOwnerThread = db.prepare(`
     INSERT INTO owner_threads (host, thread_id, set_at) VALUES (?, ?, ?)
-    ON CONFLICT (host) DO UPDATE SET thread_id = excluded.thread_id, set_at = excluded.set_at`)
+    ON CONFLICT (host) DO UPDATE SET
+      last_turn_at = CASE WHEN owner_threads.thread_id = excluded.thread_id THEN owner_threads.last_turn_at ELSE NULL END,
+      thread_id = excluded.thread_id, set_at = excluded.set_at`)
+  const selectOwnerThreadLastTurn = db.prepare('SELECT MAX(last_turn_at) AS last_turn_at FROM owner_threads WHERE thread_id = ?')
+  const touchOwnerThreadTurn = db.prepare('UPDATE owner_threads SET last_turn_at = ? WHERE thread_id = ?')
   const selectLastEvent = db.prepare('SELECT COALESCE(MAX(id), 0) AS id FROM events')
   const countSlots = db.prepare('SELECT state, COUNT(*) AS n FROM slots GROUP BY state')
   const countHolding = db.prepare("SELECT COUNT(*) AS n FROM slots WHERE holds_place = 1 AND state != 'running'")
@@ -1783,6 +1792,24 @@ export function openStore(options: StoreOptions) {
     throw new LeaseRefused(`${who}, not ${callerThreadId}: ${tool} is refused. Only the orchestrator thread ${only}.`)
   }
 
+  /**
+   * argus#70: the registered owner chat sets the directives itself, only within the presence window of its own
+   * owner_turn and while the owner has not stepped away (the global flag, set by the latest owner_turn from any
+   * thread). It is no activity of the lease holder, so this touches nothing of the holder's.
+   */
+  function requireOwnerChatPresent(callerThreadId: string): void {
+    const lastTurn = (selectOwnerThreadLastTurn.get(callerThreadId) as Row | undefined)?.last_turn_at
+    if (lastTurn === null || lastTurn === undefined) {
+      throw new Refused(`no owner_turn is recorded from this chat (${callerThreadId}): the owner chat sets the directives only within 30 minutes of its own owner_turn. Call owner_turn on the owner's turn, then set them.`)
+    }
+    if (ownerPresence().stepped_away) {
+      throw new Refused('the owner stepped away: directives change only in a turn the owner is driving. Call owner_turn on the owner\'s turn, then set them.')
+    }
+    if (now() - Number(lastTurn) >= PRESENCE_MS) {
+      throw new Refused(`the last owner_turn from this chat was ${iso(Number(lastTurn))}, over 30 minutes ago: directives change only in a turn the owner is driving. Call owner_turn on the owner's turn, then set them.`)
+    }
+  }
+
   const selectDirectives = db.prepare('SELECT * FROM directives WHERE version = ?')
   const selectCurrentDirectives = db.prepare('SELECT * FROM directives ORDER BY version DESC LIMIT 1')
   const selectDirectivesHistory = db.prepare('SELECT version, set_at, set_by, source, reason FROM directives ORDER BY version DESC')
@@ -2622,6 +2649,7 @@ export function openStore(options: StoreOptions) {
           `INSERT INTO ledger_owner (id, last_turn_at, stepped_away) VALUES (1, ?, ?)
            ON CONFLICT (id) DO UPDATE SET last_turn_at = excluded.last_turn_at, stepped_away = excluded.stepped_away`,
         ).run(at, input.stepping_away ? 1 : 0)
+        if (input.caller_thread_id) touchOwnerThreadTurn.run(at, input.caller_thread_id)
         const notes = (selectPendingNotes.all() as Row[]).map(toAwayNote)
         db.prepare('UPDATE ledger_away_notes SET presented_at = ? WHERE presented_at IS NULL').run(at)
         recordLedger('owner_turn', null, { stepping_away: input.stepping_away === true })
@@ -2775,11 +2803,16 @@ export function openStore(options: StoreOptions) {
         throw new Refused('expected_version must be the version you last read (0 when none has been set)')
       }
       return write(() => {
-        requireDirectionLease(role, input.caller_thread_id, 'directives_set')
-        const presence = ownerPresence()
-        if (!presence.present) {
-          const last = presence.stepped_away ? 'the owner stepped away' : presence.last_turn_at ? `the last owner turn was ${presence.last_turn_at}` : 'no owner turn is recorded'
-          throw new Refused(`the owner is not present (${last}): directives change only in a turn the owner is driving. Call owner_turn on the owner's turn, then set them.`)
+        const caller = input.caller_thread_id
+        if (caller !== undefined && caller !== '' && caller !== holderOf('direction') && isOwnerThread(caller)) {
+          requireOwnerChatPresent(caller)
+        } else {
+          requireDirectionLease(role, caller, 'directives_set')
+          const presence = ownerPresence()
+          if (!presence.present) {
+            const last = presence.stepped_away ? 'the owner stepped away' : presence.last_turn_at ? `the last owner turn was ${presence.last_turn_at}` : 'no owner turn is recorded'
+            throw new Refused(`the owner is not present (${last}): directives change only in a turn the owner is driving. Call owner_turn on the owner's turn, then set them.`)
+          }
         }
         const currentRow = selectCurrentDirectives.get() as Row | undefined
         const current = Number(currentRow?.version ?? 0)
