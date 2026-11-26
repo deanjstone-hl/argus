@@ -6,12 +6,14 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 const ciScript = fileURLToPath(new URL("./ci.sh", import.meta.url));
+const hookScript = fileURLToPath(new URL("../.githooks/pre-push", import.meta.url));
 const heavyLockScript = fileURLToPath(new URL("./heavy-lock.sh", import.meta.url));
 
 // Stands in for pnpm: logs each call, and answers `list` with the repo root alone,
 // which ci.sh reads as "no workspace member changed".
 const fakePnpm = `#!/usr/bin/env bash
 echo "pnpm $*" >> "$CI_TEST_LOG"
+echo "VITEST_MAX_WORKERS=\${VITEST_MAX_WORKERS:-} NODE_OPTIONS=\${NODE_OPTIONS:-}" >> "$CI_TEST_LOG.env"
 if [[ " $* " == *" list "* ]]; then pwd -P; fi
 `;
 
@@ -28,10 +30,16 @@ interface ScratchOptions {
   gitleaks?: boolean;
 }
 
-// A scratch repo whose origin/main holds one commit and whose HEAD adds `changedFile`;
-// returns the pnpm calls `ci.sh --changed root` makes. An extraEnv value of `$BASE` stands for
-// the SHA of the first commit.
-function pnpmCalls(changedFile: string, extraEnv: Record<string, string> = {}, options: ScratchOptions = {}): string[] {
+interface Scratch {
+  work: string;
+  log: string;
+  env: Record<string, string>;
+}
+
+// A scratch repo whose origin/main holds one commit and whose HEAD adds `changedFile`. An
+// extraEnv value of `$BASE` stands for the SHA of the first commit. CI_SERIAL defaults to
+// "0" so a test does not depend on how much memory the host running it has.
+function scratchRepo(changedFile: string, extraEnv: Record<string, string> = {}, options: ScratchOptions = {}): Scratch {
   const root = mkdtempSync(join(tmpdir(), "ci-changed-"));
   const origin = join(root, "origin.git");
   const work = join(root, "work");
@@ -48,6 +56,7 @@ function pnpmCalls(changedFile: string, extraEnv: Record<string, string> = {}, o
     chmodSync(join(bin, name), 0o755);
   }
   writeFileSync(log, "");
+  writeFileSync(`${log}.env`, "");
 
   git(root, "init", "--quiet", "--bare", "--initial-branch=main", origin);
   git(work, "init", "--quiet", "--initial-branch=main");
@@ -73,9 +82,9 @@ function pnpmCalls(changedFile: string, extraEnv: Record<string, string> = {}, o
   if (options.pushed) git(work, "push", "--quiet", "origin", "main");
   const env = Object.fromEntries(Object.entries(extraEnv).map(([key, value]) => [key, value === "$BASE" ? baseSha : value]));
 
-  const result = spawnSync("bash", ["scripts/ci.sh", "--changed", "root"], {
-    cwd: work,
-    encoding: "utf8",
+  return {
+    work,
+    log,
     env: {
       HOME: root,
       PATH: `${bin}:/usr/bin:/bin`,
@@ -84,11 +93,26 @@ function pnpmCalls(changedFile: string, extraEnv: Record<string, string> = {}, o
       GIT_CONFIG_SYSTEM: "/dev/null",
       HEAVY_LOCK_FILE: join(root, "heavy.lock"),
       HEAVY_LOCK_PSI_FILE: join(root, "no-pressure-file"),
+      CI_SERIAL: "0",
       ...env,
     },
-  });
+  };
+}
+
+function readLog(path: string): string[] {
+  return readFileSync(path, "utf8").split("\n").filter(Boolean);
+}
+
+// The pnpm calls `ci.sh --changed root` makes, and the env each one saw.
+function ciRun(changedFile: string, extraEnv: Record<string, string> = {}, options: ScratchOptions = {}) {
+  const { work, log, env } = scratchRepo(changedFile, extraEnv, options);
+  const result = spawnSync("bash", ["scripts/ci.sh", "--changed", "root"], { cwd: work, encoding: "utf8", env });
   if (result.status !== 0) throw new Error(`ci.sh exited ${result.status}: ${result.stdout}${result.stderr}`);
-  return readFileSync(log, "utf8").split("\n").filter(Boolean);
+  return { calls: readLog(log), seen: readLog(`${log}.env`) };
+}
+
+function pnpmCalls(changedFile: string, extraEnv: Record<string, string> = {}, options: ScratchOptions = {}): string[] {
+  return ciRun(changedFile, extraEnv, options).calls;
 }
 
 describe("ci.sh --changed root", () => {
@@ -169,6 +193,82 @@ describe("ci.sh --changed for a docs-only change", () => {
       expect(pnpmCalls(file, {}, { gitleaks: true })).toContain("pnpm run test:scripts --maxWorkers=1");
     },
   );
+});
+
+// A full gate on a small host started about 20 node and vitest processes at once and drove memory
+// pressure to some avg60 94 (argus#36, argus-config#1267). Serial mode runs one package at a time,
+// one vitest worker each; GitHub Actions runners are dedicated, so CI keeps the parallelism.
+describe("ci.sh serial mode", () => {
+  // package.json is a root config file, so --changed widens to the whole root workspace.
+  const smallHost = { CI_SERIAL: "", CI_SERIAL_MAX_MEM_MB: "999999999" };
+  const bigHost = { CI_SERIAL: "", CI_SERIAL_MAX_MEM_MB: "1" };
+  const serialCalls = (calls: string[]) => calls.filter((call) => call.includes("--workspace-concurrency=1"));
+
+  it("CI_SERIAL=1 runs every root step one package at a time", () => {
+    const { calls } = ciRun("package.json", { CI_SERIAL: "1" });
+    for (const step of ["typecheck", "lint", "build"]) {
+      expect(calls).toContain(`pnpm -r --workspace-concurrency=1 --if-present run ${step}`);
+    }
+    expect(calls).toContain("pnpm -r --if-present --workspace-concurrency=1 run test");
+  });
+
+  it("CI_SERIAL=1 gives every pnpm call one vitest worker and a heap cap", () => {
+    const { seen } = ciRun("package.json", { CI_SERIAL: "1" });
+    expect(seen.length).toBeGreaterThan(0);
+    for (const line of seen) expect(line).toBe("VITEST_MAX_WORKERS=1 NODE_OPTIONS=--max-old-space-size=1536");
+  });
+
+  it("CI_SERIAL=1 keeps a NODE_OPTIONS the caller already set", () => {
+    const { seen } = ciRun("package.json", { CI_SERIAL: "1", NODE_OPTIONS: "--max-old-space-size=512" });
+    for (const line of seen) expect(line).toContain("NODE_OPTIONS=--max-old-space-size=512");
+  });
+
+  it("CI_SERIAL=0 keeps the parallel workspace run and sets no worker cap", () => {
+    const { calls, seen } = ciRun("package.json", { ...smallHost, CI_SERIAL: "0" });
+    expect(calls).toContain("pnpm -r --if-present run typecheck");
+    expect(calls).toContain("pnpm -r --if-present run build");
+    expect(serialCalls(calls)).toEqual(["pnpm -r --if-present --workspace-concurrency=1 run test"]);
+    for (const line of seen) expect(line).toBe("VITEST_MAX_WORKERS= NODE_OPTIONS=");
+  });
+
+  it("is the default on a host with little memory", () => {
+    const { calls, seen } = ciRun("package.json", smallHost);
+    expect(calls).toContain("pnpm -r --workspace-concurrency=1 --if-present run typecheck");
+    for (const line of seen) expect(line).toContain("VITEST_MAX_WORKERS=1");
+  });
+
+  it("is not the default on a host with plenty of memory", () => {
+    const { calls } = ciRun("package.json", bigHost);
+    expect(calls).toContain("pnpm -r --if-present run typecheck");
+  });
+
+  it("is not the default in GitHub Actions, even on a small host", () => {
+    const { calls, seen } = ciRun("package.json", { ...smallHost, GITHUB_ACTIONS: "true" });
+    expect(calls).toContain("pnpm -r --if-present run typecheck");
+    for (const line of seen) expect(line).toContain("VITEST_MAX_WORKERS= ");
+  });
+
+  it("CI_SERIAL=1 still serialises in GitHub Actions", () => {
+    const { calls } = ciRun("package.json", { CI_SERIAL: "1", GITHUB_ACTIONS: "true" });
+    expect(calls).toContain("pnpm -r --workspace-concurrency=1 --if-present run typecheck");
+  });
+
+  it("the pre-push hook runs the gate with no override, so a small host gets serial mode", () => {
+    const { work, log, env } = scratchRepo("package.json", smallHost);
+    mkdirSync(join(work, ".githooks"));
+    copyFileSync(hookScript, join(work, ".githooks", "pre-push"));
+    chmodSync(join(work, ".githooks", "pre-push"), 0o755);
+    const result = spawnSync("bash", [".githooks/pre-push"], {
+      cwd: work,
+      encoding: "utf8",
+      env,
+      input: `refs/heads/main ${"a".repeat(40)} refs/heads/main ${"0".repeat(40)}\n`,
+    });
+    if (result.status !== 0) throw new Error(`pre-push exited ${result.status}: ${result.stdout}${result.stderr}`);
+    const calls = readLog(log);
+    expect(calls).toContain("pnpm -r --workspace-concurrency=1 --if-present run typecheck");
+    for (const line of readLog(`${log}.env`)) expect(line).toContain("VITEST_MAX_WORKERS=1");
+  });
 });
 
 describe("ci.yml checkout depth", () => {

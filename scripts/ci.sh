@@ -18,6 +18,12 @@
 #                                   the checkout cannot resolve (new branch, force-push)
 #                                   checks everything.
 #
+# Serial mode (argus#36): one package at a time, one vitest worker (VITEST_MAX_WORKERS=1) and a
+# 1536 MB heap cap. CI_SERIAL=1 forces it, CI_SERIAL=0 forces the parallel run, and unset picks:
+# serial everywhere except GitHub Actions (dedicated runners keep their parallelism), on a host
+# with under CI_SERIAL_MAX_MEM_MB of RAM (default 12288: WSL2 is about 5 GB, homelab 7.8 GB).
+# So `pnpm check` and the pre-push hook run serially on a small host with no flag.
+#
 # A schedule or dispatch run passes no --changed: the daily full run (daily-full.yml) is the
 # whole suite, and the Release gate counts it (argus#65, argus-config#1595).
 #
@@ -46,6 +52,36 @@ fi
 unset $(git rev-parse --local-env-vars)
 
 readonly nested_packages=()
+
+# Whether this run is serial; see the header. Sets `serial` to true or false.
+decide_serial() {
+  serial=false
+  case "${CI_SERIAL:-}" in
+    1) serial=true ;;
+    0) ;;
+    *)
+      [[ -z "${GITHUB_ACTIONS:-}" ]] || return 0
+      local total_kb total_mb
+      total_kb="$(awk '/^MemTotal:/ { print $2 }' /proc/meminfo 2> /dev/null || true)"
+      [[ -n "$total_kb" ]] || return 0
+      total_mb=$((total_kb / 1024))
+      if ((total_mb < ${CI_SERIAL_MAX_MEM_MB:-12288})); then
+        serial=true
+      fi
+      ;;
+  esac
+}
+
+serial=false
+decide_serial
+# pnpm arguments that stop a recursive run from starting every package at once.
+serial_args=()
+if [[ "$serial" == true ]]; then
+  serial_args=(--workspace-concurrency=1)
+  export VITEST_MAX_WORKERS=1
+  export NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=1536}"
+  echo "ci.sh: serial mode (one package at a time, VITEST_MAX_WORKERS=1)."
+fi
 
 # Root-level files that can change any package's outcome. When one of these
 # differs from the base, --changed widens to the full root workspace.
@@ -148,9 +184,9 @@ run_root() {
   fi
 
   step "Install (root)" pnpm install --frozen-lockfile
-  step "Typecheck (root)" pnpm "${filter_args[@]}" --if-present run typecheck
-  step "Lint (root)" pnpm "${filter_args[@]}" --if-present run lint
-  step "Build (root)" pnpm "${filter_args[@]}" --if-present run build
+  step "Typecheck (root)" pnpm "${filter_args[@]}" "${serial_args[@]}" --if-present run typecheck
+  step "Lint (root)" pnpm "${filter_args[@]}" "${serial_args[@]}" --if-present run lint
+  step "Build (root)" pnpm "${filter_args[@]}" "${serial_args[@]}" --if-present run build
   # Serialized deliberately: Workers packages (watchtower and any other)
   # each spawn their own workerd via @cloudflare/vitest-pool-workers, and run concurrently
   # on the 4-core homelab runner they starve each other into failures that look
