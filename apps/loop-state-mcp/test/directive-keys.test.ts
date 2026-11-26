@@ -32,6 +32,8 @@ const SAMPLES: Record<DirectiveKey, Partial<Record<KeyPlace, unknown>>> = {
   pace_slot_bonus: { record: { below_pace: 0.8, total_cap: 3 } },
   ignore_weekly_budget: { override: true },
   lift_budget_rung: { override: { slots: 1, weekly_ceiling_percent: 90 } },
+  standing_orders: { record: [{ order: 'x', owner_quote: 'y', at: '2026-11-21T17:22:00+11:00' }] },
+  owner_quiet_hours: { record: '22:00-07:00' },
 }
 
 function placed(key: string, place: KeyPlace, value: unknown): Record<string, unknown> {

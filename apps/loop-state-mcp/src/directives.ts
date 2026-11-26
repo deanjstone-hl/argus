@@ -47,6 +47,36 @@ function isQuietWindow(value: unknown): boolean {
   return match !== null && Number(match[1]) * 60 + Number(match[2]) !== Number(match[3]) * 60 + Number(match[4])
 }
 
+/** argus#72: the owner's quiet window when the record sets none. */
+export const DEFAULT_OWNER_QUIET_HOURS = '22:00-07:00'
+const STANDING_ORDER_FIELDS = ['order', 'owner_quote', 'at', 'until']
+const STANDING_ORDER_REQUIRED = ['order', 'owner_quote', 'at']
+const DATE_TIME_SHAPE = 'an ISO date-time with an offset, e.g. 2026-11-23T05:33:00+11:00'
+
+function standingOrderProblems(entry: unknown): string[] {
+  if (!isMapping(entry)) return ['must be a mapping of order, owner_quote, at and until']
+  const missing = STANDING_ORDER_REQUIRED.filter((field) => !(field in entry))
+  const extra = Object.keys(entry).filter((field) => !STANDING_ORDER_FIELDS.includes(field))
+  const found = [...unless(missing.length === 0, `missing field: ${missing.sort().join(', ')}`), ...unless(extra.length === 0, `unknown field: ${extra.sort().join(', ')}`)]
+  if (missing.length > 0) return found
+  found.push(...unless(isText(entry['order']), 'order must be a non-empty string'))
+  found.push(...unless(isText(entry['owner_quote']), 'owner_quote must be a non-empty string'))
+  const at = untilMs(entry['at'])
+  found.push(...unless(at !== null, `at must be ${DATE_TIME_SHAPE}`))
+  if ('until' in entry) {
+    const until = untilMs(entry['until'])
+    if (until === null) found.push(`until must be ${DATE_TIME_SHAPE}`)
+    else if (at !== null && until <= at) found.push('until must be after at')
+  }
+  return found
+}
+
+const standingOrders: Check = (value, key) =>
+  Array.isArray(value) ? value.flatMap((entry, index) => standingOrderProblems(entry).map((problem) => `${key}[${index}]: ${problem}`)) : [`${key} must be a list`]
+
+const ownerQuietHoursCheck: Check = (value, key) =>
+  unless(isQuietWindow(value), `${key} must be HH:MM-HH:MM (Sydney time, start and end differ), e.g. ${DEFAULT_OWNER_QUIET_HOURS}`)
+
 const positiveInteger: Check = (value, key) => unless(isPositiveInteger(value), `${key} must be a positive integer`)
 const positiveNumber: Check = (value, key) => unless(isPositiveNumber(value), `${key} must be a positive number`)
 const percentage: Check = (value, key) => unless(isPositiveNumber(value) && value <= 100, `${key} must be a percentage above 0 and at most 100`)
@@ -172,6 +202,8 @@ const KEY_RULES = {
   pace_slot_bonus: { record: paceBonusCheck },
   ignore_weekly_budget: { override: (value, key) => unless(value === true, `${key} must be true`) },
   lift_budget_rung: { override: liftCheck },
+  standing_orders: { record: standingOrders },
+  owner_quiet_hours: { record: ownerQuietHoursCheck },
 } satisfies Record<string, KeyRule>
 
 export type DirectiveKey = keyof typeof KEY_RULES
@@ -282,6 +314,34 @@ export function maxSlotsOverrideLive(record: unknown, atMs: number): boolean {
 /** argus-config#1573: whether a live `ignore_weekly_budget` override is in `record` at `atMs`. */
 export function ignoreWeeklyBudgetLive(record: unknown, atMs: number): boolean {
   return liveOverrides(record, 'ignore_weekly_budget', atMs).length > 0
+}
+
+/** One standing order (argus#72): what the owner ordered, in their words, when, and optionally until when. */
+export interface StandingOrder {
+  order: string
+  owner_quote: string
+  at: string
+  until?: string
+}
+
+/**
+ * argus#72: the `standing_orders` in `record` that are in force at `atMs`, in the order written. An entry
+ * whose `until` has passed (at the end itself too) is ignored, and so is one that is malformed.
+ */
+export function liveStandingOrders(record: unknown, atMs: number): StandingOrder[] {
+  const listed = isMapping(record) ? record['standing_orders'] : undefined
+  if (!Array.isArray(listed)) return []
+  return listed.filter((entry): entry is StandingOrder => {
+    if (standingOrderProblems(entry).length > 0) return false
+    const until = (entry as Mapping)['until']
+    return until === undefined || atMs < (untilMs(until) as number)
+  })
+}
+
+/** argus#72: the owner's quiet window in `record` (`HH:MM-HH:MM`, Sydney time, may wrap past midnight), or the default. */
+export function ownerQuietHours(record: unknown): string {
+  const window = isMapping(record) ? record['owner_quiet_hours'] : undefined
+  return isQuietWindow(window) ? (window as string) : DEFAULT_OWNER_QUIET_HOURS
 }
 
 /** argus#60: the owner-named issues in a record's `budget_exempt_issues`, sorted, without repeats. */

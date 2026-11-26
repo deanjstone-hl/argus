@@ -81,5 +81,11 @@
   ],
   "lift_budget_rung": [
     "override"
+  ],
+  "standing_orders": [
+    "record"
+  ],
+  "owner_quiet_hours": [
+    "record"
   ]
 }
