@@ -64,7 +64,7 @@ and vitest processes at once. `CI_SERIAL=1` forces it, `CI_SERIAL=0` forces the 
 `CI_SERIAL_MAX_MEM_MB` moves the 12288 threshold. GitHub Actions keeps its parallelism unless `CI_SERIAL=1`.
 With the hook serial there is no reason to push with `--no-verify`.
 
-Run `pnpm check` before every push (a PR branch, or `main` once the repo is trunk) and quote its
+Run `pnpm check` once before marking a PR ready (work lands by branch + PR, merged with `gh pr merge --rebase --delete-branch` once every check on the head SHA is green) and quote its
 result in the PR's test plan or the ticket's Resolution. Every push to `main` runs CI: no commit
 subject or committer skips it. A push (and a pull request) runs only the tests its change touches:
 `ci.yml` hands `scripts/ci.sh --changed` the push's `before` SHA (`CI_BASE_REF`), so the packages
