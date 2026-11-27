@@ -131,7 +131,7 @@ Or from any session: use the `deploy` skill — `deploy agent` or `deploy agent-
 does the `.githooks/pre-push` gate, which runs `scripts/ci.sh --changed` — only the packages
 that differ from `origin/main`, plus their dependents. Enable the gate once per clone with
 `git config core.hooksPath .githooks`. `pnpm check` (`scripts/ci.sh --changed`) is the local
-check: agents run it before every push, whether to a PR branch or straight to `main`, and
+check: agents run it before every push to a PR branch (never straight to `main`), and
 quote its result in the PR's test plan or the ticket's Resolution. GitHub CI remains the
 enforcing check, and it runs on every push to `main`: nothing skips a push by its commit
 subject or committer (argus-config#1183). A push runs only the tests it touches (`ci.sh --changed`
